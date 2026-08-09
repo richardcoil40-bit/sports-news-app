@@ -1,98 +1,110 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { ArticleCard } from '@/components/article-card';
+import { CategoryFilter, CategoryTabs } from '@/components/category-tabs';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+import { Spacing } from '@/constants/theme';
+import { useArticles } from '@/hooks/use-articles';
+import { useTheme } from '@/hooks/use-theme';
+import { Article } from '@/lib/feeds';
 
 export default function HomeScreen() {
+  const theme = useTheme();
+  const { articles, loading, refreshing, error, refresh } = useArticles();
+  const [category, setCategory] = useState<CategoryFilter>('all');
+
+  const filtered = useMemo(
+    () => (category === 'all' ? articles : articles.filter((a) => a.category === category)),
+    [articles, category],
+  );
+
+  const openArticle = (article: Article) => {
+    router.push({
+      pathname: '/article',
+      params: {
+        title: article.title,
+        link: article.link,
+        source: article.source,
+        category: article.category,
+        publishedAt: article.publishedAt ?? '',
+        description: article.description,
+        imageUrl: article.imageUrl ?? '',
+      },
+    });
+  };
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
+    <ThemedView style={styles.flex}>
+      <SafeAreaView style={styles.flex} edges={['top']}>
+        <View style={styles.header}>
+          <ThemedText type="title" style={styles.headerTitle}>
+            Football News
           </ThemedText>
-        </ThemedView>
+        </View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        <CategoryTabs selected={category} onSelect={setCategory} />
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator />
+          </View>
+        ) : error && filtered.length === 0 ? (
+          <View style={styles.centered}>
+            <ThemedText themeColor="textSecondary" style={styles.centeredText}>
+              {error}
+            </ThemedText>
+          </View>
+        ) : filtered.length === 0 ? (
+          <View style={styles.centered}>
+            <ThemedText themeColor="textSecondary">No headlines in this category right now.</ThemedText>
+          </View>
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => <ArticleCard article={item} onPress={() => openArticle(item)} />}
+            ItemSeparatorComponent={() => (
+              <View style={[styles.separator, { backgroundColor: theme.backgroundElement }]} />
+            )}
+            contentContainerStyle={styles.listContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
           />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
+        )}
       </SafeAreaView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  flex: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
   },
-  safeArea: {
+  header: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
+  },
+  headerTitle: {
+    fontSize: 28,
+    lineHeight: 34,
+  },
+  centered: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    paddingHorizontal: Spacing.five,
   },
-  title: {
+  centeredText: {
     textAlign: 'center',
   },
-  code: {
-    textTransform: 'uppercase',
+  listContent: {
+    paddingBottom: Spacing.five,
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: Spacing.three,
   },
 });
