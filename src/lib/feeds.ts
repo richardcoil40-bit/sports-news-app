@@ -1,43 +1,16 @@
 import { XMLParser } from 'fast-xml-parser';
 
-export type FootballCategory = 'nfl' | 'college' | 'highschool';
-
 export interface FeedSource {
   id: string;
   name: string;
-  category: FootballCategory;
   url: string;
 }
 
-/**
- * RSS feeds only — no scraping. Each source is a reputable sports outlet's
- * official feed. Google News is used for high school football since no
- * national outlet publishes a dedicated feed for it; the query is scoped
- * tightly to the sport so results stay on-topic.
- */
+/** College football RSS feeds only — no scraping. */
 export const FEED_SOURCES: FeedSource[] = [
-  { id: 'espn-nfl', name: 'ESPN', category: 'nfl', url: 'https://www.espn.com/espn/rss/nfl/news' },
-  { id: 'cbs-nfl', name: 'CBS Sports', category: 'nfl', url: 'https://www.cbssports.com/rss/headlines/nfl/' },
-  { id: 'yahoo-nfl', name: 'Yahoo Sports', category: 'nfl', url: 'https://sports.yahoo.com/nfl/rss.xml' },
-  { id: 'espn-cfb', name: 'ESPN', category: 'college', url: 'https://www.espn.com/espn/rss/ncf/news' },
-  {
-    id: 'cbs-cfb',
-    name: 'CBS Sports',
-    category: 'college',
-    url: 'https://www.cbssports.com/rss/headlines/college-football/',
-  },
-  {
-    id: 'yahoo-cfb',
-    name: 'Yahoo Sports',
-    category: 'college',
-    url: 'https://sports.yahoo.com/college-football/rss.xml',
-  },
-  {
-    id: 'google-hs',
-    name: 'Google News',
-    category: 'highschool',
-    url: 'https://news.google.com/rss/search?q=%22high+school+football%22&hl=en-US&gl=US&ceid=US:en',
-  },
+  { id: 'espn-cfb', name: 'ESPN', url: 'https://www.espn.com/espn/rss/ncf/news' },
+  { id: 'cbs-cfb', name: 'CBS Sports', url: 'https://www.cbssports.com/rss/headlines/college-football/' },
+  { id: 'yahoo-cfb', name: 'Yahoo Sports', url: 'https://sports.yahoo.com/college-football/rss.xml' },
 ];
 
 export interface Article {
@@ -46,7 +19,6 @@ export interface Article {
   link: string;
   description: string;
   source: string;
-  category: FootballCategory;
   publishedAt: string | null;
   imageUrl: string | null;
 }
@@ -59,18 +31,46 @@ const xmlParser = new XMLParser({
 
 const FETCH_TIMEOUT_MS = 10000;
 
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  '#39': "'",
+  nbsp: ' ',
+  mdash: '—',
+  ndash: '–',
+  rsquo: '’',
+  lsquo: '‘',
+  rdquo: '”',
+  ldquo: '“',
+};
+
+/**
+ * CDATA-wrapped titles/descriptions are passed through verbatim by the XML
+ * parser (entities aren't interpreted inside CDATA per spec), so sources
+ * that pre-encode apostrophes etc. as literal "&#39;" text need decoding
+ * here by hand.
+ */
+function decodeHtmlEntities(text: string): string {
+  return text.replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
+    if (entity[0] === '#') {
+      const code =
+        entity[1]?.toLowerCase() === 'x' ? parseInt(entity.slice(2), 16) : parseInt(entity.slice(1), 10);
+      return Number.isNaN(code) ? match : String.fromCodePoint(code);
+    }
+    return NAMED_ENTITIES[entity.toLowerCase()] ?? match;
+  });
 }
 
-/** Google News titles look like "Headline text - Publisher Name". */
-function splitGoogleNewsTitle(raw: string): { title: string; publisher: string | null } {
-  const idx = raw.lastIndexOf(' - ');
-  if (idx === -1) return { title: raw, publisher: null };
-  return { title: raw.slice(0, idx), publisher: raw.slice(idx + 3) };
+function stripHtml(html: string): string {
+  return decodeHtmlEntities(
+    html
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  );
 }
 
 function firstImgSrc(html: string | undefined): string | null {
@@ -126,15 +126,7 @@ async function fetchFeed(source: FeedSource): Promise<Article[]> {
       .filter((item) => item && typeof item.link === 'string' && typeof item.title === 'string')
       .map((item): Article => {
         const link = (item.link as string).trim();
-        let title = (item.title as string).trim();
-        let sourceName = source.name;
-
-        if (source.id === 'google-hs') {
-          const split = splitGoogleNewsTitle(title);
-          title = split.title;
-          if (split.publisher) sourceName = split.publisher;
-        }
-
+        const title = decodeHtmlEntities((item.title as string).trim());
         const rawDescription = typeof item.description === 'string' ? item.description : '';
 
         return {
@@ -142,8 +134,7 @@ async function fetchFeed(source: FeedSource): Promise<Article[]> {
           title,
           link,
           description: stripHtml(rawDescription),
-          source: sourceName,
-          category: source.category,
+          source: source.name,
           publishedAt: parsePubDate(item.pubDate),
           imageUrl: extractImageUrl(item),
         };

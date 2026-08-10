@@ -7,12 +7,6 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatRelativeTime } from '@/lib/format';
 import { Article } from '@/lib/feeds';
 
-const CATEGORY_LABEL: Record<Article['category'], string> = {
-  nfl: 'NFL',
-  college: 'College',
-  highschool: 'High School',
-};
-
 export function ArticleCard({ article, onPress }: { article: Article; onPress: () => void }) {
   const theme = useTheme();
 
@@ -33,7 +27,7 @@ export function ArticleCard({ article, onPress }: { article: Article; onPress: (
 
       <View style={styles.textColumn}>
         <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-          {CATEGORY_LABEL[article.category]} · {article.source}
+          {article.source}
         </ThemedText>
         <ThemedText type="smallBold" numberOfLines={3} style={styles.title}>
           {article.title}

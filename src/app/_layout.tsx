@@ -12,8 +12,10 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AnimatedSplashOverlay />
       <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="article" />
+        <Stack.Screen name="team/[id]" />
+        <Stack.Screen name="player/[id]" />
       </Stack>
     </ThemeProvider>
   );

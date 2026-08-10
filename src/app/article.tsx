@@ -9,13 +9,6 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatRelativeTime } from '@/lib/format';
-import { FootballCategory } from '@/lib/feeds';
-
-const CATEGORY_LABEL: Record<FootballCategory, string> = {
-  nfl: 'NFL',
-  college: 'College',
-  highschool: 'High School',
-};
 
 export default function ArticleScreen() {
   const theme = useTheme();
@@ -23,7 +16,6 @@ export default function ArticleScreen() {
     title: string;
     link: string;
     source: string;
-    category: FootballCategory;
     publishedAt: string;
     description: string;
     imageUrl: string;
@@ -42,7 +34,7 @@ export default function ArticleScreen() {
 
           <View style={styles.body}>
             <ThemedText type="small" themeColor="textSecondary">
-              {CATEGORY_LABEL[params.category]} · {params.source}
+              {params.source}
               {params.publishedAt ? ` · ${formatRelativeTime(params.publishedAt)}` : ''}
             </ThemedText>
 
