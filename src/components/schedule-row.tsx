@@ -28,7 +28,7 @@ export function ScheduleRow({ game }: { game: ScheduledGame }) {
           <ThemedText type="default">
             {vsAt} {game.opponentShortName}
           </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
+          <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
             {game.statusDetail || 'Date TBD'}
             {game.network ? ` · ${game.network}` : ''}
           </ThemedText>
@@ -36,18 +36,18 @@ export function ScheduleRow({ game }: { game: ScheduledGame }) {
       </View>
 
       {game.odds ? (
-        <View style={[styles.oddsRow, { borderTopColor: theme.backgroundElement }]}>
-          <ThemedText type="small" themeColor="textSecondary">
+        <View style={[styles.oddsRow, { borderTopColor: theme.text }]}>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
             {game.odds.details ?? 'Line'}
             {game.odds.overUnder ? ` · O/U ${game.odds.overUnder}` : ''}
           </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
+          <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
             ML {moneylineLabel(game.homeAway === 'away' ? game.odds.awayMoneyline : game.odds.homeMoneyline)}
           </ThemedText>
         </View>
       ) : !game.completed ? (
-        <View style={[styles.oddsRow, { borderTopColor: theme.backgroundElement }]}>
-          <ThemedText type="small" themeColor="textSecondary">
+        <View style={[styles.oddsRow, { borderTopColor: theme.text }]}>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
             Odds not posted yet
           </ThemedText>
         </View>
@@ -72,16 +72,21 @@ const styles = StyleSheet.create({
     height: 32,
   },
   placeholder: {
-    borderRadius: 16,
+    borderRadius: 0,
   },
   textColumn: {
     flex: 1,
     gap: Spacing.half,
   },
+  meta: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 11,
+  },
   oddsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: 1.5,
     paddingTop: Spacing.two,
   },
 });

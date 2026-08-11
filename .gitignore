@@ -41,3 +41,9 @@ example
 # generated native folders
 /ios
 /android
+
+# local agent settings
+.claude/settings.local.json
+
+# feed checker output — regenerate with scripts/check-feeds.sh
+feed-status*.txt

@@ -53,7 +53,7 @@ export default function HomeScreen() {
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => <ArticleCard article={item} onPress={() => openArticle(item)} />}
             ItemSeparatorComponent={() => (
-              <View style={[styles.separator, { backgroundColor: theme.backgroundElement }]} />
+              <View style={[styles.separator, { backgroundColor: theme.text }]} />
             )}
             contentContainerStyle={styles.listContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
@@ -74,8 +74,10 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.two,
   },
   headerTitle: {
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 24,
+    lineHeight: 30,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   centered: {
     flex: 1,
@@ -90,7 +92,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.five,
   },
   separator: {
-    height: StyleSheet.hairlineWidth,
+    height: 1.5,
     marginLeft: Spacing.three,
   },
 });

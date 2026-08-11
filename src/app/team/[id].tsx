@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AccentRow } from '@/components/accent-row';
 import { ArticleCard } from '@/components/article-card';
 import { PlayerRow } from '@/components/player-row';
 import { ScheduleRow } from '@/components/schedule-row';
@@ -18,6 +19,7 @@ import { pickNotablePlayers } from '@/lib/notable-players';
 import { filterRecruitingArticles } from '@/lib/recruiting';
 import { Player, fetchTeamRoster } from '@/lib/roster';
 import { fetchGameOdds, fetchTeamSchedule, ScheduledGame } from '@/lib/schedule';
+import { fetchTeamColor } from '@/lib/team-color';
 import { fetchTeamNewsPool } from '@/lib/team-news-pool';
 
 type TabKey = 'news' | 'schedule' | 'players' | 'recruiting';
@@ -40,6 +42,8 @@ export default function TeamScreen() {
 
   const [tab, setTab] = useState<TabKey>('news');
   const [journalistsOnly, setJournalistsOnly] = useState(false);
+  const [trustedOnly, setTrustedOnly] = useState(false);
+  const [teamColor, setTeamColor] = useState<string | null>(null);
 
   const [newsArticles, setNewsArticles] = useState<Article[] | null>(null);
   const [newsLoading, setNewsLoading] = useState(false);
@@ -52,6 +56,16 @@ export default function TeamScreen() {
   const [roster, setRoster] = useState<Player[] | null>(null);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterError, setRosterError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchTeamColor(params.id).then((color) => {
+      if (!cancelled) setTeamColor(color);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id]);
 
   // Each tab's data loads only the first time that tab is opened, not all
   // four up front — the schedule tab in particular fires one odds request
@@ -129,8 +143,12 @@ export default function TeamScreen() {
 
   const visibleNews = useMemo(() => {
     if (!newsArticles) return [];
-    return journalistsOnly ? filterByNotableJournalists(newsArticles) : newsArticles;
-  }, [newsArticles, journalistsOnly]);
+    let result = newsArticles;
+    // Tier 1–2 = professional newsrooms and credible independents.
+    if (trustedOnly) result = result.filter((a) => a.tier <= 2);
+    if (journalistsOnly) result = filterByNotableJournalists(result);
+    return result;
+  }, [newsArticles, journalistsOnly, trustedOnly]);
 
   const recruitingArticles = useMemo(
     () => (newsArticles ? filterRecruitingArticles(newsArticles) : []),
@@ -173,11 +191,15 @@ export default function TeamScreen() {
     <ThemedView style={styles.flex}>
       <Stack.Screen options={{ title: params.shortName || params.name, headerBackTitle: 'Teams' }} />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: teamColor ?? theme.backgroundElement }]}>
           {params.logoUrl ? (
-            <Image source={{ uri: params.logoUrl }} style={styles.logo} contentFit="contain" />
+            <View style={styles.logoChip}>
+              <Image source={{ uri: params.logoUrl }} style={styles.logo} contentFit="contain" />
+            </View>
           ) : null}
-          <ThemedText type="title" style={styles.teamName}>
+          <ThemedText
+            type="title"
+            style={[styles.teamName, { color: teamColor ? '#FFFFFF' : theme.text }]}>
             {params.name}
           </ThemedText>
         </View>
@@ -191,12 +213,20 @@ export default function TeamScreen() {
             error={newsError}
             journalistsOnly={journalistsOnly}
             onToggleJournalists={() => setJournalistsOnly((v) => !v)}
+            trustedOnly={trustedOnly}
+            onToggleTrusted={() => setTrustedOnly((v) => !v)}
             onOpenArticle={openArticle}
+            accentColor={teamColor}
           />
         ) : null}
 
         {tab === 'schedule' ? (
-          <ScheduleTab games={schedule} loading={schedule === null && !scheduleError} error={scheduleError} />
+          <ScheduleTab
+            games={schedule}
+            loading={schedule === null && !scheduleError}
+            error={scheduleError}
+            accentColor={teamColor}
+          />
         ) : null}
 
         {tab === 'players' ? (
@@ -205,6 +235,7 @@ export default function TeamScreen() {
             loading={roster === null && !rosterError}
             error={rosterError}
             onOpenPlayer={openPlayer}
+            accentColor={teamColor}
           />
         ) : null}
 
@@ -214,6 +245,7 @@ export default function TeamScreen() {
             loading={newsArticles === null && !newsError}
             error={newsError}
             onOpenArticle={openArticle}
+            accentColor={teamColor}
           />
         ) : null}
       </SafeAreaView>
@@ -231,14 +263,20 @@ function NewsTab({
   error,
   journalistsOnly,
   onToggleJournalists,
+  trustedOnly,
+  onToggleTrusted,
   onOpenArticle,
+  accentColor,
 }: {
   articles: Article[];
   loading: boolean;
   error: boolean;
   journalistsOnly: boolean;
   onToggleJournalists: () => void;
+  trustedOnly: boolean;
+  onToggleTrusted: () => void;
   onOpenArticle: (a: Article) => void;
+  accentColor: string | null;
 }) {
   const theme = useTheme();
 
@@ -254,24 +292,27 @@ function NewsTab({
     <FlatList
       data={articles}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <ArticleCard article={item} onPress={() => onOpenArticle(item)} />}
+      renderItem={({ item }) => (
+        <AccentRow color={accentColor}>
+          <ArticleCard article={item} onPress={() => onOpenArticle(item)} />
+        </AccentRow>
+      )}
       ItemSeparatorComponent={() => (
-        <View style={[styles.separator, { backgroundColor: theme.backgroundElement }]} />
+        <View style={[styles.separator, { backgroundColor: theme.text }]} />
       )}
       ListHeaderComponent={
-        <TouchableFilterChip
-          label="Notable journalists only"
-          active={journalistsOnly}
-          onPress={onToggleJournalists}
-        />
+        <View style={styles.chipRow}>
+          <TouchableFilterChip label="Trusted sources" active={trustedOnly} onPress={onToggleTrusted} />
+          <TouchableFilterChip label="Notable bylines" active={journalistsOnly} onPress={onToggleJournalists} />
+        </View>
       }
       ListEmptyComponent={
         <Centered>
           <ThemedText themeColor="textSecondary" style={styles.centeredText}>
             {error
               ? "Couldn't load headlines right now. Try again later."
-              : journalistsOnly
-                ? 'No articles from notable journalists right now.'
+              : journalistsOnly || trustedOnly
+                ? 'Nothing matches those filters right now.'
                 : 'No recent headlines found for this team.'}
           </ThemedText>
         </Centered>
@@ -286,11 +327,13 @@ function RecruitingTab({
   loading,
   error,
   onOpenArticle,
+  accentColor,
 }: {
   articles: Article[];
   loading: boolean;
   error: boolean;
   onOpenArticle: (a: Article) => void;
+  accentColor: string | null;
 }) {
   const theme = useTheme();
 
@@ -306,9 +349,13 @@ function RecruitingTab({
     <FlatList
       data={articles}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <ArticleCard article={item} onPress={() => onOpenArticle(item)} />}
+      renderItem={({ item }) => (
+        <AccentRow color={accentColor}>
+          <ArticleCard article={item} onPress={() => onOpenArticle(item)} />
+        </AccentRow>
+      )}
       ItemSeparatorComponent={() => (
-        <View style={[styles.separator, { backgroundColor: theme.backgroundElement }]} />
+        <View style={[styles.separator, { backgroundColor: theme.text }]} />
       )}
       ListEmptyComponent={
         <Centered>
@@ -328,10 +375,12 @@ function ScheduleTab({
   games,
   loading,
   error,
+  accentColor,
 }: {
   games: ScheduledGame[] | null;
   loading: boolean;
   error: boolean;
+  accentColor: string | null;
 }) {
   const theme = useTheme();
 
@@ -347,9 +396,13 @@ function ScheduleTab({
     <FlatList
       data={games ?? []}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <ScheduleRow game={item} />}
+      renderItem={({ item }) => (
+        <AccentRow color={accentColor}>
+          <ScheduleRow game={item} />
+        </AccentRow>
+      )}
       ItemSeparatorComponent={() => (
-        <View style={[styles.separator, { backgroundColor: theme.backgroundElement }]} />
+        <View style={[styles.separator, { backgroundColor: theme.text }]} />
       )}
       ListEmptyComponent={
         <Centered>
@@ -368,11 +421,13 @@ function PlayersTab({
   loading,
   error,
   onOpenPlayer,
+  accentColor,
 }: {
   players: Player[];
   loading: boolean;
   error: boolean;
   onOpenPlayer: (p: Player) => void;
+  accentColor: string | null;
 }) {
   const theme = useTheme();
 
@@ -388,9 +443,13 @@ function PlayersTab({
     <FlatList
       data={players}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <PlayerRow player={item} onPress={() => onOpenPlayer(item)} />}
+      renderItem={({ item }) => (
+        <AccentRow color={accentColor}>
+          <PlayerRow player={item} onPress={() => onOpenPlayer(item)} />
+        </AccentRow>
+      )}
       ItemSeparatorComponent={() => (
-        <View style={[styles.separator, { backgroundColor: theme.backgroundElement }]} />
+        <View style={[styles.separator, { backgroundColor: theme.text }]} />
       )}
       ListHeaderComponent={
         <ThemedText type="small" themeColor="textSecondary" style={styles.playersNote}>
@@ -420,21 +479,20 @@ function TouchableFilterChip({
 }) {
   const theme = useTheme();
   return (
-    <View style={styles.chipWrap}>
-      <ThemedText
-        type="smallBold"
-        onPress={onPress}
-        style={[
-          styles.chip,
-          {
-            backgroundColor: active ? theme.text : theme.backgroundElement,
-            color: active ? theme.background : theme.text,
-          },
-        ]}>
-        {active ? '✓ ' : ''}
-        {label}
-      </ThemedText>
-    </View>
+    <ThemedText
+      type="smallBold"
+      onPress={onPress}
+      style={[
+        styles.chip,
+        {
+          borderColor: theme.text,
+          backgroundColor: active ? theme.text : 'transparent',
+          color: active ? theme.background : theme.text,
+        },
+      ]}>
+      {active ? '✓ ' : ''}
+      {label.toUpperCase()}
+    </ThemedText>
   );
 }
 
@@ -446,16 +504,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     paddingTop: Spacing.four,
-    paddingBottom: Spacing.two,
+    paddingBottom: Spacing.three,
+    paddingHorizontal: Spacing.three,
+  },
+  logoChip: {
+    width: 56,
+    height: 56,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logo: {
-    width: 64,
-    height: 64,
+    width: 44,
+    height: 44,
   },
   teamName: {
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 18,
+    lineHeight: 24,
     textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   centered: {
     flex: 1,
@@ -468,13 +536,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   separator: {
-    height: StyleSheet.hairlineWidth,
+    height: 1.5,
     marginLeft: Spacing.three,
   },
   listContent: {
     paddingBottom: Spacing.five,
   },
-  chipWrap: {
+  chipRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.two,
   },
@@ -482,11 +552,17 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
-    borderRadius: 16,
+    borderRadius: 0,
+    borderWidth: 1.5,
+    fontSize: 11,
+    letterSpacing: 0.5,
     overflow: 'hidden',
   },
   playersNote: {
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.two,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 11,
   },
 });

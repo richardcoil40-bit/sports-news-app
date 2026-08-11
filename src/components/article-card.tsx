@@ -26,13 +26,13 @@ export function ArticleCard({ article, onPress }: { article: Article; onPress: (
       )}
 
       <View style={styles.textColumn}>
-        <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+        <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.meta}>
           {article.source}
         </ThemedText>
         <ThemedText type="smallBold" numberOfLines={3} style={styles.title}>
           {article.title}
         </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
+        <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
           {formatRelativeTime(article.publishedAt)}
         </ThemedText>
       </View>
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   thumbnail: {
     width: 96,
     height: 72,
-    borderRadius: 8,
+    borderRadius: 0,
   },
   placeholder: {
     alignItems: 'center',
@@ -66,5 +66,10 @@ const styles = StyleSheet.create({
   },
   title: {
     lineHeight: 20,
+  },
+  meta: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 11,
   },
 });

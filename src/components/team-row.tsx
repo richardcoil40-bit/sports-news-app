@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
     height: 36,
   },
   placeholder: {
-    borderRadius: 18,
+    borderRadius: 0,
   },
   name: {
     flex: 1,

@@ -16,20 +16,29 @@ export function TabBar<T extends string>({
   const theme = useTheme();
 
   return (
-    <View style={styles.container}>
-      {tabs.map((tab) => {
+    <View
+      style={[
+        styles.container,
+        { borderTopColor: theme.text, borderBottomColor: theme.text },
+      ]}>
+      {tabs.map((tab, index) => {
         const isActive = tab.key === active;
         return (
           <TouchableOpacity
             key={tab.key}
             onPress={() => onChange(tab.key)}
-            activeOpacity={0.7}
-            style={[styles.pill, { backgroundColor: isActive ? theme.text : theme.backgroundElement }]}>
+            activeOpacity={0.6}
+            style={[
+              styles.tab,
+              index < tabs.length - 1 && { borderRightWidth: 1.5, borderRightColor: theme.text },
+            ]}>
             <ThemedText
               type="small"
               numberOfLines={1}
-              adjustsFontSizeToFit
-              style={[styles.label, { color: isActive ? theme.background : theme.text }]}>
+              style={[
+                styles.label,
+                { color: isActive ? theme.text : theme.textSecondary, fontWeight: isActive ? '700' : '400' },
+              ]}>
               {tab.label}
             </ThemedText>
           </TouchableOpacity>
@@ -42,19 +51,19 @@ export function TabBar<T extends string>({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.three,
+    borderTopWidth: 1.5,
+    borderBottomWidth: 1.5,
+    marginBottom: Spacing.two,
   },
-  pill: {
+  tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: Spacing.one,
     paddingVertical: Spacing.two,
-    borderRadius: 20,
   },
   label: {
-    fontWeight: '700',
+    fontSize: 11,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
 });

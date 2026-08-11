@@ -93,7 +93,7 @@ export default function PlayerScreen() {
           <ThemedText type="title" style={styles.name}>
             {params.fullName}
           </ThemedText>
-          <ThemedText themeColor="textSecondary">
+          <ThemedText themeColor="textSecondary" style={styles.meta}>
             {[params.position, params.teamName].filter(Boolean).join(' · ')}
           </ThemedText>
         </View>
@@ -112,7 +112,7 @@ export default function PlayerScreen() {
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => <ArticleCard article={item} onPress={() => openArticle(item)} />}
             ItemSeparatorComponent={() => (
-              <View style={[styles.separator, { backgroundColor: theme.backgroundElement }]} />
+              <View style={[styles.separator, { backgroundColor: theme.text }]} />
             )}
             ListEmptyComponent={
               <View style={styles.centered}>
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   headshot: {
     width: 88,
     height: 88,
-    borderRadius: 44,
+    borderRadius: 0,
   },
   headshotPlaceholder: {
     alignItems: 'center',
@@ -155,6 +155,11 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     textAlign: 'center',
     marginTop: Spacing.two,
+  },
+  meta: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 11,
   },
   sectionHeader: {
     fontSize: 13,
@@ -174,7 +179,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   separator: {
-    height: StyleSheet.hairlineWidth,
+    height: 1.5,
     marginLeft: Spacing.three,
   },
   listContent: {

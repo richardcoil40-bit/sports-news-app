@@ -33,7 +33,7 @@ export default function ArticleScreen() {
           ) : null}
 
           <View style={styles.body}>
-            <ThemedText type="small" themeColor="textSecondary">
+            <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
               {params.source}
               {params.publishedAt ? ` · ${formatRelativeTime(params.publishedAt)}` : ''}
             </ThemedText>
@@ -49,8 +49,8 @@ export default function ArticleScreen() {
             <TouchableOpacity
               style={[styles.readButton, { backgroundColor: theme.text }]}
               onPress={openInBrowser}>
-              <ThemedText type="smallBold" style={{ color: theme.background }}>
-                Read Full Article
+              <ThemedText type="smallBold" style={[styles.meta, { color: theme.background }]}>
+                Read full article
               </ThemedText>
             </TouchableOpacity>
           </View>
@@ -79,13 +79,18 @@ const styles = StyleSheet.create({
     fontSize: 24,
     lineHeight: 30,
   },
+  meta: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 11,
+  },
   description: {
     marginTop: Spacing.one,
   },
   readButton: {
     marginTop: Spacing.four,
     paddingVertical: Spacing.three,
-    borderRadius: 12,
+    borderRadius: 0,
     alignItems: 'center',
   },
 });

@@ -17,7 +17,7 @@ export function PlayerRow({ player, onPress }: { player: Player; onPress: () => 
         {player.fullName}
       </ThemedText>
       {player.position ? (
-        <ThemedText type="small" themeColor="textSecondary">
+        <ThemedText type="small" themeColor="textSecondary" style={styles.position}>
           {player.position}
         </ThemedText>
       ) : null}
@@ -36,11 +36,16 @@ const styles = StyleSheet.create({
   jerseyBadge: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
   name: {
     flex: 1,
+  },
+  position: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 11,
   },
 });

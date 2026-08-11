@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TeamRow } from '@/components/team-row';
-import { Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
 import { Team } from '@/lib/teams';
@@ -56,7 +56,7 @@ export default function TeamsScreen() {
             clearButtonMode="while-editing"
             style={[
               styles.searchInput,
-              { backgroundColor: theme.backgroundElement, color: theme.text },
+              { borderColor: theme.text, color: theme.text },
             ]}
           />
         </View>
@@ -76,6 +76,9 @@ export default function TeamsScreen() {
             data={filtered}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => <TeamRow team={item} onPress={() => openTeam(item)} />}
+            ItemSeparatorComponent={() => (
+              <View style={[styles.separator, { backgroundColor: theme.text }]} />
+            )}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.listContent}
           />
@@ -94,18 +97,22 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.two,
   },
   headerTitle: {
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 24,
+    lineHeight: 30,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   searchWrap: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },
   searchInput: {
-    borderRadius: 10,
+    borderRadius: 0,
+    borderWidth: 1.5,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
-    fontSize: 16,
+    fontSize: 14,
+    fontFamily: Fonts.mono,
   },
   centered: {
     flex: 1,
@@ -118,5 +125,9 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: Spacing.five,
+  },
+  separator: {
+    height: 1.5,
+    marginLeft: Spacing.three,
   },
 });

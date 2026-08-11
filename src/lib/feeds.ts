@@ -1,16 +1,37 @@
 import { XMLParser } from 'fast-xml-parser';
 
+/**
+ * How far a source is trusted. Assigned by the criteria in
+ * docs/source-reliability.md, not by how well-known the outlet is.
+ *   1 — professional newsroom (masthead, corrections policy, original reporting)
+ *   2 — credible independent (named staff, real reporting, lighter formal standards)
+ *   3 — community / fan perspective
+ */
+export type SourceTier = 1 | 2 | 3;
+
+/**
+ * Whether everything a source publishes is already about one team.
+ *   'team'  — a team-specific site; take all of it.
+ *   'broad' — a general sports section covering pro teams and other sports
+ *             too, so it has to be filtered down to the team by name.
+ */
+export type SourceScope = 'team' | 'broad';
+
 export interface FeedSource {
   id: string;
   name: string;
   url: string;
+  tier?: SourceTier;
+  scope?: SourceScope;
 }
 
 /** College football RSS feeds only — no scraping. */
 export const FEED_SOURCES: FeedSource[] = [
-  { id: 'espn-cfb', name: 'ESPN', url: 'https://www.espn.com/espn/rss/ncf/news' },
-  { id: 'cbs-cfb', name: 'CBS Sports', url: 'https://www.cbssports.com/rss/headlines/college-football/' },
-  { id: 'yahoo-cfb', name: 'Yahoo Sports', url: 'https://sports.yahoo.com/college-football/rss.xml' },
+  { id: 'espn-cfb', name: 'ESPN', url: 'https://www.espn.com/espn/rss/ncf/news', tier: 1, scope: 'broad' },
+  { id: 'cbs-cfb', name: 'CBS Sports', url: 'https://www.cbssports.com/rss/headlines/college-football/', tier: 1, scope: 'broad' },
+  { id: 'yahoo-cfb', name: 'Yahoo Sports', url: 'https://sports.yahoo.com/college-football/rss.xml', tier: 1, scope: 'broad' },
+  { id: 'off-tackle-empire', name: 'Off Tackle Empire', url: 'https://www.offtackleempire.com/rss/index.xml', tier: 3, scope: 'broad' },
+  { id: 'extra-points', name: 'Extra Points', url: 'https://extrapoints.substack.com/feed', tier: 2, scope: 'broad' },
 ];
 
 export interface Article {
@@ -22,6 +43,7 @@ export interface Article {
   author: string | null;
   publishedAt: string | null;
   imageUrl: string | null;
+  tier: SourceTier;
 }
 
 const xmlParser = new XMLParser({
@@ -147,6 +169,7 @@ async function fetchFeed(source: FeedSource): Promise<Article[]> {
           author: extractAuthor(item),
           publishedAt: parsePubDate(item.pubDate),
           imageUrl: extractImageUrl(item),
+          tier: source.tier ?? 3,
         };
       });
   } finally {

@@ -52,6 +52,7 @@ export async function fetchTeamArticles(teamId: string): Promise<Article[]> {
         author: a.byline ?? null,
         publishedAt: parsePublished(a.published),
         imageUrl: a.images?.[0]?.url ?? null,
+        tier: 1,
       }),
     );
 }
