@@ -17,7 +17,10 @@ export function useArticles() {
     setError(null);
 
     try {
-      const [feedResult, teams] = await Promise.all([fetchAllFeeds(), fetchBigTenTeams()]);
+      const [feedResult, teams] = await Promise.all([
+        fetchAllFeeds({ force: isRefresh }),
+        fetchBigTenTeams(),
+      ]);
       const bigTenArticles = filterArticlesForTeams(
         feedResult.articles,
         teams.map((t) => t.shortName),

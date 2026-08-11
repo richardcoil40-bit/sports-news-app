@@ -6,6 +6,7 @@ interface RawArticle {
   id: number;
   headline: string;
   description?: string;
+  byline?: string;
   published?: string;
   images?: { url: string }[];
   links?: { web?: { href?: string } };
@@ -48,6 +49,7 @@ export async function fetchTeamArticles(teamId: string): Promise<Article[]> {
         link: a.links!.web!.href!,
         description: a.description ?? '',
         source: 'ESPN',
+        author: a.byline ?? null,
         publishedAt: parsePublished(a.published),
         imageUrl: a.images?.[0]?.url ?? null,
       }),

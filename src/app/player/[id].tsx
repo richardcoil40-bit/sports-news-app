@@ -119,7 +119,7 @@ export default function PlayerScreen() {
                 <ThemedText themeColor="textSecondary" style={styles.centeredText}>
                   {error
                     ? "Couldn't load articles right now. Try again later."
-                    : `No recent articles mention ${params.fullName}.`}
+                    : 'No news is good news :)'}
                 </ThemedText>
               </View>
             }

@@ -19,6 +19,7 @@ export interface Article {
   link: string;
   description: string;
   source: string;
+  author: string | null;
   publishedAt: string | null;
   imageUrl: string | null;
 }
@@ -110,6 +111,14 @@ function parsePubDate(raw: unknown): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+/** dc:creator is the common RSS extension for bylines; plain <author> is the fallback. */
+function extractAuthor(item: Record<string, unknown>): string | null {
+  const raw = item['dc:creator'] ?? item.author;
+  if (typeof raw !== 'string') return null;
+  const cleaned = decodeHtmlEntities(raw.trim());
+  return cleaned || null;
+}
+
 async function fetchFeed(source: FeedSource): Promise<Article[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -135,6 +144,7 @@ async function fetchFeed(source: FeedSource): Promise<Article[]> {
           link,
           description: stripHtml(rawDescription),
           source: source.name,
+          author: extractAuthor(item),
           publishedAt: parsePubDate(item.pubDate),
           imageUrl: extractImageUrl(item),
         };
@@ -149,24 +159,17 @@ export interface FetchAllResult {
   failedSources: string[];
 }
 
-export async function fetchAllFeeds(): Promise<FetchAllResult> {
-  const results = await Promise.allSettled(FEED_SOURCES.map(fetchFeed));
-
+function dedupeAndSort(articleLists: Article[][]): Article[] {
   const articles: Article[] = [];
-  const failedSources: string[] = [];
   const seenLinks = new Set<string>();
 
-  results.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      for (const article of result.value) {
-        if (seenLinks.has(article.link)) continue;
-        seenLinks.add(article.link);
-        articles.push(article);
-      }
-    } else {
-      failedSources.push(FEED_SOURCES[index].name);
+  for (const list of articleLists) {
+    for (const article of list) {
+      if (seenLinks.has(article.link)) continue;
+      seenLinks.add(article.link);
+      articles.push(article);
     }
-  });
+  }
 
   articles.sort((a, b) => {
     if (!a.publishedAt) return 1;
@@ -174,5 +177,53 @@ export async function fetchAllFeeds(): Promise<FetchAllResult> {
     return b.publishedAt.localeCompare(a.publishedAt);
   });
 
-  return { articles, failedSources };
+  return articles;
+}
+
+/** Fetches an arbitrary list of RSS sources, tolerating individual failures. */
+export async function fetchFeeds(sources: FeedSource[]): Promise<FetchAllResult> {
+  const results = await Promise.allSettled(sources.map(fetchFeed));
+
+  const failedSources: string[] = [];
+  const fulfilled: Article[][] = [];
+
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') fulfilled.push(result.value);
+    else failedSources.push(sources[index].name);
+  });
+
+  return { articles: dedupeAndSort(fulfilled), failedSources };
+}
+
+/**
+ * The general pool (ESPN/CBS/Yahoo, ~3 feeds including one that runs
+ * fairly large) gets re-requested by a lot of screens — team news,
+ * recruiting, and every player detail page all pull from it. Without
+ * caching, tapping from team → player was re-fetching and re-parsing all
+ * three feeds from scratch every single time, which is most of what made
+ * navigation feel slow. Cached for a few minutes; pull-to-refresh on the
+ * News tab passes `force: true` to bypass it.
+ */
+const CACHE_TTL_MS = 3 * 60 * 1000;
+let cachedResult: FetchAllResult | null = null;
+let cachedAt = 0;
+let inFlight: Promise<FetchAllResult> | null = null;
+
+export async function fetchAllFeeds(options?: { force?: boolean }): Promise<FetchAllResult> {
+  if (!options?.force) {
+    const isFresh = cachedResult !== null && Date.now() - cachedAt < CACHE_TTL_MS;
+    if (isFresh) return cachedResult!;
+    if (inFlight) return inFlight;
+  }
+
+  inFlight = fetchFeeds(FEED_SOURCES)
+    .then((result) => {
+      cachedResult = result;
+      cachedAt = Date.now();
+      return result;
+    })
+    .finally(() => {
+      inFlight = null;
+    });
+  return inFlight;
 }

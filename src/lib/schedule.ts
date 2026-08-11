@@ -1,0 +1,149 @@
+const FETCH_TIMEOUT_MS = 10000;
+
+export interface Odds {
+  provider: string;
+  /** e.g. "OSU -50.5" */
+  details: string | null;
+  overUnder: number | null;
+  homeMoneyline: number | null;
+  awayMoneyline: number | null;
+}
+
+export interface ScheduledGame {
+  id: string;
+  date: string; // ISO
+  opponentName: string; // "Michigan Wolverines"
+  opponentShortName: string; // "Michigan"
+  opponentLogoUrl: string | null;
+  homeAway: 'home' | 'away' | 'neutral';
+  network: string | null;
+  statusDetail: string; // "Sat, September 5th at 12:30 PM EDT" or "Final: W 34-10"
+  completed: boolean;
+  odds: Odds | null;
+}
+
+async function fetchWithTimeout(url: string): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+interface RawTeamRef {
+  id: string;
+  displayName: string;
+  shortDisplayName: string;
+  logos?: { href: string }[];
+}
+
+interface RawCompetitor {
+  homeAway: 'home' | 'away';
+  team: RawTeamRef;
+}
+
+interface RawBroadcast {
+  media?: { shortName?: string };
+}
+
+interface RawStatus {
+  type?: { detail?: string; completed?: boolean };
+}
+
+interface RawCompetition {
+  id: string;
+  neutralSite?: boolean;
+  competitors?: RawCompetitor[];
+  broadcasts?: RawBroadcast[];
+  status?: RawStatus;
+}
+
+interface RawEvent {
+  id: string;
+  date: string;
+  competitions?: RawCompetition[];
+}
+
+/**
+ * ESPN's team-scoped schedule. Same public site API as the rest of the app.
+ * Odds aren't included here — they're fetched separately per game, since
+ * ESPN only publishes them once a sportsbook has posted a line (often not
+ * until close to kickoff), so most future games come back with none.
+ */
+export async function fetchTeamSchedule(teamId: string): Promise<ScheduledGame[]> {
+  const url = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${teamId}/schedule?seasontype=2`;
+  const response = await fetchWithTimeout(url);
+  if (!response.ok) throw new Error(`Schedule responded ${response.status}`);
+  const json = await response.json();
+  const events: RawEvent[] = json?.events ?? [];
+
+  const games: ScheduledGame[] = [];
+  for (const event of events) {
+    const competition = event.competitions?.[0];
+    if (!competition) continue;
+
+    const self = competition.competitors?.find((c) => c.team?.id === teamId);
+    const opponent = competition.competitors?.find((c) => c.team?.id !== teamId);
+    if (!opponent) continue;
+
+    const homeAway: ScheduledGame['homeAway'] = competition.neutralSite
+      ? 'neutral'
+      : (self?.homeAway ?? 'home');
+
+    games.push({
+      id: event.id,
+      date: event.date,
+      opponentName: opponent.team.displayName,
+      opponentShortName: opponent.team.shortDisplayName,
+      opponentLogoUrl: opponent.team.logos?.[0]?.href ?? null,
+      homeAway,
+      network: competition.broadcasts?.[0]?.media?.shortName ?? null,
+      statusDetail: competition.status?.type?.detail ?? '',
+      completed: competition.status?.type?.completed ?? false,
+      odds: null,
+    });
+  }
+
+  return games;
+}
+
+interface RawTeamOddsSide {
+  moneyLine?: number;
+}
+
+interface RawOddsItem {
+  provider?: { name?: string };
+  details?: string;
+  overUnder?: number;
+  homeTeamOdds?: RawTeamOddsSide;
+  awayTeamOdds?: RawTeamOddsSide;
+}
+
+interface RawOddsRoot {
+  items?: RawOddsItem[];
+}
+
+/**
+ * Best-effort free odds via ESPN's public core API (the same data ESPN's
+ * own site pulls from DraftKings). Real sportsbook data, but not always
+ * present: ESPN only returns a line once a book has posted one for that
+ * game, so this can legitimately come back null for games further out.
+ */
+export async function fetchGameOdds(eventId: string): Promise<Odds | null> {
+  const url = `https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/events/${eventId}/competitions/${eventId}/odds`;
+  const response = await fetchWithTimeout(url);
+  if (!response.ok) return null;
+  const json: RawOddsRoot = await response.json();
+  const item = json.items?.[0];
+  if (!item) return null;
+
+  return {
+    provider: item.provider?.name ?? 'Sportsbook',
+    details: item.details ?? null,
+    overUnder: item.overUnder ?? null,
+    homeMoneyline: item.homeTeamOdds?.moneyLine ?? null,
+    awayMoneyline: item.awayTeamOdds?.moneyLine ?? null,
+  };
+}
