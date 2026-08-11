@@ -4,6 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Logo } from '@/components/logo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -31,7 +32,9 @@ export default function ArticleScreen() {
 
   return (
     <ThemedView style={styles.flex}>
-      <Stack.Screen options={{ title: '', headerBackTitle: 'Back' }} />
+      <Stack.Screen
+        options={{ title: '', headerBackTitle: 'Back', headerRight: () => <Logo size={18} /> }}
+      />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           {params.imageUrl ? (

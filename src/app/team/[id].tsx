@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AccentRow } from '@/components/accent-row';
 import { ArticleCard } from '@/components/article-card';
+import { Logo } from '@/components/logo';
 import { PlayerRow } from '@/components/player-row';
 import { ScheduleRow } from '@/components/schedule-row';
 import { TabBar } from '@/components/tab-bar';
@@ -205,7 +206,13 @@ export default function TeamScreen() {
 
   return (
     <ThemedView style={styles.flex}>
-      <Stack.Screen options={{ title: params.shortName || params.name, headerBackTitle: 'Teams' }} />
+      <Stack.Screen
+        options={{
+          title: params.shortName || params.name,
+          headerBackTitle: 'Teams',
+          headerRight: () => <Logo size={18} />,
+        }}
+      />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <View style={[styles.header, { backgroundColor: teamColor ?? theme.backgroundElement }]}>
           {params.logoUrl ? (
