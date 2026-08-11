@@ -42,12 +42,15 @@ interface RawTeam {
   logos?: { href: string }[];
 }
 
-interface ConferenceGroup {
-  standings?: { entries?: { team: RawTeam }[] };
-}
-
+/**
+ * Scoping to a single conference (group=5) changes the response shape:
+ * querying all of FBS (group=80) nests each conference's standings under
+ * a top-level `children` array, but querying one conference returns that
+ * conference itself as the root object, with `standings.entries` sitting
+ * directly at the top — no `children` wrapper.
+ */
 interface StandingsRoot {
-  children?: ConferenceGroup[];
+  standings?: { entries?: { team: RawTeam }[] };
 }
 
 let cachedTeams: Team[] | null = null;
@@ -62,19 +65,17 @@ export async function fetchBigTenTeams(): Promise<Team[]> {
   const seen = new Set<string>();
   const teams: Team[] = [];
 
-  for (const conference of json.children ?? []) {
-    for (const entry of conference.standings?.entries ?? []) {
-      const t = entry.team;
-      if (!t || seen.has(t.id)) continue;
-      seen.add(t.id);
-      teams.push({
-        id: t.id,
-        name: t.displayName,
-        shortName: t.shortDisplayName,
-        abbreviation: t.abbreviation,
-        logoUrl: t.logos?.[0]?.href ?? null,
-      });
-    }
+  for (const entry of json.standings?.entries ?? []) {
+    const t = entry.team;
+    if (!t || seen.has(t.id)) continue;
+    seen.add(t.id);
+    teams.push({
+      id: t.id,
+      name: t.displayName,
+      shortName: t.shortDisplayName,
+      abbreviation: t.abbreviation,
+      logoUrl: t.logos?.[0]?.href ?? null,
+    });
   }
 
   teams.sort((a, b) => a.shortName.localeCompare(b.shortName));
