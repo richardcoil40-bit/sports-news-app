@@ -5,7 +5,15 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { Player } from '@/lib/roster';
 
-export function PlayerRow({ player, onPress }: { player: Player; onPress: () => void }) {
+export function PlayerRow({
+  player,
+  detail,
+  onPress,
+}: {
+  player: Player;
+  detail?: string;
+  onPress: () => void;
+}) {
   const theme = useTheme();
 
   return (
@@ -13,9 +21,16 @@ export function PlayerRow({ player, onPress }: { player: Player; onPress: () => 
       <View style={[styles.jerseyBadge, { backgroundColor: theme.backgroundElement }]}>
         <ThemedText type="smallBold">{player.jersey ?? '—'}</ThemedText>
       </View>
-      <ThemedText type="default" style={styles.name}>
-        {player.fullName}
-      </ThemedText>
+
+      <View style={styles.textColumn}>
+        <ThemedText type="default">{player.fullName}</ThemedText>
+        {detail ? (
+          <ThemedText type="small" themeColor="textSecondary" style={styles.detail}>
+            {detail}
+          </ThemedText>
+        ) : null}
+      </View>
+
       {player.position ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.position}>
           {player.position}
@@ -40,8 +55,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  name: {
+  textColumn: {
     flex: 1,
+    gap: Spacing.half,
+  },
+  detail: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 11,
   },
   position: {
     textTransform: 'uppercase',

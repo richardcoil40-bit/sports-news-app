@@ -9,9 +9,9 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { Article, fetchAllFeeds } from '@/lib/feeds';
+import { Article } from '@/lib/feeds';
 import { matchArticlesForPlayer } from '@/lib/player-match';
-import { fetchTeamArticles } from '@/lib/team-news';
+import { fetchTeamNewsPool } from '@/lib/team-news-pool';
 
 export default function PlayerScreen() {
   const theme = useTheme();
@@ -24,6 +24,7 @@ export default function PlayerScreen() {
     headshotUrl: string;
     teamId: string;
     teamName: string;
+    teamShortName: string;
   }>();
 
   const [matches, setMatches] = useState<Article[]>([]);
@@ -37,20 +38,12 @@ export default function PlayerScreen() {
       setLoading(true);
       setError(false);
       try {
-        const [teamArticles, generalFeeds] = await Promise.all([
-          fetchTeamArticles(params.teamId),
-          fetchAllFeeds(),
-        ]);
+        // Same pool the team's News tab uses (ESPN + community sites + local
+        // newsroom + national feeds), and cached there, so this is usually
+        // instant rather than a fresh fetch of everything.
+        const pool = await fetchTeamNewsPool(params.teamId, params.teamShortName || params.teamName);
         if (cancelled) return;
-
-        const seen = new Set<string>();
-        const pool = [...teamArticles, ...generalFeeds.articles].filter((a) => {
-          if (seen.has(a.link)) return false;
-          seen.add(a.link);
-          return true;
-        });
-
-        setMatches(matchArticlesForPlayer(pool, params));
+        setMatches(matchArticlesForPlayer(pool.articles, params));
       } catch {
         if (!cancelled) setError(true);
       } finally {
@@ -62,7 +55,14 @@ export default function PlayerScreen() {
     return () => {
       cancelled = true;
     };
-  }, [params]);
+    // useLocalSearchParams() returns a new object every render, so depending
+    // on `params` itself re-ran this effect (and re-fetched) on every
+    // re-render forever — the screen never settled on "loaded" because it
+    // kept resetting to loading before the previous fetch's result could
+    // stick. Depending on the specific primitive values actually used here
+    // fixes that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.teamId, params.teamShortName, params.teamName, params.fullName, params.lastName]);
 
   const openArticle = (article: Article) => {
     router.push({

@@ -141,9 +141,22 @@ function extractAuthor(item: Record<string, unknown>): string | null {
   return cleaned || null;
 }
 
+/**
+ * Set EXPO_PUBLIC_DEBUG_FEEDS=1 (or flip DEBUG_TIMING below) to log how long
+ * each individual feed takes and whether it succeeded, failed, or hit the
+ * 10s timeout. Added to debug reports of the news pool "loading forever" —
+ * every fetch here has a timeout, so if the pool as a whole still hangs
+ * well past ~10s, this pinpoints which source (or confirms it's none of
+ * them, i.e. the hang is somewhere else, like parsing or a downstream
+ * consumer).
+ */
+const DEBUG_TIMING = true;
+
 async function fetchFeed(source: FeedSource): Promise<Article[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const startedAt = Date.now();
+  if (DEBUG_TIMING) console.log(`[feeds] → ${source.name} start`);
 
   try {
     const response = await fetch(source.url, { signal: controller.signal });
@@ -153,7 +166,7 @@ async function fetchFeed(source: FeedSource): Promise<Article[]> {
     const rawItems: Record<string, unknown>[] = parsed?.rss?.channel?.item ?? [];
     const items = Array.isArray(rawItems) ? rawItems : [rawItems];
 
-    return items
+    const articles = items
       .filter((item) => item && typeof item.link === 'string' && typeof item.title === 'string')
       .map((item): Article => {
         const link = (item.link as string).trim();
@@ -172,6 +185,17 @@ async function fetchFeed(source: FeedSource): Promise<Article[]> {
           tier: source.tier ?? 3,
         };
       });
+
+    if (DEBUG_TIMING) {
+      console.log(`[feeds] ✓ ${source.name} done in ${Date.now() - startedAt}ms (${articles.length} items)`);
+    }
+    return articles;
+  } catch (err) {
+    if (DEBUG_TIMING) {
+      const reason = err instanceof Error ? err.message : String(err);
+      console.log(`[feeds] ✗ ${source.name} failed after ${Date.now() - startedAt}ms: ${reason}`);
+    }
+    throw err;
   } finally {
     clearTimeout(timeout);
   }

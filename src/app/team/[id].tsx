@@ -15,11 +15,12 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { Article } from '@/lib/feeds';
 import { filterByNotableJournalists } from '@/lib/journalists';
-import { pickNotablePlayers } from '@/lib/notable-players';
+import { RankedPlayer, rankNotablePlayers } from '@/lib/notable-players';
 import { filterRecruitingArticles } from '@/lib/recruiting';
 import { Player, fetchTeamRoster } from '@/lib/roster';
 import { fetchGameOdds, fetchTeamSchedule, ScheduledGame } from '@/lib/schedule';
 import { fetchTeamColor } from '@/lib/team-color';
+import { StatLeader, fetchTeamStatLeaders } from '@/lib/team-leaders';
 import { fetchTeamNewsPool } from '@/lib/team-news-pool';
 
 type TabKey = 'news' | 'schedule' | 'players' | 'recruiting';
@@ -56,6 +57,7 @@ export default function TeamScreen() {
   const [roster, setRoster] = useState<Player[] | null>(null);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterError, setRosterError] = useState(false);
+  const [statLeaders, setStatLeaders] = useState<StatLeader[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,8 +124,14 @@ export default function TeamScreen() {
       setRosterLoading(true);
       setRosterError(false);
       try {
-        const players = await fetchTeamRoster(params.id);
-        if (!cancelled) setRoster(players);
+        const [players, leaders] = await Promise.all([
+          fetchTeamRoster(params.id),
+          fetchTeamStatLeaders(params.id),
+        ]);
+        if (!cancelled) {
+          setRoster(players);
+          setStatLeaders(leaders);
+        }
       } catch {
         if (!cancelled) setRosterError(true);
       } finally {
@@ -133,7 +141,11 @@ export default function TeamScreen() {
 
     if (tab === 'news' || tab === 'recruiting') loadNews();
     if (tab === 'schedule') loadSchedule();
-    if (tab === 'players') loadRoster();
+    // The players tab ranks by article mentions, so it needs the news pool too.
+    if (tab === 'players') {
+      loadRoster();
+      loadNews();
+    }
 
     return () => {
       cancelled = true;
@@ -155,7 +167,10 @@ export default function TeamScreen() {
     [newsArticles],
   );
 
-  const notablePlayers = useMemo(() => (roster ? pickNotablePlayers(roster) : []), [roster]);
+  const notablePlayers = useMemo(
+    () => (roster ? rankNotablePlayers(roster, newsArticles ?? [], statLeaders, 10) : []),
+    [roster, newsArticles, statLeaders],
+  );
 
   const openArticle = (article: Article) => {
     router.push({
@@ -183,6 +198,7 @@ export default function TeamScreen() {
         headshotUrl: player.headshotUrl ?? '',
         teamId: params.id,
         teamName: params.name,
+        teamShortName: params.shortName,
       },
     });
   };
@@ -232,7 +248,7 @@ export default function TeamScreen() {
         {tab === 'players' ? (
           <PlayersTab
             players={notablePlayers}
-            loading={roster === null && !rosterError}
+            loading={(roster === null || newsArticles === null) && !rosterError && !newsError}
             error={rosterError}
             onOpenPlayer={openPlayer}
             accentColor={teamColor}
@@ -423,7 +439,7 @@ function PlayersTab({
   onOpenPlayer,
   accentColor,
 }: {
-  players: Player[];
+  players: RankedPlayer[];
   loading: boolean;
   error: boolean;
   onOpenPlayer: (p: Player) => void;
@@ -442,10 +458,14 @@ function PlayersTab({
   return (
     <FlatList
       data={players}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item) => item.player.id}
       renderItem={({ item }) => (
         <AccentRow color={accentColor}>
-          <PlayerRow player={item} onPress={() => onOpenPlayer(item)} />
+          <PlayerRow
+            player={item.player}
+            detail={item.detail}
+            onPress={() => onOpenPlayer(item.player)}
+          />
         </AccentRow>
       )}
       ItemSeparatorComponent={() => (
@@ -453,13 +473,15 @@ function PlayersTab({
       )}
       ListHeaderComponent={
         <ThemedText type="small" themeColor="textSecondary" style={styles.playersNote}>
-          Most-featured 15, estimated from roster experience — not an official depth chart.
+          Most talked about — ranked by recent coverage and last season&apos;s stat leaders.
         </ThemedText>
       }
       ListEmptyComponent={
         <Centered>
           <ThemedText themeColor="textSecondary" style={styles.centeredText}>
-            {error ? "Couldn't load the roster right now. Try again later." : 'No roster found.'}
+            {error
+              ? "Couldn't load the roster right now. Try again later."
+              : 'No players stand out in recent coverage yet.'}
           </ThemedText>
         </Centered>
       }

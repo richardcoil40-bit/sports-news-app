@@ -1,0 +1,74 @@
+# Data retention
+
+What this app keeps, where, and for how long. Written so the answer to "how
+long do you retain X" is something you can point to rather than reconstruct
+from the code each time someone asks.
+
+## Current state: nothing persists
+
+As of this writing, the app writes nothing to disk. No AsyncStorage, no
+SQLite, no file system writes, no analytics SDK, no user accounts. Every
+cache in the codebase is a plain in-memory JavaScript `Map` or object that
+exists only for the lifetime of the running app process:
+
+| Cache | File | Bound |
+|---|---|---|
+| National feed pool | `lib/feeds.ts` | Single object, replaced (not appended) every fetch |
+| Per-team news pool | `lib/team-news-pool.ts` | Keyed by team ID — max 18 entries (Big Ten only) |
+| Rosters | `lib/roster.ts` | Keyed by team ID — max 18 entries |
+| Stat leaders | `lib/team-leaders.ts` | Keyed by team ID — max 18 entries |
+| Team colors | `lib/team-color.ts` | Keyed by team ID — max 18 entries |
+
+Force-quitting the app clears all of it. None of these caches can grow
+unbounded — the team-keyed ones are capped by the number of teams that
+exist, not by how long the app has been open or how much you've browsed,
+and the national pool is overwritten rather than accumulated.
+
+The auto-refresh added for the morning/noon/night cycle (`lib/refresh-
+schedule.ts`) doesn't change this: it just forces one of these same bounded
+caches to re-fetch on a schedule. It doesn't create a new store or a
+history of past pulls.
+
+Article content itself is never stored beyond what's needed to render a
+list and link out: title, description, source, byline, publish date, image
+URL, and the link to the original. No full article bodies are scraped or
+retained — every article click hands off to the source's own site. That's
+also the right posture for not overstepping a fair-use "excerpt and link"
+model with publishers whose content is being aggregated.
+
+No personal data is collected. There's no login, no user profile, no
+tracking identifiers, no crash/analytics reporting wired up. The only
+network calls out are to ESPN's public endpoints and the RSS feeds listed
+in `lib/community-sources.ts` and `lib/feeds.ts`, made directly from the
+device the same way any RSS reader would.
+
+## Why this is worth stating explicitly
+
+This is the same question SOC 2 (CC6.5, secure disposal) and GDPR's
+storage limitation principle are getting at: don't keep data longer than
+you have a reason to, and be able to say why for whatever you do keep.
+Right now the honest answer is "we don't keep it past the running
+process" — worth writing down while it's true and trivial, rather than
+only when someone asks and it's no longer obvious from the code.
+
+## The rule for whenever persistence gets added
+
+The first time this app writes anything to disk — offline reading, a
+bookmarks/saved-articles list, a "recently viewed" history, or true
+background refresh (which would need to cache results somewhere to be
+worth anything) — that feature needs an explicit retention rule alongside
+it, decided at the same time as the feature, not bolted on later:
+
+- **Cap by count or age.** e.g. "keep the last 200 articles" or "purge
+  anything older than 30 days," not "keep everything forever."
+- **Eviction policy.** LRU (least recently used) is usually the simplest
+  correct default for a cache; FIFO by fetch date for anything meant to
+  behave like a history.
+- **State it in this file.** Add a row to a running list below — what's
+  stored, where, the cap, and why that cap — so this document stays the
+  actual source of truth instead of drifting from the code.
+
+### Persisted stores (none yet)
+
+_Nothing to list. This section exists so the next persisted store gets
+added here instead of only in code._
