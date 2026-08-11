@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { fetchAllTeams, Team } from '@/lib/teams';
+import { fetchBigTenTeams, Team } from '@/lib/teams';
 
 export function useTeams() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -11,7 +11,7 @@ export function useTeams() {
     setLoading(true);
     setError(null);
     try {
-      setTeams(await fetchAllTeams());
+      setTeams(await fetchBigTenTeams());
     } catch {
       setError('Could not load teams. Check your connection and try again.');
     } finally {

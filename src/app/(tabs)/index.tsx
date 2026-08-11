@@ -33,7 +33,7 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.flex} edges={['top']}>
         <View style={styles.header}>
           <ThemedText type="title" style={styles.headerTitle}>
-            College Football
+            Big Ten Football
           </ThemedText>
         </View>
 

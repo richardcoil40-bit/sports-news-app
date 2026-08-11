@@ -1,9 +1,5 @@
 import { Article } from '@/lib/feeds';
-
-function wordBoundaryMatch(haystack: string, needle: string): boolean {
-  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`\\b${escaped}\\b`, 'i').test(haystack);
-}
+import { wordBoundaryMatch } from '@/lib/text-match';
 
 /**
  * There's no per-player news feed anywhere (ESPN, CBS, Yahoo all lack one) —

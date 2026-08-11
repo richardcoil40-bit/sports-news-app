@@ -41,7 +41,7 @@ export default function TeamsScreen() {
       <SafeAreaView style={styles.flex} edges={['top']}>
         <View style={styles.header}>
           <ThemedText type="title" style={styles.headerTitle}>
-            Teams
+            Big Ten Teams
           </ThemedText>
         </View>
 

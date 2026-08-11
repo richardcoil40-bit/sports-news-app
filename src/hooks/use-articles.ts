@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { filterArticlesForTeams } from '@/lib/conference-filter';
 import { Article, fetchAllFeeds } from '@/lib/feeds';
+import { fetchBigTenTeams } from '@/lib/teams';
 
 export function useArticles() {
   const [articles, setArticles] = useState<Article[]>([]);
@@ -15,10 +17,14 @@ export function useArticles() {
     setError(null);
 
     try {
-      const result = await fetchAllFeeds();
-      setArticles(result.articles);
-      setFailedSources(result.failedSources);
-      if (result.articles.length === 0 && result.failedSources.length > 0) {
+      const [feedResult, teams] = await Promise.all([fetchAllFeeds(), fetchBigTenTeams()]);
+      const bigTenArticles = filterArticlesForTeams(
+        feedResult.articles,
+        teams.map((t) => t.shortName),
+      );
+      setArticles(bigTenArticles);
+      setFailedSources(feedResult.failedSources);
+      if (bigTenArticles.length === 0 && feedResult.failedSources.length > 0) {
         setError('Could not load headlines. Check your connection and try again.');
       }
     } catch {

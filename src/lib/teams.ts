@@ -5,12 +5,14 @@
  * per-team or list team rosters.
  *
  * The standings endpoint (rather than the plain /teams list) is the only
- * one that actually honors group=80 (FBS) — the /teams endpoint ignores
- * every division filter and always returns all ~800 college football
- * teams across every division.
+ * one that reliably honors a group filter — the /teams endpoint ignores
+ * every division/conference filter and always returns all ~800 college
+ * football teams across every division. group=5 is the Big Ten (verified
+ * against ESPN's response, which tags the conference "big10" and returns
+ * its current 18 members).
  */
-const FBS_STANDINGS_URL =
-  'https://site.api.espn.com/apis/v2/sports/football/college-football/standings?group=80';
+const BIG_TEN_STANDINGS_URL =
+  'https://site.api.espn.com/apis/v2/sports/football/college-football/standings?group=5';
 
 const FETCH_TIMEOUT_MS = 10000;
 
@@ -50,10 +52,10 @@ interface StandingsRoot {
 
 let cachedTeams: Team[] | null = null;
 
-export async function fetchAllTeams(): Promise<Team[]> {
+export async function fetchBigTenTeams(): Promise<Team[]> {
   if (cachedTeams) return cachedTeams;
 
-  const response = await fetchWithTimeout(FBS_STANDINGS_URL);
+  const response = await fetchWithTimeout(BIG_TEN_STANDINGS_URL);
   if (!response.ok) throw new Error(`Team list responded ${response.status}`);
   const json: StandingsRoot = await response.json();
 
