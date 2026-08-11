@@ -1,56 +1,78 @@
-# Welcome to your Expo app 👋
+# NoFrills
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A plain, ad-free, subscription-free feed of news for the teams you care
+about. No editorializing, no "top stories" algorithm, no clutter — just
+headlines from a curated set of sources, filtered to your teams.
 
-## Get started
+Currently scoped to Big Ten college football while the core is being
+proven out, with the explicit intent to expand to other sports and
+leagues later. Code and naming choices favor sport-agnostic terms where
+reasonable, so that expansion doesn't mean a rewrite.
 
-1. Install dependencies
+## What's actually here
 
-   ```bash
-   npm install
-   ```
+- Per-team news, pulled from ESPN plus each team's community sites,
+  independent outlets, and local newsroom sports sections — not just
+  the big national outlets. See `docs/source-reliability.md` for how a
+  source earns a place in the app and what tier it's given.
+- Schedule and odds (where posted).
+- A "most talked about" players list per team, ranked by how often
+  they're actually named in recent coverage plus last season's
+  statistical leaders — not roster order or depth-chart guesses.
+- Recruiting news, filtered from the same article pool.
+- A morning/noon/night refresh cycle — see `src/lib/refresh-schedule.ts`
+  for why that's foreground-triggered rather than a true background job.
 
-2. Start the app
+Nothing persists to disk — every cache is in-memory only. See
+`docs/data-retention.md` for the full picture.
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Getting started
 
 ```bash
-npm run reset-project
+npm install
+npx expo run:ios
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+That builds the native project and installs it to a connected simulator
+or device. Subsequent JS-only changes just need a Metro reload
+(Cmd+D → Reload in the simulator) — no rebuild required.
 
-### Other setup steps
+### When you *do* need a full rebuild
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Anything that changes native config — the app icon, display name,
+splash screen, or a new native dependency — won't show up from a reload
+alone, because the native `ios/` project is generated once and then
+reused. Regenerate it first:
 
-## Learn more
+```bash
+npx expo prebuild --clean
+npx expo run:ios
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+### Free Apple ID signing
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Without a paid Apple Developer account, on-device builds are signed
+with a certificate that expires every 7 days. After that, the app just
+won't open until you re-run `npx expo run:ios` from this Mac. That's
+Apple's policy, not a bug — see `docs/` or ask if this needs solving
+properly (TestFlight, via `eas build`, is the real fix once this is
+ready to share with other people).
 
-## Join the community
+## Project layout
 
-Join our community of developers creating universal apps.
+- `src/app/` — screens, one file per route (Expo Router file-based
+  routing).
+- `src/lib/` — all data fetching, parsing, caching, and ranking logic.
+  Nothing in here touches React; it's plain TypeScript that the screens
+  call into.
+- `src/components/` — shared UI pieces.
+- `src/hooks/` — thin React wrappers around `lib/` calls.
+- `docs/` — decisions worth having a paper trail for: source
+  reliability criteria, data retention posture. Add to this rather than
+  letting the reasoning live only in a chat history.
+- `assets/brand/` — source SVGs for the app icon/logo, in case the mark
+  needs to be re-exported at a different size later.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+See `AGENTS.md` for the coding conventions established across this
+codebase (caching pattern, effect-safety pattern, design system rules)
+before making changes — they're consistent on purpose.

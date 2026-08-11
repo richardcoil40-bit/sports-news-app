@@ -1,7 +1,7 @@
 import { Article } from '@/lib/feeds';
 import { Player } from '@/lib/roster';
 import { StatLeader } from '@/lib/team-leaders';
-import { wordBoundaryMatch } from '@/lib/text-match';
+import { compileWordBoundary } from '@/lib/text-match';
 
 export interface RankedPlayer {
   player: Player;
@@ -74,18 +74,25 @@ export function rankNotablePlayers(
       lastName.length >= MIN_LAST_NAME_LENGTH &&
       (lastNameCounts.get(player.lastName.toLowerCase()) ?? 0) === 1;
 
+    // Compiled once per player, not once per (player, article) pair — this
+    // loop runs roster.length × articles.length times, and rebuilding a
+    // RegExp on every single comparison (as wordBoundaryMatch does) adds up
+    // to tens of thousands of compiles for a full roster against a full
+    // pool. Reusing a compiled pattern here is the same match, much faster.
+    const fullNameRegex = compileWordBoundary(fullName);
+    const firstLastRegex = firstLast !== fullName ? compileWordBoundary(firstLast) : null;
+    const lastNameRegex = lastNameIsUsable ? compileWordBoundary(lastName) : null;
+
     let mentions = 0;
     let score = 0;
 
     for (const haystack of haystacks) {
-      const namedInFull =
-        wordBoundaryMatch(haystack, fullName) ||
-        (firstLast !== fullName && wordBoundaryMatch(haystack, firstLast));
+      const namedInFull = fullNameRegex.test(haystack) || (firstLastRegex?.test(haystack) ?? false);
 
       if (namedInFull) {
         mentions += 1;
         score += FULL_NAME_POINTS;
-      } else if (lastNameIsUsable && wordBoundaryMatch(haystack, lastName)) {
+      } else if (lastNameRegex?.test(haystack)) {
         mentions += 1;
         score += LAST_NAME_POINTS;
       }

@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus, useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { refreshIfNewPeriod } from '@/lib/refresh-schedule';
 
 SplashScreen.preventAutoHideAsync();
@@ -36,14 +37,16 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   useAutoRefresh();
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="article" />
-        <Stack.Screen name="team/[id]" />
-        <Stack.Screen name="player/[id]" />
-      </Stack>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <AnimatedSplashOverlay />
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="article" />
+          <Stack.Screen name="team/[id]" />
+          <Stack.Screen name="player/[id]" />
+        </Stack>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { filterArticlesForTeams } from '@/lib/conference-filter';
 import { Article, fetchAllFeeds } from '@/lib/feeds';
@@ -11,7 +11,13 @@ export function useArticles() {
   const [failedSources, setFailedSources] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Guards against a slow call's response landing after a faster, more
+  // recent call's response and overwriting it with stale data — can happen
+  // if refresh() fires twice in quick succession.
+  const requestId = useRef(0);
+
   const load = useCallback(async (isRefresh: boolean) => {
+    const id = ++requestId.current;
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     setError(null);
@@ -21,6 +27,8 @@ export function useArticles() {
         fetchAllFeeds({ force: isRefresh }),
         fetchBigTenTeams(),
       ]);
+      if (id !== requestId.current) return;
+
       const bigTenArticles = filterArticlesForTeams(
         feedResult.articles,
         teams.map((t) => t.shortName),
@@ -31,10 +39,13 @@ export function useArticles() {
         setError('Could not load headlines. Check your connection and try again.');
       }
     } catch {
+      if (id !== requestId.current) return;
       setError('Could not load headlines. Check your connection and try again.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (id === requestId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 

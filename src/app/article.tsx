@@ -21,7 +21,13 @@ export default function ArticleScreen() {
     imageUrl: string;
   }>();
 
-  const openInBrowser = () => WebBrowser.openBrowserAsync(params.link);
+  const openInBrowser = () => {
+    // params.link comes straight from a third-party RSS item — validate the
+    // scheme before handing it to the browser, and swallow a rejection
+    // instead of leaving an unhandled promise if it's malformed.
+    if (!/^https?:\/\//i.test(params.link ?? '')) return;
+    WebBrowser.openBrowserAsync(params.link).catch(() => {});
+  };
 
   return (
     <ThemedView style={styles.flex}>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { fetchBigTenTeams, Team } from '@/lib/teams';
 
@@ -7,15 +7,25 @@ export function useTeams() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // If reload() fires again before the first call resolves (e.g. a fast
+  // double pull-to-refresh), only the most recently started call should be
+  // allowed to write to state — otherwise a slow first response landing
+  // after a fast second one silently overwrites newer data with older data.
+  const requestId = useRef(0);
+
   const load = useCallback(async () => {
+    const id = ++requestId.current;
     setLoading(true);
     setError(null);
     try {
-      setTeams(await fetchBigTenTeams());
+      const result = await fetchBigTenTeams();
+      if (id !== requestId.current) return;
+      setTeams(result);
     } catch {
+      if (id !== requestId.current) return;
       setError('Could not load teams. Check your connection and try again.');
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   }, []);
 
