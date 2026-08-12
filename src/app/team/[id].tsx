@@ -15,10 +15,12 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { Article } from '@/lib/feeds';
-import { filterByNotableJournalists } from '@/lib/journalists';
 import { RankedPlayer, rankNotablePlayers } from '@/lib/notable-players';
 import { filterRecruitingArticles } from '@/lib/recruiting';
 import { Player, fetchTeamRoster } from '@/lib/roster';
+import { ReachFilterBar } from '@/components/reach-filter-bar';
+import { filterByReach, ReachFilter } from '@/lib/reach-filter';
+import { balanceBySource } from '@/lib/source-balance';
 import { fetchGameOdds, fetchTeamSchedule, ScheduledGame } from '@/lib/schedule';
 import { fetchTeamColor } from '@/lib/team-color';
 import { StatLeader, fetchTeamStatLeaders } from '@/lib/team-leaders';
@@ -43,8 +45,7 @@ export default function TeamScreen() {
   }>();
 
   const [tab, setTab] = useState<TabKey>('news');
-  const [journalistsOnly, setJournalistsOnly] = useState(false);
-  const [trustedOnly, setTrustedOnly] = useState(false);
+  const [reachFilter, setReachFilter] = useState<ReachFilter>('all');
   const [teamColor, setTeamColor] = useState<string | null>(null);
 
   const [newsArticles, setNewsArticles] = useState<Article[] | null>(null);
@@ -156,12 +157,10 @@ export default function TeamScreen() {
 
   const visibleNews = useMemo(() => {
     if (!newsArticles) return [];
-    let result = newsArticles;
-    // Tier 1–2 = professional newsrooms and credible independents.
-    if (trustedOnly) result = result.filter((a) => a.tier <= 2);
-    if (journalistsOnly) result = filterByNotableJournalists(result);
-    return result;
-  }, [newsArticles, journalistsOnly, trustedOnly]);
+    // Balanced after filtering, so it operates on whatever survived
+    // rather than reserving slots for sources just filtered out.
+    return balanceBySource(filterByReach(newsArticles, reachFilter));
+  }, [newsArticles, reachFilter]);
 
   const recruitingArticles = useMemo(
     () => (newsArticles ? filterRecruitingArticles(newsArticles) : []),
@@ -234,10 +233,8 @@ export default function TeamScreen() {
             articles={visibleNews}
             loading={newsArticles === null && !newsError}
             error={newsError}
-            journalistsOnly={journalistsOnly}
-            onToggleJournalists={() => setJournalistsOnly((v) => !v)}
-            trustedOnly={trustedOnly}
-            onToggleTrusted={() => setTrustedOnly((v) => !v)}
+            reachFilter={reachFilter}
+            onChangeReach={setReachFilter}
             onOpenArticle={openArticle}
             accentColor={teamColor}
           />
@@ -284,20 +281,16 @@ function NewsTab({
   articles,
   loading,
   error,
-  journalistsOnly,
-  onToggleJournalists,
-  trustedOnly,
-  onToggleTrusted,
+  reachFilter,
+  onChangeReach,
   onOpenArticle,
   accentColor,
 }: {
   articles: Article[];
   loading: boolean;
   error: boolean;
-  journalistsOnly: boolean;
-  onToggleJournalists: () => void;
-  trustedOnly: boolean;
-  onToggleTrusted: () => void;
+  reachFilter: ReachFilter;
+  onChangeReach: (next: ReachFilter) => void;
   onOpenArticle: (a: Article) => void;
   accentColor: string | null;
 }) {
@@ -323,19 +316,14 @@ function NewsTab({
       ItemSeparatorComponent={() => (
         <View style={[styles.separator, { backgroundColor: theme.text }]} />
       )}
-      ListHeaderComponent={
-        <View style={styles.chipRow}>
-          <TouchableFilterChip label="Trusted sources" active={trustedOnly} onPress={onToggleTrusted} />
-          <TouchableFilterChip label="Notable bylines" active={journalistsOnly} onPress={onToggleJournalists} />
-        </View>
-      }
+      ListHeaderComponent={<ReachFilterBar active={reachFilter} onChange={onChangeReach} />}
       ListEmptyComponent={
         <Centered>
           <ThemedText themeColor="textSecondary" style={styles.centeredText}>
             {error
               ? "Couldn't load headlines right now. Try again later."
-              : journalistsOnly || trustedOnly
-                ? 'Nothing matches those filters right now.'
+              : reachFilter !== 'all'
+                ? 'Nothing matches that filter right now.'
                 : 'No recent headlines found for this team.'}
           </ThemedText>
         </Centered>
@@ -497,34 +485,6 @@ function PlayersTab({
   );
 }
 
-function TouchableFilterChip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <ThemedText
-      type="smallBold"
-      onPress={onPress}
-      style={[
-        styles.chip,
-        {
-          borderColor: theme.text,
-          backgroundColor: active ? theme.text : 'transparent',
-          color: active ? theme.background : theme.text,
-        },
-      ]}>
-      {active ? '✓ ' : ''}
-      {label.toUpperCase()}
-    </ThemedText>
-  );
-}
-
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
@@ -570,22 +530,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: Spacing.five,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.two,
-  },
-  chip: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: 0,
-    borderWidth: 1.5,
-    fontSize: 11,
-    letterSpacing: 0.5,
-    overflow: 'hidden',
   },
   playersNote: {
     paddingHorizontal: Spacing.three,

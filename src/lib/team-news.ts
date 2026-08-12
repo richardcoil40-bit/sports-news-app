@@ -53,6 +53,9 @@ export async function fetchTeamArticles(teamId: string): Promise<Article[]> {
         publishedAt: parsePublished(a.published),
         imageUrl: a.images?.[0]?.url ?? null,
         tier: 1,
+        // ESPN's team-scoped endpoint is still ESPN — national coverage
+        // pointed at a team, not a beat writer who follows it daily.
+        reach: 'national',
       }),
     );
 }

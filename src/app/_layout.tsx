@@ -1,10 +1,11 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus, useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { hasOnboarded, hydrateFavorites } from '@/lib/favorites';
 import { refreshIfNewPeriod } from '@/lib/refresh-schedule';
 
 SplashScreen.preventAutoHideAsync();
@@ -33,15 +34,40 @@ function useAutoRefresh() {
   }, []);
 }
 
+/**
+ * Sends first-time users to the team picker before anything else. Reads
+ * the persisted flag rather than inferring from "has no favorites," so
+ * someone who deliberately unfollows every team isn't dragged back
+ * through onboarding on their next launch.
+ */
+function useFirstLaunchRouting() {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function check() {
+      await hydrateFavorites();
+      const onboarded = await hasOnboarded();
+      if (!cancelled && !onboarded) router.replace('/onboarding');
+    }
+
+    check();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   useAutoRefresh();
+  useFirstLaunchRouting();
   return (
     <ErrorBoundary>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <AnimatedSplashOverlay />
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="article" />
           <Stack.Screen name="team/[id]" />
           <Stack.Screen name="player/[id]" />

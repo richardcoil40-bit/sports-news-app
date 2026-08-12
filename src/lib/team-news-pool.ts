@@ -24,7 +24,7 @@ const inFlight = new Map<string, Promise<TeamNewsPool>>();
 // than ~10-11s — if reports say it hangs well past that, these logs (plus
 // the per-source ones in feeds.ts) show whether one group is the long pole
 // or whether it's genuinely stuck (never resolves at all).
-const DEBUG_TIMING = true;
+const DEBUG_TIMING = false;
 
 async function fetchTeamNewsPoolUncached(teamId: string, teamShortName: string): Promise<TeamNewsPool> {
   const poolStartedAt = Date.now();
@@ -62,8 +62,18 @@ async function fetchTeamNewsPoolUncached(teamId: string, teamShortName: string):
   const failedSources: string[] = [];
   const lists: Article[][] = [];
 
-  if (espnResult.status === 'fulfilled') lists.push(espnResult.value);
-  else failedSources.push('ESPN team news');
+  // ESPN's team endpoint is only *re-ranked* toward a team, not
+  // restricted to it — a chunk of what it returns is general college
+  // football filler that happens to be adjacent. Held to the same
+  // name-match standard as every other broad source rather than trusted
+  // wholesale, both because it's more relevant and because unfiltered it
+  // padded the pool enough to crowd out the smaller sources this app
+  // exists to surface.
+  if (espnResult.status === 'fulfilled') {
+    lists.push(filterArticlesForTeams(espnResult.value, [teamShortName]));
+  } else {
+    failedSources.push('ESPN team news');
+  }
 
   // Team-specific sites publish nothing but this team — take all of it.
   if (teamSiteResult.status === 'fulfilled') {

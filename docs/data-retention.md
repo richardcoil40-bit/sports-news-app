@@ -4,12 +4,14 @@ What this app keeps, where, and for how long. Written so the answer to "how
 long do you retain X" is something you can point to rather than reconstruct
 from the code each time someone asks.
 
-## Current state: nothing persists
+## Current state: one small persisted store, everything else in memory
 
-As of this writing, the app writes nothing to disk. No AsyncStorage, no
-SQLite, no file system writes, no analytics SDK, no user accounts. Every
-cache in the codebase is a plain in-memory JavaScript `Map` or object that
-exists only for the lifetime of the running app process:
+The app persists exactly one thing — which teams you follow — and nothing
+else. No analytics SDK, no user accounts, no article content, no
+behavioral or usage data. See "Persisted stores" below for the detail.
+
+Every other cache in the codebase is a plain in-memory JavaScript `Map` or
+object that exists only for the lifetime of the running app process:
 
 | Cache | File | Bound |
 |---|---|---|
@@ -36,8 +38,11 @@ retained — every article click hands off to the source's own site. That's
 also the right posture for not overstepping a fair-use "excerpt and link"
 model with publishers whose content is being aggregated.
 
-No personal data is collected. There's no login, no user profile, no
-tracking identifiers, no crash/analytics reporting wired up. The only
+No personal data is collected in the sense that matters here: there's no
+login, no user profile, no tracking identifiers, no crash/analytics
+reporting, and nothing is transmitted anywhere. The one persisted value
+(followed team IDs) never leaves the device — it's read by the app to
+decide what to fetch, and that's all. The only
 network calls out are to ESPN's public endpoints and the RSS feeds listed
 in `lib/community-sources.ts` and `lib/feeds.ts`, made directly from the
 device the same way any RSS reader would.
@@ -68,7 +73,19 @@ it, decided at the same time as the feature, not bolted on later:
   stored, where, the cap, and why that cap — so this document stays the
   actual source of truth instead of drifting from the code.
 
-### Persisted stores (none yet)
+### Persisted stores
 
-_Nothing to list. This section exists so the next persisted store gets
-added here instead of only in code._
+| What | Where | Cap | Why that cap |
+|---|---|---|---|
+| Followed team IDs (`nofrills.favoriteTeamIds`) | AsyncStorage, via `lib/storage.ts` | Structurally capped at 18 (the number of Big Ten teams); an array of short ID strings, a few hundred bytes at most | No eviction policy needed — the set of teams that exist is small and fixed, so this cannot grow with use, only with conference realignment |
+| Onboarding-complete flag (`nofrills.hasOnboarded`) | AsyncStorage, via `lib/storage.ts` | A single boolean | Nothing to cap |
+
+Both are written and read only through `lib/storage.ts`, which is the
+single chokepoint for anything touching disk — deliberately, so this
+table can't silently drift from reality. If a future feature needs
+persistence, it goes through that module, and it gets a row here at the
+same time it gets written, per the rule above.
+
+Neither value is transmitted off the device, and neither contains
+anything identifying — team IDs are ESPN's public identifiers, the same
+for every user who follows that team.

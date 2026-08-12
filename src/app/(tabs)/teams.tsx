@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TeamRow } from '@/components/team-row';
 import { Fonts, Spacing } from '@/constants/theme';
+import { useFavorites } from '@/hooks/use-favorites';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
 import { Team } from '@/lib/teams';
@@ -15,15 +16,25 @@ import { Team } from '@/lib/teams';
 export default function TeamsScreen() {
   const theme = useTheme();
   const { teams, loading, error } = useTeams();
+  const { favoriteIds, toggleFavorite } = useFavorites();
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return teams;
-    return teams.filter(
-      (t) => t.name.toLowerCase().includes(q) || t.abbreviation.toLowerCase().includes(q),
-    );
-  }, [teams, query]);
+    const matching = q
+      ? teams.filter(
+          (t) => t.name.toLowerCase().includes(q) || t.abbreviation.toLowerCase().includes(q),
+        )
+      : teams;
+
+    // Followed teams float to the top, so the list doubles as a view of
+    // who you follow rather than needing a separate screen for it.
+    // Alphabetical within each group, preserving the order from lib/teams.
+    return [
+      ...matching.filter((t) => favoriteIds.includes(t.id)),
+      ...matching.filter((t) => !favoriteIds.includes(t.id)),
+    ];
+  }, [teams, query, favoriteIds]);
 
   const openTeam = (team: Team) => {
     router.push({
@@ -43,7 +54,7 @@ export default function TeamsScreen() {
         <View style={styles.header}>
           <Logo size={22} />
           <ThemedText type="title" style={styles.headerTitle}>
-            Big Ten Teams
+            Teams
           </ThemedText>
         </View>
 
@@ -77,7 +88,14 @@ export default function TeamsScreen() {
           <FlatList
             data={filtered}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <TeamRow team={item} onPress={() => openTeam(item)} />}
+            renderItem={({ item }) => (
+              <TeamRow
+                team={item}
+                onPress={() => openTeam(item)}
+                following={favoriteIds.includes(item.id)}
+                onToggleFollow={() => toggleFavorite(item.id)}
+              />
+            )}
             ItemSeparatorComponent={() => (
               <View style={[styles.separator, { backgroundColor: theme.text }]} />
             )}

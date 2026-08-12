@@ -6,8 +6,23 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatRelativeTime } from '@/lib/format';
 import { Article } from '@/lib/feeds';
+import { tierLabel } from '@/lib/source-tier';
 
-export function ArticleCard({ article, onPress }: { article: Article; onPress: () => void }) {
+export function ArticleCard({
+  article,
+  onPress,
+  /**
+   * Which team this story is about. Only set in the merged home feed,
+   * where several teams' news share one list and the headline alone
+   * doesn't tell you who it concerns. Omitted on team-specific screens,
+   * where it would just repeat the header.
+   */
+  tagLabel,
+}: {
+  article: Article;
+  onPress: () => void;
+  tagLabel?: string;
+}) {
   const theme = useTheme();
 
   return (
@@ -26,14 +41,27 @@ export function ArticleCard({ article, onPress }: { article: Article; onPress: (
       )}
 
       <View style={styles.textColumn}>
-        <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.meta}>
-          {article.source}
-        </ThemedText>
+        <View style={styles.metaRow}>
+          {tagLabel ? (
+            <View style={[styles.tag, { backgroundColor: theme.text }]}>
+              <ThemedText style={[styles.tagText, { color: theme.background }]}>
+                {tagLabel}
+              </ThemedText>
+            </View>
+          ) : null}
+          <ThemedText
+            type="small"
+            themeColor="textSecondary"
+            numberOfLines={1}
+            style={[styles.meta, styles.metaFlex]}>
+            {article.source}
+          </ThemedText>
+        </View>
         <ThemedText type="smallBold" numberOfLines={3} style={styles.title}>
           {article.title}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
-          {formatRelativeTime(article.publishedAt)}
+          {formatRelativeTime(article.publishedAt)} · {tierLabel(article.tier)}
         </ThemedText>
       </View>
     </TouchableOpacity>
@@ -71,5 +99,24 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     fontSize: 11,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  metaFlex: {
+    flex: 1,
+  },
+  tag: {
+    paddingHorizontal: Spacing.one,
+    paddingVertical: 1,
+    borderRadius: 0,
+  },
+  tagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });

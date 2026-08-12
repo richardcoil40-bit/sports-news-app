@@ -206,5 +206,15 @@ function slugify(value: string): string {
 
 export function communitySourcesForTeam(teamShortName: string): FeedSource[] {
   const slug = slugify(teamShortName);
-  return SOURCES_BY_SLUG[slug] ?? SOURCES_BY_SLUG[SLUG_ALIASES[slug] ?? ''] ?? [];
+  const sources = SOURCES_BY_SLUG[slug] ?? SOURCES_BY_SLUG[SLUG_ALIASES[slug] ?? ''] ?? [];
+
+  // Everything in this file is beat coverage by definition — a team blog,
+  // an independent that covers one program, or a metro paper's sports
+  // section. Tagged here in one place rather than repeated on every
+  // entry, so a source added later can't accidentally be left untagged
+  // and get filed under national. Note this can't be derived from
+  // `scope`: local newsrooms are broad-scoped (they cover pro teams and
+  // other sports too, so they need name-filtering) but are still beat
+  // coverage of the program.
+  return sources.map((source) => ({ ...source, reach: 'beat' as const }));
 }

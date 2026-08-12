@@ -17,21 +17,44 @@ export type SourceTier = 1 | 2 | 3;
  */
 export type SourceScope = 'team' | 'broad';
 
+/**
+ * Who a source covers — a separate axis from tier, and the distinction
+ * tier deliberately can't make.
+ *
+ *   'national' — covers the whole sport (ESPN, CBS, Yahoo).
+ *   'beat'     — covers one team or region full-time: the metro paper's
+ *                beat writer, the team blog, the student paper.
+ *
+ * These are orthogonal on purpose. MLive, the Seattle Times and the
+ * Lincoln Journal Star are all Tier 1 professional newsrooms, exactly
+ * like ESPN — so filtering by tier can't separate national wire coverage
+ * from the reporter who watches your team every day. That's a real thing
+ * to want, and it needs its own dimension.
+ */
+export type SourceReach = 'national' | 'beat';
+
 export interface FeedSource {
   id: string;
   name: string;
   url: string;
   tier?: SourceTier;
   scope?: SourceScope;
+  reach?: SourceReach;
 }
 
 /** College football RSS feeds only — no scraping. */
+/**
+ * The national pool — sources that cover the whole sport rather than any
+ * one team. Off Tackle Empire (conference-wide) and Extra Points (the
+ * business of college sports) are both wider than a single program, so
+ * they count as national here even though neither is a big TV network.
+ */
 export const FEED_SOURCES: FeedSource[] = [
-  { id: 'espn-cfb', name: 'ESPN', url: 'https://www.espn.com/espn/rss/ncf/news', tier: 1, scope: 'broad' },
-  { id: 'cbs-cfb', name: 'CBS Sports', url: 'https://www.cbssports.com/rss/headlines/college-football/', tier: 1, scope: 'broad' },
-  { id: 'yahoo-cfb', name: 'Yahoo Sports', url: 'https://sports.yahoo.com/college-football/rss.xml', tier: 1, scope: 'broad' },
-  { id: 'off-tackle-empire', name: 'Off Tackle Empire', url: 'https://www.offtackleempire.com/rss/index.xml', tier: 3, scope: 'broad' },
-  { id: 'extra-points', name: 'Extra Points', url: 'https://extrapoints.substack.com/feed', tier: 2, scope: 'broad' },
+  { id: 'espn-cfb', name: 'ESPN', url: 'https://www.espn.com/espn/rss/ncf/news', tier: 1, scope: 'broad', reach: 'national' },
+  { id: 'cbs-cfb', name: 'CBS Sports', url: 'https://www.cbssports.com/rss/headlines/college-football/', tier: 1, scope: 'broad', reach: 'national' },
+  { id: 'yahoo-cfb', name: 'Yahoo Sports', url: 'https://sports.yahoo.com/college-football/rss.xml', tier: 1, scope: 'broad', reach: 'national' },
+  { id: 'off-tackle-empire', name: 'Off Tackle Empire', url: 'https://www.offtackleempire.com/rss/index.xml', tier: 3, scope: 'broad', reach: 'national' },
+  { id: 'extra-points', name: 'Extra Points', url: 'https://extrapoints.substack.com/feed', tier: 2, scope: 'broad', reach: 'national' },
 ];
 
 export interface Article {
@@ -44,6 +67,7 @@ export interface Article {
   publishedAt: string | null;
   imageUrl: string | null;
   tier: SourceTier;
+  reach: SourceReach;
 }
 
 const xmlParser = new XMLParser({
@@ -150,7 +174,7 @@ function extractAuthor(item: Record<string, unknown>): string | null {
  * them, i.e. the hang is somewhere else, like parsing or a downstream
  * consumer).
  */
-const DEBUG_TIMING = true;
+const DEBUG_TIMING = false;
 
 async function fetchFeed(source: FeedSource): Promise<Article[]> {
   const controller = new AbortController();
@@ -183,6 +207,11 @@ async function fetchFeed(source: FeedSource): Promise<Article[]> {
           publishedAt: parsePubDate(item.pubDate),
           imageUrl: extractImageUrl(item),
           tier: source.tier ?? 3,
+          // A team-specific site is a beat source by definition. Local
+          // newsrooms are broad-scoped but still beat coverage, so
+          // community-sources.ts tags those explicitly rather than
+          // relying on this fallback.
+          reach: source.reach ?? (source.scope === 'team' ? 'beat' : 'national'),
         };
       });
 
