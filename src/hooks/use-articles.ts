@@ -50,6 +50,8 @@ export function useArticles() {
   }, []);
 
   useEffect(() => {
+    // Fetch-on-mount: load() sets `loading` synchronously before awaiting.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load(false);
   }, [load]);
 

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface AsyncState<T> {
   /** null until the first successful result lands. */
@@ -44,9 +44,15 @@ export function useAsync<T>(load: (publish: (value: T) => void) => Promise<T>): 
 
   // The loader closes over screen params, so it's a new function every
   // render. Keep the latest one in a ref so `load` doesn't have to change
-  // identity with it.
+  // identity with it. Synced in an effect rather than assigned during
+  // render (refs aren't safe to touch mid-render); the ref's initial value
+  // covers the first pass, and this effect is registered before the
+  // consuming screen's own effects, so it's always current by the time
+  // anything calls load().
   const loadRef = useRef(load);
-  loadRef.current = load;
+  useEffect(() => {
+    loadRef.current = load;
+  });
 
   const run = useCallback((force: boolean) => {
     if (!force && (dataRef.current !== null || inFlightRef.current)) return;

@@ -82,6 +82,36 @@ There's a top-level `ErrorBoundary` (`src/components/error-boundary.tsx`)
 wrapping the whole app in `_layout.tsx`. It's the last line of defense,
 not a substitute for the two points above.
 
+For a plain data/loading/error triple, use `src/hooks/use-async.ts`
+rather than writing the three `useState`s again — it has the `requestId`
+guard built in. Two things about it are load-bearing and shouldn't be
+"simplified": the loader receives a `publish` callback so results can
+land in stages (the team schedule renders its games before its odds
+finish loading), and `load()` is idempotent while `reload()` forces, so
+it can be called from an effect that re-runs on every tab change. A
+*failed* load deliberately doesn't count as done, so revisiting a tab
+after an error retries.
+
+## Lint
+
+`npm run lint` runs `expo lint` against `eslint.config.js`
+(`eslint-config-expo`, flat config). It passes clean — keep it that way.
+
+The rule worth knowing about is `no-restricted-imports` scoped to
+`src/lib/**`: importing `react` or `react-native` from the data layer is
+an error, because that layer is plain TypeScript and staying that way is
+what lets it be tested under Vitest without a React Native harness.
+`@react-native-async-storage/async-storage` is blocked there too, with a
+single declared exception for `src/lib/storage.ts` — the one file that
+touches disk. Add UI code to `src/hooks/` or `src/components/` instead
+of relaxing the rule.
+
+Four `react-hooks/set-state-in-effect` errors are suppressed inline,
+each with a reason: three are ordinary fetch-on-mount (`use-teams`,
+`use-articles`, `use-feed`) and one is Expo's own web hydration
+boilerplate. They're per-line rather than a rule-level "off" so the rule
+still fails the build on new code.
+
 ## Design system
 
 Established and intentional — don't drift from it without discussing:
