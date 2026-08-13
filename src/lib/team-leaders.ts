@@ -1,4 +1,4 @@
-const FETCH_TIMEOUT_MS = 10000;
+import { fetchWithTimeout } from '@/lib/http';
 
 export interface StatLeader {
   athleteId: string;
@@ -19,16 +19,6 @@ interface RawCategory {
   displayName?: string;
   name?: string;
   leaders?: RawLeader[];
-}
-
-async function fetchWithTimeout(url: string): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(url, { signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 /**

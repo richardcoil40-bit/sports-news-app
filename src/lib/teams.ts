@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from '@/lib/http';
+
 /**
  * ESPN's public site API — the same JSON endpoints ESPN's own site and apps
  * call. Not RSS, but not scraped HTML either: structured, unauthenticated
@@ -14,24 +16,12 @@
 const BIG_TEN_STANDINGS_URL =
   'https://site.api.espn.com/apis/v2/sports/football/college-football/standings?group=5';
 
-const FETCH_TIMEOUT_MS = 10000;
-
 export interface Team {
   id: string;
   name: string; // "Georgia Bulldogs"
   shortName: string; // "Georgia"
   abbreviation: string; // "UGA"
   logoUrl: string | null;
-}
-
-async function fetchWithTimeout(url: string): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(url, { signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 interface RawTeam {

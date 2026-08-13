@@ -1,17 +1,7 @@
-const FETCH_TIMEOUT_MS = 10000;
+import { fetchWithTimeout } from '@/lib/http';
 
 const colorCache = new Map<string, string | null>();
 const inFlight = new Map<string, Promise<string | null>>();
-
-async function fetchWithTimeout(url: string): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(url, { signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
-}
 
 async function fetchTeamColorUncached(teamId: string): Promise<string | null> {
   const url = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${teamId}`;

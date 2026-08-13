@@ -1,4 +1,4 @@
-const FETCH_TIMEOUT_MS = 10000;
+import { fetchWithTimeout } from '@/lib/http';
 
 export interface Odds {
   provider: string;
@@ -20,16 +20,6 @@ export interface ScheduledGame {
   statusDetail: string; // "Sat, September 5th at 12:30 PM EDT" or "Final: W 34-10"
   completed: boolean;
   odds: Odds | null;
-}
-
-async function fetchWithTimeout(url: string): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(url, { signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 interface RawTeamRef {

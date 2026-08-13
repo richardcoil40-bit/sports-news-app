@@ -16,10 +16,14 @@ goes stale.
 Every remote data source follows the same shape. Match it rather than
 inventing a new one:
 
-- **Timeout every fetch.** `AbortController` + `setTimeout(..., 10000)`,
-  wrapped in a small `fetchWithTimeout` per file. Nothing hits the
-  network without a hard timeout — a hung request should fail loud
-  within 10s, not hang the caller forever.
+- **Timeout every fetch.** Import `fetchWithTimeout` from
+  `src/lib/http.ts` — don't hand-roll another one. It wraps `fetch` in
+  an `AbortController` + `setTimeout(..., FETCH_TIMEOUT_MS)` (10s).
+  Nothing hits the network without a hard timeout — a hung request
+  should fail loud within 10s, not hang the caller forever. If a call
+  site needs its own fetch logic (see `feeds.ts`, which times each feed
+  for debugging), still import `FETCH_TIMEOUT_MS` rather than
+  redeclaring the number.
 - **Cache with a `Map` + an in-flight `Map`.** Per-entity caches (keyed
   by team ID, for example) use two module-level `Map`s: one for
   resolved results, one for in-progress promises, so concurrent callers

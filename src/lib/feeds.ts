@@ -1,5 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 
+import { FETCH_TIMEOUT_MS } from '@/lib/http';
+
 /**
  * How far a source is trusted. Assigned by the criteria in
  * docs/source-reliability.md, not by how well-known the outlet is.
@@ -75,8 +77,6 @@ const xmlParser = new XMLParser({
   attributeNamePrefix: '@_',
   textNodeName: '#text',
 });
-
-const FETCH_TIMEOUT_MS = 10000;
 
 const NAMED_ENTITIES: Record<string, string> = {
   amp: '&',

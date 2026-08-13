@@ -1,4 +1,4 @@
-const FETCH_TIMEOUT_MS = 10000;
+import { fetchWithTimeout } from '@/lib/http';
 
 export type PositionGroup = 'offense' | 'defense' | 'specialTeam';
 
@@ -24,16 +24,6 @@ interface RawAthlete {
   position?: { abbreviation?: string };
   headshot?: { href?: string };
   experience?: { years?: number };
-}
-
-async function fetchWithTimeout(url: string): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(url, { signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 const POSITION_GROUPS: PositionGroup[] = ['offense', 'defense', 'specialTeam'];

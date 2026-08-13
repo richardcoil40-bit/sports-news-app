@@ -1,4 +1,4 @@
-const FETCH_TIMEOUT_MS = 10000;
+import { fetchWithTimeout } from '@/lib/http';
 
 /**
  * Pinned to the 2025 season for this first pass rather than computed from
@@ -32,16 +32,6 @@ interface RawCategory {
   labels?: string[];
   displayNames?: string[];
   statistics?: RawStatEntry[];
-}
-
-async function fetchWithTimeout(url: string): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(url, { signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 /** A category where every recorded value is zero/blank isn't worth a card (e.g. a punt return line for a WR who fielded one and gained nothing). */
