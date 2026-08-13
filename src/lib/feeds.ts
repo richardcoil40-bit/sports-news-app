@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 
+import { createSingletonCache } from '@/lib/cache';
 import { FETCH_TIMEOUT_MS } from '@/lib/http';
 
 /**
@@ -281,25 +282,8 @@ export async function fetchFeeds(sources: FeedSource[]): Promise<FetchAllResult>
  * News tab passes `force: true` to bypass it.
  */
 const CACHE_TTL_MS = 3 * 60 * 1000;
-let cachedResult: FetchAllResult | null = null;
-let cachedAt = 0;
-let inFlight: Promise<FetchAllResult> | null = null;
+const allFeedsCache = createSingletonCache<FetchAllResult>({ ttlMs: CACHE_TTL_MS });
 
 export async function fetchAllFeeds(options?: { force?: boolean }): Promise<FetchAllResult> {
-  if (!options?.force) {
-    const isFresh = cachedResult !== null && Date.now() - cachedAt < CACHE_TTL_MS;
-    if (isFresh) return cachedResult!;
-    if (inFlight) return inFlight;
-  }
-
-  inFlight = fetchFeeds(FEED_SOURCES)
-    .then((result) => {
-      cachedResult = result;
-      cachedAt = Date.now();
-      return result;
-    })
-    .finally(() => {
-      inFlight = null;
-    });
-  return inFlight;
+  return allFeedsCache.get(() => fetchFeeds(FEED_SOURCES), { force: options?.force });
 }

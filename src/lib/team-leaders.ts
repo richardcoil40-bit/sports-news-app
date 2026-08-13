@@ -1,3 +1,4 @@
+import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
 
 export interface StatLeader {
@@ -37,8 +38,7 @@ function athleteIdFromRef(ref: string | undefined): string | null {
   return match ? match[1] : null;
 }
 
-const cache = new Map<string, StatLeader[]>();
-const inFlight = new Map<string, Promise<StatLeader[]>>();
+const cache = createEntityCache<string, StatLeader[]>();
 
 async function fetchUncached(teamId: string): Promise<StatLeader[]> {
   const season = lastCompletedSeason();
@@ -74,22 +74,7 @@ async function fetchUncached(teamId: string): Promise<StatLeader[]> {
  * cross-referencing against the current roster.
  */
 export async function fetchTeamStatLeaders(teamId: string): Promise<StatLeader[]> {
-  const cached = cache.get(teamId);
-  if (cached) return cached;
-
-  const existing = inFlight.get(teamId);
-  if (existing) return existing;
-
-  const promise = fetchUncached(teamId)
-    .catch(() => [] as StatLeader[])
-    .then((leaders) => {
-      cache.set(teamId, leaders);
-      return leaders;
-    })
-    .finally(() => {
-      inFlight.delete(teamId);
-    });
-
-  inFlight.set(teamId, promise);
-  return promise;
+  // Failures degrade to (and are cached as) empty — leaders are a nice-to-have
+  // second opinion, not something worth failing a screen over.
+  return cache.get(teamId, () => fetchUncached(teamId).catch(() => [] as StatLeader[]));
 }

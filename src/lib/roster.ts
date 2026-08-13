@@ -1,3 +1,4 @@
+import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
 
 export type PositionGroup = 'offense' | 'defense' | 'specialTeam';
@@ -30,8 +31,7 @@ const POSITION_GROUPS: PositionGroup[] = ['offense', 'defense', 'specialTeam'];
 
 // Full rosters run large (100+ players' worth of fields). Cached per team so
 // leaving and re-entering a team's Players tab doesn't re-fetch every time.
-const rosterCache = new Map<string, Player[]>();
-const rosterInFlight = new Map<string, Promise<Player[]>>();
+const rosterCache = createEntityCache<string, Player[]>();
 
 async function fetchTeamRosterUncached(teamId: string): Promise<Player[]> {
   const url = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${teamId}/roster`;
@@ -62,21 +62,5 @@ async function fetchTeamRosterUncached(teamId: string): Promise<Player[]> {
 }
 
 export async function fetchTeamRoster(teamId: string): Promise<Player[]> {
-  const cached = rosterCache.get(teamId);
-  if (cached) return cached;
-
-  const existing = rosterInFlight.get(teamId);
-  if (existing) return existing;
-
-  const promise = fetchTeamRosterUncached(teamId)
-    .then((players) => {
-      rosterCache.set(teamId, players);
-      return players;
-    })
-    .finally(() => {
-      rosterInFlight.delete(teamId);
-    });
-
-  rosterInFlight.set(teamId, promise);
-  return promise;
+  return rosterCache.get(teamId, () => fetchTeamRosterUncached(teamId));
 }

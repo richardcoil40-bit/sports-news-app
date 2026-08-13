@@ -24,13 +24,25 @@ inventing a new one:
   site needs its own fetch logic (see `feeds.ts`, which times each feed
   for debugging), still import `FETCH_TIMEOUT_MS` rather than
   redeclaring the number.
-- **Cache with a `Map` + an in-flight `Map`.** Per-entity caches (keyed
-  by team ID, for example) use two module-level `Map`s: one for
-  resolved results, one for in-progress promises, so concurrent callers
-  for the same key share a single request instead of firing duplicates.
-  See `roster.ts`, `team-color.ts`, `team-leaders.ts` for the plainest
-  examples; `feeds.ts` and `team-news-pool.ts` add a TTL on top (3
-  minutes) since those are shared pools re-fetched more often.
+- **Cache with `createEntityCache` from `src/lib/cache.ts`.** Don't
+  hand-roll another resolved-`Map`-plus-in-flight-`Map` pair; the helper
+  encapsulates that, so concurrent callers for the same key share a
+  single request instead of firing duplicates. Pass `{ ttlMs }` for
+  pools that should go stale (`feeds.ts` and `team-news-pool.ts` use 3
+  minutes, since those are shared and re-fetched more often); omit it to
+  cache for the life of the process (`roster.ts`, `team-color.ts`,
+  `team-leaders.ts`, `player-stats.ts`). `force: true` on a `get`
+  bypasses the read and refetches — that's what pull-to-refresh uses.
+  `peek(key)` is a TTL-ignoring stale read, for fallback paths that
+  would rather serve something old than nothing (`team-news-pool.ts`'s
+  hard cap). Sources that cache one global result rather than one per
+  entity use `createSingletonCache` from the same file.
+  - **Error policy stays at the call site.** The helper caches whatever
+    the loader resolves to and caches nothing when it rejects. If a
+    source should degrade to empty *and* remember that, catch inside
+    the loader you pass (`team-leaders.ts`, `player-stats.ts`); if it
+    should stay uncached so the next call retries, let it throw
+    (`roster.ts`).
 - **Tolerate partial failure.** Multi-source fetches (`fetchFeeds`,
   `fetchTeamNewsPool`) use `Promise.allSettled`, not `Promise.all` — one
   dead feed should never take down the others. Failed sources get

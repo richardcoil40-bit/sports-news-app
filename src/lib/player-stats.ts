@@ -1,3 +1,4 @@
+import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
 
 /**
@@ -39,8 +40,7 @@ function hasSignal(values: string[]): boolean {
   return values.some((v) => v && v !== '0' && v !== '0.0' && v !== '-');
 }
 
-const cache = new Map<string, PlayerStatCategory[]>();
-const inFlight = new Map<string, Promise<PlayerStatCategory[]>>();
+const cache = createEntityCache<string, PlayerStatCategory[]>();
 
 async function fetchUncached(athleteId: string): Promise<PlayerStatCategory[]> {
   const url = `https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/athletes/${athleteId}/stats`;
@@ -75,22 +75,7 @@ async function fetchUncached(athleteId: string): Promise<PlayerStatCategory[]> {
  * consumer and re-visiting it shouldn't re-fetch.
  */
 export async function fetchPlayerSeasonStats(athleteId: string): Promise<PlayerStatCategory[]> {
-  const cached = cache.get(athleteId);
-  if (cached) return cached;
-
-  const existing = inFlight.get(athleteId);
-  if (existing) return existing;
-
-  const promise = fetchUncached(athleteId)
-    .catch(() => [] as PlayerStatCategory[])
-    .then((categories) => {
-      cache.set(athleteId, categories);
-      return categories;
-    })
-    .finally(() => {
-      inFlight.delete(athleteId);
-    });
-
-  inFlight.set(athleteId, promise);
-  return promise;
+  // Failures degrade to (and are cached as) empty — a player screen without a
+  // stats card is fine; one that fails to load isn't.
+  return cache.get(athleteId, () => fetchUncached(athleteId).catch(() => [] as PlayerStatCategory[]));
 }
