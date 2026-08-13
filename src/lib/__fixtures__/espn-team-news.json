@@ -1,0 +1,28 @@
+{
+  "header": "Ohio State Buckeyes News",
+  "articles": [
+    {
+      "id": 43210001,
+      "headline": "Buckeyes hold off Michigan in The Game",
+      "description": "Ohio State survived a late push to take the rivalry game.",
+      "byline": "Adam Rittenberg",
+      "published": "2025-11-29T22:14:00Z",
+      "images": [{ "url": "https://a.espncdn.com/photo/2025/1129/r1000_1296x729_16-9.jpg" }],
+      "links": { "web": { "href": "https://www.espn.com/college-football/story/_/id/43210001" } }
+    },
+    {
+      "id": 43210002,
+      "headline": "Playoff picture: where the Big Ten stands",
+      "description": "A look at the conference's postseason path.",
+      "published": "not-a-real-date",
+      "links": { "web": { "href": "https://www.espn.com/college-football/story/_/id/43210002" } }
+    },
+    {
+      "id": 43210003,
+      "headline": "This one has no web link and should be dropped",
+      "description": "No links.web.href field.",
+      "published": "2025-11-28T10:00:00Z",
+      "links": {}
+    }
+  ]
+}

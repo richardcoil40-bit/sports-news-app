@@ -38,12 +38,17 @@ async function fetchTeamRosterUncached(teamId: string): Promise<Player[]> {
   const response = await fetchWithTimeout(url);
   if (!response.ok) throw new Error(`Roster responded ${response.status}`);
   const json = await response.json();
-  const groups: { position: string; items: RawAthlete[] }[] = json?.athletes ?? [];
+  const rawGroups = json?.athletes;
+  const groups: { position: string; items?: RawAthlete[] }[] = Array.isArray(rawGroups)
+    ? rawGroups
+    : [];
 
   const players: Player[] = [];
   for (const group of groups) {
-    if (!POSITION_GROUPS.includes(group.position as PositionGroup)) continue;
-    for (const athlete of group.items) {
+    if (!POSITION_GROUPS.includes(group?.position as PositionGroup)) continue;
+    // A position group with no `items` is a real response ESPN returns for
+    // teams with an incomplete roster — iterating it directly threw.
+    for (const athlete of Array.isArray(group.items) ? group.items : []) {
       players.push({
         id: athlete.id,
         fullName: athlete.fullName,

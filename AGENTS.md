@@ -92,6 +92,34 @@ it can be called from an effect that re-runs on every tab change. A
 *failed* load deliberately doesn't count as done, so revisiting a tab
 after an error retries.
 
+## Tests
+
+`npm test` runs Vitest (`npm run test:watch` to watch). It's scoped to
+`src/lib/**/*.test.ts` by `vitest.config.mts` and runs in a plain Node
+environment — no jest-expo, no Metro transform, no React Native mocks.
+That's only possible because the data layer has no React or React Native
+imports, which the lint rule above enforces. Testing components or hooks
+would need that heavier harness; add it alongside this rather than
+folding these tests into it.
+
+- **No live network calls.** Tests stub `fetch` and serve a fixture from
+  `src/lib/__fixtures__/` (see the README there for what each file
+  covers and why it's shaped that way).
+- **Import fixtures, don't read them.** JSON via a plain import
+  (`resolveJsonModule` is on), text via Vite's `?raw`. Node's `fs` isn't
+  available to the type-checker: Expo's `tsconfig.base` sets
+  `customConditions: ["react-native"]`, under which `node:*` types don't
+  resolve.
+- **Use a unique entity id per call.** Every module here caches at module
+  scope with no reset hook, so tests that reuse an id will serve each
+  other's cached values. `teams.ts` caches per *league*, so its tests
+  pass `{ force: true }` instead.
+- **The contract worth protecting** is that a malformed or
+  unexpected-shape response degrades to empty rather than throwing.
+  `espn-parsers.test.ts` asserts it for every parser against a shared
+  list of junk shapes. That list found five real crashes when it was
+  written — add to it rather than narrowing it.
+
 ## Lint
 
 `npm run lint` runs `expo lint` against `eslint.config.js`

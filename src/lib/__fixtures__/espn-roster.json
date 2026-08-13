@@ -1,0 +1,54 @@
+{
+  "team": { "id": "194", "displayName": "Ohio State Buckeyes" },
+  "athletes": [
+    {
+      "position": "offense",
+      "items": [
+        {
+          "id": "4432762",
+          "firstName": "Will",
+          "lastName": "Howard",
+          "fullName": "Will Howard",
+          "jersey": "18",
+          "position": { "abbreviation": "QB" },
+          "headshot": { "href": "https://a.espncdn.com/i/headshots/college-football/players/full/4432762.png" },
+          "experience": { "years": 5 }
+        },
+        {
+          "id": "4685702",
+          "firstName": "Jeremiah",
+          "lastName": "Smith",
+          "fullName": "Jeremiah Smith",
+          "jersey": "4",
+          "position": { "abbreviation": "WR" },
+          "experience": { "years": 1 }
+        }
+      ]
+    },
+    {
+      "position": "defense",
+      "items": [
+        {
+          "id": "4429943",
+          "firstName": "Jack",
+          "lastName": "Sawyer",
+          "fullName": "Jack Sawyer",
+          "jersey": "33",
+          "position": { "abbreviation": "DE" },
+          "experience": { "years": 4 }
+        }
+      ]
+    },
+    {
+      "position": "coaches",
+      "items": [
+        {
+          "id": "9999999",
+          "firstName": "Not",
+          "lastName": "Aplayer",
+          "fullName": "Not Aplayer"
+        }
+      ]
+    }
+  ]
+}

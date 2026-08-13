@@ -1,0 +1,42 @@
+{
+  "uid": "s:20~l:23~g:5",
+  "id": "5",
+  "name": "Big Ten Conference",
+  "abbreviation": "Big Ten",
+  "standings": {
+    "id": "0",
+    "name": "overall",
+    "entries": [
+      {
+        "team": {
+          "id": "194",
+          "displayName": "Ohio State Buckeyes",
+          "shortDisplayName": "Ohio State",
+          "abbreviation": "OSU",
+          "logos": [
+            { "href": "https://a.espncdn.com/i/teamlogos/ncaa/500/194.png", "width": 500, "height": 500 }
+          ]
+        }
+      },
+      {
+        "team": {
+          "id": "130",
+          "displayName": "Michigan Wolverines",
+          "shortDisplayName": "Michigan",
+          "abbreviation": "MICH",
+          "logos": [
+            { "href": "https://a.espncdn.com/i/teamlogos/ncaa/500/130.png", "width": 500, "height": 500 }
+          ]
+        }
+      },
+      {
+        "team": {
+          "id": "213",
+          "displayName": "Penn State Nittany Lions",
+          "shortDisplayName": "Penn State",
+          "abbreviation": "PSU"
+        }
+      }
+    ]
+  }
+}

@@ -61,7 +61,7 @@ async function fetchTeamsUncached(league: League): Promise<Team[]> {
   const seen = new Set<string>();
   const teams: Team[] = [];
 
-  for (const entry of json.standings?.entries ?? []) {
+  for (const entry of json?.standings?.entries ?? []) {
     const t = entry.team;
     if (!t || seen.has(t.id)) continue;
     seen.add(t.id);

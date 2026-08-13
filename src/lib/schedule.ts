@@ -67,7 +67,7 @@ export async function fetchTeamSchedule(teamId: string): Promise<ScheduledGame[]
   const response = await fetchWithTimeout(url);
   if (!response.ok) throw new Error(`Schedule responded ${response.status}`);
   const json = await response.json();
-  const events: RawEvent[] = json?.events ?? [];
+  const events: RawEvent[] = Array.isArray(json?.events) ? json.events : [];
 
   const games: ScheduledGame[] = [];
   for (const event of events) {
@@ -76,7 +76,9 @@ export async function fetchTeamSchedule(teamId: string): Promise<ScheduledGame[]
 
     const self = competition.competitors?.find((c) => c.team?.id === teamId);
     const opponent = competition.competitors?.find((c) => c.team?.id !== teamId);
-    if (!opponent) continue;
+    // `team` can be absent on a competitor (a TBD opponent on a future
+    // bracket game), which used to throw on opponent.team.displayName below.
+    if (!opponent?.team) continue;
 
     const homeAway: ScheduledGame['homeAway'] = competition.neutralSite
       ? 'neutral'
@@ -126,7 +128,7 @@ export async function fetchGameOdds(eventId: string): Promise<Odds | null> {
   const response = await fetchWithTimeout(url);
   if (!response.ok) return null;
   const json: RawOddsRoot = await response.json();
-  const item = json.items?.[0];
+  const item = Array.isArray(json?.items) ? json.items[0] : undefined;
   if (!item) return null;
 
   return {

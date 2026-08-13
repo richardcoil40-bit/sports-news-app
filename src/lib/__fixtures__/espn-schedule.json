@@ -1,0 +1,70 @@
+{
+  "team": { "id": "194", "displayName": "Ohio State Buckeyes" },
+  "events": [
+    {
+      "id": "401628461",
+      "date": "2025-11-29T17:00Z",
+      "competitions": [
+        {
+          "neutralSite": false,
+          "competitors": [
+            {
+              "homeAway": "home",
+              "team": {
+                "id": "194",
+                "displayName": "Ohio State Buckeyes",
+                "shortDisplayName": "Ohio State"
+              }
+            },
+            {
+              "homeAway": "away",
+              "team": {
+                "id": "130",
+                "displayName": "Michigan Wolverines",
+                "shortDisplayName": "Michigan",
+                "logos": [{ "href": "https://a.espncdn.com/i/teamlogos/ncaa/500/130.png" }]
+              }
+            }
+          ],
+          "broadcasts": [{ "media": { "shortName": "FOX" } }],
+          "status": { "type": { "detail": "Final: W 34-10", "completed": true } }
+        }
+      ]
+    },
+    {
+      "id": "401628999",
+      "date": "2025-12-06T20:00Z",
+      "competitions": [
+        {
+          "neutralSite": true,
+          "competitors": [
+            {
+              "homeAway": "home",
+              "team": { "id": "194", "displayName": "Ohio State Buckeyes", "shortDisplayName": "Ohio State" }
+            },
+            {
+              "homeAway": "away",
+              "team": { "id": "213", "displayName": "Penn State Nittany Lions", "shortDisplayName": "Penn State" }
+            }
+          ],
+          "status": { "type": { "detail": "Sat, December 6th at 3:00 PM EST" } }
+        }
+      ]
+    },
+    {
+      "id": "401629000",
+      "date": "2025-12-13T20:00Z",
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "home",
+              "team": { "id": "194", "displayName": "Ohio State Buckeyes", "shortDisplayName": "Ohio State" }
+            }
+          ],
+          "status": { "type": { "detail": "No opponent listed — should be skipped" } }
+        }
+      ]
+    }
+  ]
+}

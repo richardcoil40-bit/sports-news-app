@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Land-Grant Holy Land - All Posts</title>
+    <link>https://www.landgrantholyland.com/</link>
+    <description>Ohio State Buckeyes news and analysis</description>
+    <item>
+      <title>Ohio State&#39;s defense sets the tone in Ann Arbor</title>
+      <link>https://www.landgrantholyland.com/2025/11/29/ohio-state-defense</link>
+      <description>&lt;p&gt;The Buckeyes held Michigan to 62 rushing yards.&lt;/p&gt;</description>
+      <pubDate>Sat, 29 Nov 2025 22:30:00 -0500</pubDate>
+      <dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">Matt Tamanini</dc:creator>
+      <media:content url="https://cdn.vox-cdn.com/thumbor/example/hero.jpg" medium="image" />
+    </item>
+    <item>
+      <title><![CDATA[Recruiting notebook: three commits in &#39;26 class]]></title>
+      <link>https://www.landgrantholyland.com/2025/11/28/recruiting-notebook</link>
+      <description><![CDATA[<p>A look at the latest additions.</p>]]></description>
+      <pubDate>Fri, 28 Nov 2025 14:00:00 -0500</pubDate>
+    </item>
+    <item>
+      <title>Item with no link should be dropped</title>
+      <description>No link element on this one.</description>
+      <pubDate>Thu, 27 Nov 2025 09:00:00 -0500</pubDate>
+    </item>
+  </channel>
+</rss>

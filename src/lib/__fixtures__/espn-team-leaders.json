@@ -1,0 +1,35 @@
+{
+  "categories": [
+    {
+      "name": "passingYards",
+      "displayName": "Passing Leader",
+      "leaders": [
+        {
+          "displayValue": "3,323",
+          "athlete": { "$ref": "http://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/2025/athletes/4432762?lang=en" }
+        },
+        {
+          "displayValue": "412",
+          "athlete": { "$ref": "http://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/2025/athletes/4433971?lang=en" }
+        }
+      ]
+    },
+    {
+      "name": "rushingYards",
+      "displayName": "Rushing Leader",
+      "leaders": [
+        {
+          "displayValue": "168 CAR, 1035 YDS, 5 TD",
+          "athlete": { "$ref": "http://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/2025/athletes/4636106?lang=en" }
+        }
+      ]
+    },
+    {
+      "name": "brokenRef",
+      "displayName": "Receiving Leader",
+      "leaders": [
+        { "displayValue": "62 REC, 934 YDS", "athlete": { "$ref": "http://example.com/no-athlete-id-here" } }
+      ]
+    }
+  ]
+}

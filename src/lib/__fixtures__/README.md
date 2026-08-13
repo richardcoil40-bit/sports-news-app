@@ -1,0 +1,29 @@
+# Test fixtures
+
+Saved sample responses for the `src/lib/` tests. Nothing here hits the
+network — every test stubs `fetch` and serves one of these files.
+
+These are **hand-trimmed representative samples**, not verbatim captures. Real
+ESPN responses are tens of kilobytes of fields this app never reads, so each
+file keeps only the fields the corresponding parser touches, plus at least one
+deliberate edge case:
+
+| File | Parser | Edge case it carries |
+| --- | --- | --- |
+| `espn-standings.json` | `teams.ts` | Third team has no `logos` array |
+| `espn-roster.json` | `roster.ts` | A `coaches` group that must be filtered out |
+| `espn-team-leaders.json` | `team-leaders.ts` | A `$ref` with no extractable athlete id |
+| `espn-player-stats.json` | `player-stats.ts` | An all-zero category, and an off-season year |
+| `espn-schedule.json` | `schedule.ts` | A neutral-site game, and an event with no opponent |
+| `espn-team-news.json` | `team-news.ts` | An unparseable date, and an article with no web link |
+| `espn-team.json` | `team-color.ts` | — (the white-color case is inline in the test) |
+| `rss-valid.xml` | `feeds.ts` | CDATA with pre-encoded entities, and an item with no link |
+| `rss-malformed.xml` | `feeds.ts` | Truncated mid-document, as a dying CDN returns |
+
+Malformed *shapes* (null bodies, wrong types, missing keys) are generated in
+the tests rather than saved as files — they're one-liners and reading them
+next to the assertion is clearer than opening a file.
+
+If a parser starts reading a new field, add it to the relevant fixture rather
+than loosening the assertion. If ESPN changes a response shape for real,
+that's worth re-capturing from a live call and re-trimming by hand.

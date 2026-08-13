@@ -27,7 +27,7 @@ export async function fetchTeamArticles(teamId: string): Promise<Article[]> {
   const response = await fetchWithTimeout(url);
   if (!response.ok) throw new Error(`Team news responded ${response.status}`);
   const json = await response.json();
-  const rawArticles: RawArticle[] = json?.articles ?? [];
+  const rawArticles: RawArticle[] = Array.isArray(json?.articles) ? json.articles : [];
 
   return rawArticles
     .filter((a) => a.links?.web?.href)

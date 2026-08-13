@@ -1,0 +1,29 @@
+{
+  "athlete": { "id": "4685702", "displayName": "Jeremiah Smith" },
+  "categories": [
+    {
+      "name": "receiving",
+      "displayName": "Receiving",
+      "labels": ["REC", "YDS", "AVG", "TD", "LNG"],
+      "displayNames": ["Receptions", "Receiving Yards", "Yards Per Reception", "Receiving Touchdowns", "Longest Reception"],
+      "statistics": [
+        { "season": { "year": 2025 }, "stats": ["76", "1315", "17.3", "15", "70"] },
+        { "season": { "year": 2024 }, "stats": ["50", "800", "16.0", "9", "60"] }
+      ]
+    },
+    {
+      "name": "puntReturns",
+      "displayName": "Punt Returns",
+      "labels": ["RET", "YDS", "TD"],
+      "displayNames": ["Punt Returns", "Punt Return Yards", "Punt Return Touchdowns"],
+      "statistics": [{ "season": { "year": 2025 }, "stats": ["0", "0", "0"] }]
+    },
+    {
+      "name": "rushing",
+      "displayName": "Rushing",
+      "labels": ["CAR", "YDS", "TD"],
+      "displayNames": ["Carries", "Rushing Yards", "Rushing Touchdowns"],
+      "statistics": [{ "season": { "year": 2023 }, "stats": ["4", "22", "1"] }]
+    }
+  ]
+}
