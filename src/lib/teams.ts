@@ -1,3 +1,4 @@
+import { createSingletonCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
 
 /**
@@ -43,13 +44,17 @@ interface StandingsRoot {
   standings?: { entries?: { team: RawTeam }[] };
 }
 
-let cachedTeams: Team[] | null = null;
-
-export async function fetchBigTenTeams(): Promise<Team[]> {
-  if (cachedTeams) return cachedTeams;
-
+async function fetchBigTenTeamsUncached(): Promise<Team[]> {
   const response = await fetchWithTimeout(BIG_TEN_STANDINGS_URL);
+
+  // Deliberate exception to the "degrade to empty, never throw" rule the rest
+  // of src/lib/ follows. Every other source is supplementary — a screen
+  // without stat leaders or a team color is still a usable screen. The team
+  // list isn't: it's what the tab bar, the filters, and every per-team fetch
+  // are keyed on, so an empty list is an empty app that looks like it loaded
+  // fine. Throwing surfaces it as a real error the user can retry instead.
   if (!response.ok) throw new Error(`Team list responded ${response.status}`);
+
   const json: StandingsRoot = await response.json();
 
   const seen = new Set<string>();
@@ -69,6 +74,18 @@ export async function fetchBigTenTeams(): Promise<Team[]> {
   }
 
   teams.sort((a, b) => a.shortName.localeCompare(b.shortName));
-  cachedTeams = teams;
   return teams;
+}
+
+/**
+ * Conference membership changes at realignment, not during a session, so this
+ * TTL is only here to bound staleness in a long-lived process — not to keep up
+ * with anything. Much longer than the 3 minutes the news pools use, where
+ * freshness is the whole point.
+ */
+const CACHE_TTL_MS = 30 * 60 * 1000;
+const teamsCache = createSingletonCache<Team[]>({ ttlMs: CACHE_TTL_MS });
+
+export async function fetchBigTenTeams(options?: { force?: boolean }): Promise<Team[]> {
+  return teamsCache.get(fetchBigTenTeamsUncached, { force: options?.force });
 }

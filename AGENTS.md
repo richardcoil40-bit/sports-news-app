@@ -51,6 +51,14 @@ inventing a new one:
   chaining and a fallback (`json?.field ?? []`), never assumed to have
   the shape you expect. A malformed response should degrade to empty,
   not crash.
+  - **One deliberate exception: `teams.ts` throws on a non-OK
+    response.** Every other source is supplementary — a screen missing
+    stat leaders or a team color still works. The team list isn't: the
+    tab bar, the filters, and every per-team fetch key off it, so
+    degrading to empty produces an empty app that looks like it loaded
+    correctly. Throwing surfaces a retryable error instead. Don't
+    "fix" this to match the rule; if you add another source the app
+    genuinely can't function without, it belongs in this exception too.
 
 ## React effect safety
 
