@@ -135,3 +135,19 @@ Built for Big Ten college football today, with an explicit intent to
 expand to other sports and leagues. Favor sport-agnostic naming and
 structure where it doesn't cost real effort now, so that expansion is
 additive later rather than a rewrite.
+
+A league's identity lives in `src/lib/leagues.ts` as a `League`
+descriptor (`id`, `displayName`, and the `espn*` fields its URLs are
+built from). `BIG_TEN` is the only one wired up today.
+`fetchTeams(league)` in `teams.ts` takes one and defaults to it, and
+each league's team list caches under its own `id`. When you add a
+league, add a constant — don't hardcode a group number or a conference
+name into a module.
+
+Two things are still conference-shaped and deliberately left alone:
+`community-sources.ts` is a Big Ten–only source table keyed by team
+slug, and the five other ESPN modules (`roster.ts`, `schedule.ts`,
+`team-color.ts`, `team-news.ts`, `player-stats.ts`) each hardcode
+`football/college-football` in their URLs. Both are additive to fix
+later — a second table and a threaded-through descriptor respectively —
+not blockers.
