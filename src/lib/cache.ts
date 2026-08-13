@@ -49,7 +49,11 @@ export function createEntityCache<K, V>(options?: { ttlMs?: number }): EntityCac
           return value;
         })
         .finally(() => {
-          inFlight.delete(key);
+          // Only clear the slot if it's still ours. A `force` refetch replaces
+          // the in-flight entry mid-flight, and an unconditional delete would
+          // evict that newer promise when this older one settles — leaving the
+          // next caller to start a third, redundant request.
+          if (inFlight.get(key) === promise) inFlight.delete(key);
         });
 
       inFlight.set(key, promise);
