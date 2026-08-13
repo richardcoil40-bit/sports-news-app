@@ -45,5 +45,8 @@ example
 # local agent settings
 .claude/settings.local.json
 
-# feed checker output — regenerate with scripts/check-feeds.sh
-feed-status*.txt
+# Stray feed-checker output at the repo root. Reports under docs/evidence/
+# are deliberately tracked — they're the record of when each source was last
+# verified alive. Root-only pattern so scripts/check-feeds.sh output lands in
+# version control where it's useful.
+/feed-status*.txt

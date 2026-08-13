@@ -47,6 +47,13 @@ inventing a new one:
   `fetchTeamNewsPool`) use `Promise.allSettled`, not `Promise.all` — one
   dead feed should never take down the others. Failed sources get
   collected and surfaced, not silently dropped and not thrown.
+  - **Known gap:** "failed" currently means a rejected promise or a
+    non-OK status. A source that returns a *successful* response with
+    nothing usable in it — ESPN's feed answers 202 with an empty body —
+    parses to zero articles and is never added to `failedSources`. It
+    contributes nothing and reports nothing. See
+    `docs/evidence/README.md`; unresolved, and worth fixing if you're
+    touching this code.
 - **Defensive parsing.** External JSON is always read with optional
   chaining and a fallback (`json?.field ?? []`), never assumed to have
   the shape you expect. A malformed response should degrade to empty,
@@ -62,8 +69,8 @@ inventing a new one:
 
 ## React effect safety
 
-Two failure modes have actually happened in this codebase — guard
-against both:
+Three failure modes have actually happened in this codebase — guard
+against all three:
 
 - **Don't depend on a whole object from `useLocalSearchParams()`.**
   It returns a new object every render, so `useEffect(..., [params])`
@@ -73,10 +80,19 @@ against both:
   can be re-triggered before the previous call resolves (pull-to-
   refresh, fast navigation), a slow first response landing after a
   fast second one will silently overwrite newer state with stale data.
-  Either a `cancelled` flag (for unmount safety, see any screen in
-  `src/app/`) or a `requestId` ref (for out-of-order safety within a
-  hook, see `use-teams.ts` / `use-articles.ts`) — use whichever the
-  existing file already uses as its pattern.
+  Either a `cancelled` flag (for unmount safety, see the team-color
+  effect in `src/app/team/[id].tsx`) or a `requestId` ref (for
+  out-of-order safety within a hook, see `use-teams.ts`,
+  `use-articles.ts`, `use-async.ts`) — use whichever the existing file
+  already uses as its pattern.
+- **Don't put the `setLoading(false)` inside a `cancelled` guard when
+  the flag flips on anything other than unmount.** The team screen's
+  effect re-ran per tab, so its cleanup set `cancelled = true` on every
+  tab change; the `finally` block then skipped clearing `loading`, and
+  the load-once re-entry guard saw a load still "in flight" and refused
+  to retry. Switching tabs mid-load left a permanent spinner. If an
+  effect can be torn down for reasons other than unmount, prefer a
+  `requestId` — it stops stale writes without discarding a live result.
 
 There's a top-level `ErrorBoundary` (`src/components/error-boundary.tsx`)
 wrapping the whole app in `_layout.tsx`. It's the last line of defense,
@@ -98,7 +114,8 @@ after an error retries.
 `src/lib/**/*.test.ts` by `vitest.config.mts` and runs in a plain Node
 environment — no jest-expo, no Metro transform, no React Native mocks.
 That's only possible because the data layer has no React or React Native
-imports, which the lint rule above enforces. Testing components or hooks
+imports, which the `no-restricted-imports` rule in `eslint.config.js`
+enforces (see **Lint** below). Testing components or hooks
 would need that heavier harness; add it alongside this rather than
 folding these tests into it.
 
@@ -148,7 +165,10 @@ Established and intentional — don't drift from it without discussing:
 - Sharp corners. `borderRadius: 0` on every card, thumbnail, and logo.
 - Metadata text (sources, dates, positions) is uppercase, 11px, with
   slight letter-spacing.
-- Separators are bold — 1.5px using `theme.text`, not a hairline.
+- Separators are bold — 1.5px using `theme.text`, not a hairline. The
+  team tabs share a `Separator` component
+  (`src/components/team-tabs/shared.tsx`) rather than re-declaring the
+  style; use it where it fits.
 - Each team's real color (from `fetchTeamColor`) is the only per-screen
   accent, applied as a left-edge bar via `AccentRow` rather than
   reskinning components.
@@ -164,8 +184,16 @@ code comments:
   clear, and why. There's also a generalized, portable version of this
   saved as a Claude skill (`source-reliability`) usable outside this
   project.
-- `docs/data-retention.md` — current posture (nothing persists) and the
-  rule for whenever a persistent store gets added.
+- `docs/data-retention.md` — what's kept and for how long. One small
+  persisted store (followed teams, via `lib/storage.ts`); everything
+  else is in-memory and dies with the process. It carries the table of
+  every cache and its TTL, so update it when you add or retime one, and
+  it has the rule any future persistent store has to follow.
+- `docs/evidence/` — dated output from `scripts/check-feeds.sh`, the
+  record of when each source was last verified to be returning items.
+  Re-run it rather than assuming; feeds rot silently. Its README also
+  documents a standing failure worth knowing about (ESPN's feed returns
+  202 with an empty body and the app doesn't count that as a failure).
 
 ## Environment-specific constraints
 
@@ -203,9 +231,17 @@ league, add a constant — don't hardcode a group number or a conference
 name into a module.
 
 Two things are still conference-shaped and deliberately left alone:
-`community-sources.ts` is a Big Ten–only source table keyed by team
-slug, and the five other ESPN modules (`roster.ts`, `schedule.ts`,
-`team-color.ts`, `team-news.ts`, `player-stats.ts`) each hardcode
-`football/college-football` in their URLs. Both are additive to fix
-later — a second table and a threaded-through descriptor respectively —
-not blockers.
+
+- `community-sources.ts` is a Big Ten–only source table keyed by team
+  slug. The *shape* is league-agnostic; only the contents are Big Ten.
+  The real cost of a second conference is the research — every URL in
+  there was verified live — not the code.
+- Six modules still hardcode the sport and league in their URLs:
+  `roster.ts`, `schedule.ts`, `team-color.ts`, `team-news.ts`,
+  `player-stats.ts` and `team-leaders.ts`. Note the last one is easy to
+  miss when grepping — it uses `football/leagues/college-football`
+  rather than the `football/college-football` the others use. So the
+  `League` descriptor closes the *conference* boundary but not yet the
+  *sport* one; those six each need it threaded through.
+
+Both are additive to fix later, not blockers.

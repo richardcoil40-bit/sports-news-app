@@ -1,0 +1,45 @@
+Feed liveness report
+  generated  2026-08-13 02:42:54 UTC
+  commit     a27b0e8
+  script     scripts/check-feeds.sh
+
+In-app sources (read from src/lib/feeds.ts + src/lib/community-sources.ts)
+  ESPN                       HTTP 202  https://www.espn.com/espn/rss/ncf/news
+  CBS Sports                 OK        36 items
+  Yahoo Sports               OK        50 items
+  Off Tackle Empire          OK        10 items
+  Extra Points               OK        20 items
+  The News-Gazette           OK        50 items
+  MLive                      OK        50 items
+  Star Tribune               OK        10 items
+  Lincoln Journal Star       OK        50 items
+  Omaha World-Herald         OK        50 items
+  Daily Nebraskan            OK        50 items
+  Eleven Warriors            OK        10 items
+  Cleveland.com              OK        50 items
+  OregonLive                 OK        50 items
+  PennLive                   OK        50 items
+  NJ.com                     OK        50 items
+  Los Angeles Times          OK        98 items
+  The Seattle Times          OK        35 items
+  Wisconsin State Journal    OK        50 items
+  The Champaign Room         OK        10 items
+  The Crimson Quarry         OK        10 items
+  Black Heart Gold Pants     OK        10 items
+  Testudo Times              OK        10 items
+  Maize n Brew               OK        10 items
+  The Only Colors            OK        10 items
+  The Daily Gopher           OK        10 items
+  Corn Nation                OK        10 items
+  Inside NU                  OK        10 items
+  Land-Grant Holy Land       OK        10 items
+  Addicted To Quack          OK        10 items
+  Black Shoe Diaries         OK        10 items
+  Hammer and Rails           OK        10 items
+  On the Banks               OK        10 items
+  UW Dawg Pound              OK        10 items
+  Bucky's 5th Quarter        OK        10 items
+
+----------------------------------------
+  34 passing, 1 failing
+----------------------------------------
