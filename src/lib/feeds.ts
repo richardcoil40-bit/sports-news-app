@@ -5,11 +5,18 @@ import { FETCH_TIMEOUT_MS } from '@/lib/http';
 /**
  * How far a source is trusted. Assigned by the criteria in
  * docs/source-reliability.md, not by how well-known the outlet is.
+ *   0 — not assessed (see below)
  *   1 — professional newsroom (masthead, corrections policy, original reporting)
  *   2 — credible independent (named staff, real reporting, lighter formal standards)
  *   3 — community / fan perspective
+ *
+ * Tier 0 is deliberately *not* "bad". It means nobody has applied the
+ * criteria to this outlet, which is a different statement from "this outlet
+ * is a fan blog" — and conflating the two is exactly the mislabeling this
+ * tier exists to prevent. Tier 3 is a description of what a source is; tier
+ * 0 is an admission of what the app doesn't know.
  */
-export type SourceTier = 1 | 2 | 3;
+export type SourceTier = 0 | 1 | 2 | 3;
 
 /**
  * Whether everything a source publishes is already about one team.
@@ -204,6 +211,22 @@ function extractAuthor(item: Record<string, unknown>): string | null {
 }
 
 /**
+ * RSS's `<source url="…">Name</source>` names the outlet an item was
+ * *republished from*, which need not be the feed serving it.
+ *
+ * Surveyed across all 35 in-app feeds on 2026-08-18: exactly one uses it.
+ * Yahoo Sports is an aggregator — 50 items drawn from 27 different outlets
+ * (SB Nation, Trojans Wire, Detroit Free Press, HEAVY…), none of them
+ * written by Yahoo. Attributing those to "Yahoo Sports" is simply false,
+ * and inheriting Yahoo's Tier 1 puts a "Newsroom" badge on outlets nobody
+ * has assessed.
+ */
+function extractItemSourceName(item: Record<string, unknown>): string | null {
+  const cleaned = decodeHtmlEntities(textOf(item.source).trim());
+  return cleaned || null;
+}
+
+/**
  * Atom nests the byline: `<author><name>…</name></author>`, and a document
  * may carry several. Take the first — the UI shows one byline.
  */
@@ -306,24 +329,29 @@ function articleFromRssItem(item: Record<string, unknown>, source: FeedSource): 
 
   const rawDescription = typeof item.description === 'string' ? item.description : '';
 
+  // An item that names a *different* outlet than the feed serving it was
+  // syndicated. Credit the outlet that wrote it, and drop the tier to
+  // unrated: the feed's rating was earned by the feed, and passing it on to
+  // 27 outlets nobody assessed is the mislabeling tier 0 exists to stop.
+  // Renaming without re-rating would be worse than doing neither.
+  const itemSource = extractItemSourceName(item);
+  const syndicated =
+    itemSource !== null && itemSource.toLowerCase() !== source.name.toLowerCase();
+
   return {
     id: link,
     title: decodeHtmlEntities(item.title.trim()),
     link,
     description: stripHtml(rawDescription),
-    // NOT read from the item-level `<source url="…">Name</source>`, even
-    // though Stage 3's discovery lane will need that. Yahoo's feed is an
-    // aggregator — 50 items from 31 different outlets on 2026-08-18 —
-    // so reading it would relabel those articles correctly while still
-    // stamping them with Yahoo's tier 1, putting a false "Newsroom" badge
-    // on FanSided and HEAVY. It needs the unrated tier that arrives with
-    // the source registry; renaming without re-rating is worse than not
-    // renaming.
-    source: source.name,
+    source: syndicated ? itemSource : source.name,
     author: extractAuthor(item),
     publishedAt: parsePubDate(item.pubDate),
     imageUrl: extractImageUrl(item),
-    tier: source.tier ?? 3,
+    tier: syndicated ? 0 : (source.tier ?? 0),
+    // Reach stays the feed's even when syndicated. It is a coverage-scope
+    // claim rather than a trust claim, there is no "unknown" value for it,
+    // and guessing in either direction would be worse than inheriting.
+    //
     // A team-specific site is a beat source by definition. Local
     // newsrooms are broad-scoped but still beat coverage, so
     // community-sources.ts tags those explicitly rather than
@@ -357,7 +385,7 @@ function articleFromAtomEntry(entry: Record<string, unknown>, source: FeedSource
     // is the only date many feeds set, so it has to be the fallback.
     publishedAt: parsePubDate(entry.published ?? entry.updated),
     imageUrl: extractAtomImageUrl(entry),
-    tier: source.tier ?? 3,
+    tier: source.tier ?? 0,
     reach: source.reach ?? (source.scope === 'team' ? 'beat' : 'national'),
   };
 }

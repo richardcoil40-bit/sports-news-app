@@ -4,6 +4,7 @@ import atomValid from '@/lib/__fixtures__/atom-valid.xml?raw';
 import rssMalformed from '@/lib/__fixtures__/rss-malformed.xml?raw';
 import rssValid from '@/lib/__fixtures__/rss-valid.xml?raw';
 import { FeedSource, fetchFeeds } from '@/lib/feeds';
+import { tierLabel } from '@/lib/source-tier';
 
 /** Serves a different body per URL, so partial-failure cases are testable. */
 function respondPerUrl(byUrl: Record<string, { body?: string; ok?: boolean; status?: number }>) {
@@ -225,25 +226,73 @@ describe('fetchFeeds', () => {
     });
   });
 
-  // Guards the decision recorded in feeds.ts: an aggregating feed's
-  // item-level <source> is deliberately NOT read yet, because the tier
-  // would still come from the feed config and stamp an unassessed outlet
-  // with the aggregator's rating. Flip this test when the source registry
-  // lands and can rate those domains properly.
-  it('attributes articles to the feed, not an item-level <source>', async () => {
-    respondPerUrl({
+  // Yahoo Sports is an aggregator: 50 items from 27 different outlets, none
+  // written by Yahoo. Surveyed across all 35 in-app feeds, it is the only
+  // one that emits an item-level <source> at all.
+  describe('syndicated items', () => {
+    const syndicated = (itemSourceName: string) => ({
       'https://a.test/rss': {
         body: `<?xml version="1.0"?><rss><channel><title>Aggregator</title><item>
           <title>Smith enters the portal</title>
           <link>https://example.com/a</link>
-          <source url="https://www.fansided.com">FanSided</source>
+          <source url="https://www.fansided.com">${itemSourceName}</source>
         </item></channel></rss>`,
       },
     });
 
-    const { articles } = await fetchFeeds([source('aggregator', 'https://a.test/rss')]);
+    // Tier 1 feed, so the naive behaviour would badge FanSided "Newsroom".
+    const tierOneFeed = (id: string, url: string): FeedSource => ({
+      id,
+      name: id,
+      url,
+      tier: 1,
+    });
 
-    expect(articles[0].source).toBe('aggregator');
+    it('credits the outlet that actually wrote it', async () => {
+      respondPerUrl(syndicated('FanSided'));
+
+      const { articles } = await fetchFeeds([tierOneFeed('Yahoo Sports', 'https://a.test/rss')]);
+
+      expect(articles[0].source).toBe('FanSided');
+    });
+
+    // The point of the whole change: a rating is earned by the feed, and
+    // passing it on to an outlet nobody assessed is a false claim on the one
+    // axis this app exists to be honest about.
+    it('does not inherit the aggregator’s tier', async () => {
+      respondPerUrl(syndicated('FanSided'));
+
+      const { articles } = await fetchFeeds([tierOneFeed('Yahoo Sports', 'https://a.test/rss')]);
+
+      expect(articles[0].tier).toBe(0);
+      expect(tierLabel(articles[0].tier)).toBe('Unrated');
+    });
+
+    it('keeps the feed’s own tier when <source> just repeats the feed name', async () => {
+      respondPerUrl(syndicated('Yahoo Sports'));
+
+      const { articles } = await fetchFeeds([tierOneFeed('Yahoo Sports', 'https://a.test/rss')]);
+
+      expect(articles[0].source).toBe('Yahoo Sports');
+      expect(articles[0].tier).toBe(1);
+    });
+
+    it('compares the name case-insensitively', async () => {
+      respondPerUrl(syndicated('yahoo sports'));
+
+      const { articles } = await fetchFeeds([tierOneFeed('Yahoo Sports', 'https://a.test/rss')]);
+
+      expect(articles[0].tier).toBe(1);
+    });
+
+    it('leaves an ordinary feed with no <source> untouched', async () => {
+      respondPerUrl({ 'https://a.test/rss': { body: rssValid } });
+
+      const { articles } = await fetchFeeds([tierOneFeed('MLive', 'https://a.test/rss')]);
+
+      expect(articles[0].source).toBe('MLive');
+      expect(articles[0].tier).toBe(1);
+    });
   });
 
   // The allSettled contract from AGENTS.md: one dead feed must not take the

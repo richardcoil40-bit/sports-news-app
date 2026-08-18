@@ -15,11 +15,15 @@ import { SourceTier } from '@/lib/feeds';
  * the writing is worse, which isn't what the tiers mean.
  */
 const TIER_LABELS: Record<SourceTier, string> = {
+  0: 'Unrated',
   1: 'Newsroom',
   2: 'Independent',
   3: 'Community',
 };
 
 export function tierLabel(tier: SourceTier): string {
-  return TIER_LABELS[tier] ?? TIER_LABELS[3];
+  // Falls back to 'Unrated' rather than 'Community': an unrecognised tier
+  // means the app doesn't know what this outlet is, which is what 0 says.
+  // Guessing 'Community' would assert something about the outlet instead.
+  return TIER_LABELS[tier] ?? TIER_LABELS[0];
 }
