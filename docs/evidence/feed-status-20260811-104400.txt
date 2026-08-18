@@ -1,0 +1,47 @@
+
+Gannett — Des Moines Register (Iowa)
+  DMR a                    EMPTY     https://rssfeeds.desmoinesregister.com/desmoinesregister/home
+  DMR b                    EMPTY     https://rssfeeds.desmoinesregister.com/desmoinesregister/news
+  DMR c                    HTTP 404  https://www.desmoinesregister.com/rss/
+  DMR d                    HTTP 404  https://www.desmoinesregister.com/arc/outboundfeeds/rss/?outputType=xml
+
+Gannett — Indianapolis Star (Indiana / Purdue)
+  IndyStar a               EMPTY     https://rssfeeds.indystar.com/indystar/home
+  IndyStar b               EMPTY     https://rssfeeds.indystar.com/indystar/news
+  IndyStar c               HTTP 404  https://www.indystar.com/rss/
+  IndyStar d               HTTP 404  https://www.indystar.com/arc/outboundfeeds/rss/?outputType=xml
+
+Tribune — Chicago Tribune (Illinois / Northwestern)
+  ChiTrib a                HTTP 403  https://www.chicagotribune.com/feed/
+  ChiTrib b                HTTP 403  https://www.chicagotribune.com/sports/feed/
+  ChiTrib c                HTTP 403  https://www.chicagotribune.com/arc/outboundfeeds/rss/?outputType=xml
+
+Tribune — Baltimore Sun (Maryland)
+  BaltSun a                HTTP 403  https://www.baltimoresun.com/feed/
+  BaltSun b                HTTP 403  https://www.baltimoresun.com/sports/feed/
+  BaltSun c                HTTP 403  https://www.baltimoresun.com/arc/outboundfeeds/rss/?outputType=xml
+
+Extra Points (independent newsletter)
+  ExtraPoints a            HTTP 404  https://www.extrapointsmb.com/rss/
+  ExtraPoints b            OK        20   https://extrapoints.substack.com/feed
+  ExtraPoints c            HTTP 404  https://www.extrapointsmb.com/feed/
+
+Alternate local coverage for the uncovered programs
+  Gazette (Iowa)           HTTP 404  https://www.thegazette.com/feed/
+  HawkCentral (Iowa)       EMPTY     https://rssfeeds.desmoinesregister.com/hawkcentral/home
+  Herald-Times (IU)        HTTP 000  https://rssfeeds.heraldtimesonline.com/heraldtimesonline/home
+  J&C (Purdue)             EMPTY     https://rssfeeds.jconline.com/jconline/home
+  News-Gazette (Ill)       OK        50   https://www.news-gazette.com/search/?f=rss&t=article&c=sports&l=50
+  Daily Northwestern       OK        10   https://dailynorthwestern.com/feed/
+  Diamondback (Md)         OK        10   https://dbknews.com/feed/
+  Daily Illini             OK        20   https://dailyillini.com/feed/
+
+Student papers for programs that already have local coverage
+  Lantern (Ohio St)        OK        20   https://www.thelantern.com/feed/
+  Michigan Daily           OK        10   https://www.michigandaily.com/feed/
+  Daily Nebraskan          OK        50   https://www.dailynebraskan.com/search/?f=rss&t=article&c=sports&l=50
+  Daily Cardinal (Wis)     EMPTY     https://www.dailycardinal.com/search/?f=rss&t=article&c=sports&l=50
+
+----------------------------------------
+  8 passing, 21 failing
+----------------------------------------

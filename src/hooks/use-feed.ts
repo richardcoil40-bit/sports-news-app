@@ -67,6 +67,10 @@ export function useFeed() {
     if (!hydrated || teamsLoading) return;
 
     if (followedTeams.length === 0) {
+      // Settling to the empty state is the whole point of this branch — it
+      // runs only once hydration and the team list have both finished, so
+      // there's no cascading render to avoid here.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setArticles([]);
       setLoading(false);
       return;

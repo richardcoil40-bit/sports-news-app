@@ -1,4 +1,4 @@
-const FETCH_TIMEOUT_MS = 10000;
+import { fetchWithTimeout } from '@/lib/http';
 
 export interface Odds {
   provider: string;
@@ -20,16 +20,6 @@ export interface ScheduledGame {
   statusDetail: string; // "Sat, September 5th at 12:30 PM EDT" or "Final: W 34-10"
   completed: boolean;
   odds: Odds | null;
-}
-
-async function fetchWithTimeout(url: string): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(url, { signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 interface RawTeamRef {
@@ -77,7 +67,7 @@ export async function fetchTeamSchedule(teamId: string): Promise<ScheduledGame[]
   const response = await fetchWithTimeout(url);
   if (!response.ok) throw new Error(`Schedule responded ${response.status}`);
   const json = await response.json();
-  const events: RawEvent[] = json?.events ?? [];
+  const events: RawEvent[] = Array.isArray(json?.events) ? json.events : [];
 
   const games: ScheduledGame[] = [];
   for (const event of events) {
@@ -86,7 +76,9 @@ export async function fetchTeamSchedule(teamId: string): Promise<ScheduledGame[]
 
     const self = competition.competitors?.find((c) => c.team?.id === teamId);
     const opponent = competition.competitors?.find((c) => c.team?.id !== teamId);
-    if (!opponent) continue;
+    // `team` can be absent on a competitor (a TBD opponent on a future
+    // bracket game), which used to throw on opponent.team.displayName below.
+    if (!opponent?.team) continue;
 
     const homeAway: ScheduledGame['homeAway'] = competition.neutralSite
       ? 'neutral'
@@ -136,7 +128,7 @@ export async function fetchGameOdds(eventId: string): Promise<Odds | null> {
   const response = await fetchWithTimeout(url);
   if (!response.ok) return null;
   const json: RawOddsRoot = await response.json();
-  const item = json.items?.[0];
+  const item = Array.isArray(json?.items) ? json.items[0] : undefined;
   if (!item) return null;
 
   return {

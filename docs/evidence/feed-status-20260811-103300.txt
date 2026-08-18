@@ -1,0 +1,51 @@
+
+Controls (already in the app — these should pass)
+  ESPN CFB                   HTTP 202  https://www.espn.com/espn/rss/ncf/news
+  CBS Sports CFB             OK        36 items
+  Yahoo CFB                  OK        50 items
+  Eleven Warriors            OK        10 items
+
+SB Nation network (one per Big Ten program)
+  Illinois                   OK        10 items
+  Indiana                    OK        10 items
+  Iowa                       OK        10 items
+  Maryland                   OK        10 items
+  Michigan                   OK        10 items
+  Michigan State             OK        10 items
+  Minnesota                  OK        10 items
+  Nebraska                   OK        10 items
+  Northwestern               OK        10 items
+  Ohio State                 OK        10 items
+  Oregon                     OK        10 items
+  Penn State                 OK        10 items
+  Purdue                     OK        10 items
+  Rutgers                    OK        10 items
+  UCLA                       HTTP 404  https://www.bruinsnation.com/rss/index.xml
+  USC                        HTTP 000  https://www.conquestchronicles.com/rss/index.xml
+  Washington                 OK        10 items
+  Wisconsin                  OK        10 items
+  Off Tackle Empire          OK        10 items
+
+Independent / newsletter
+  Extra Points               HTTP 404  https://www.extrapointsmb.com/feed
+
+Local newsrooms (URLs are guesses — verify failures by hand)
+  Cleveland.com              OK        50 items
+  MLive                      OK        50 items
+  PennLive                   OK        50 items
+  NJ.com                     OK        50 items
+  OregonLive                 OK        50 items
+  Des Moines Register        EMPTY     200 but no items — likely not a feed
+  Indianapolis Star          EMPTY     200 but no items — likely not a feed
+  Lincoln Journal Star       OK        50 items
+  Wisconsin State Jrnl       OK        50 items
+  Omaha World-Herald         OK        50 items
+  Chicago Tribune            EMPTY     200 but no items — likely not a feed
+  Baltimore Sun              EMPTY     200 but no items — likely not a feed
+  Seattle Times              OK        35 items
+  LA Times                   OK        99 items
+  Star Tribune               OK        10 items
+
+----------------------------------------
+  31 passing, 8 failing
+----------------------------------------

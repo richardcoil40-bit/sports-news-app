@@ -1,18 +1,47 @@
 #!/usr/bin/env bash
 #
-# Checks candidate RSS/Atom feeds and reports which ones actually return items.
+# Checks that the RSS/Atom feeds the app depends on still return items, and
+# writes a timestamped report to docs/evidence/.
 #
-# Run this before adding any source to the app. A FAIL here can mean either
-# "no feed" or "wrong URL" — for the newspaper entries especially, the URLs
-# below are educated guesses at each publisher's feed convention, so a failure
-# is a prompt to go find the real URL, not proof the outlet has no feed.
+# This is an ongoing check, not a one-time exercise: feeds rot quietly. A
+# publisher retires RSS, a path changes, a CDN starts refusing programmatic
+# requests — and nothing in the app fails loudly, the source just silently
+# stops contributing. Re-run this periodically and diff against the last
+# report in docs/evidence/.
 #
-# Usage:  bash scripts/check-feeds.sh
-#         bash scripts/check-feeds.sh > feed-status.txt
+# The in-app list is read out of src/lib/feeds.ts and src/lib/community-sources.ts
+# rather than duplicated here, so it can't drift from what the app actually
+# fetches. Add a source there and it's covered here automatically.
+#
+# A FAIL can mean "no feed" or "wrong URL" — for newspapers especially, treat
+# it as a prompt to go find the real URL, not proof the outlet has no feed.
+#
+# Usage:
+#   bash scripts/check-feeds.sh              # in-app sources only
+#   bash scripts/check-feeds.sh --candidates # also probe the not-in-app list
+#   bash scripts/check-feeds.sh --help
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+
+CANDIDATES=0
+for arg in "$@"; do
+  case "$arg" in
+    --candidates) CANDIDATES=1 ;;
+    --help|-h) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown option: $arg (try --help)" >&2; exit 2 ;;
+  esac
+done
 
 UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
+
+EVIDENCE_DIR="docs/evidence"
+mkdir -p "$EVIDENCE_DIR"
+STAMP="$(date -u +%Y%m%d-%H%M%S)"
+OUT="$EVIDENCE_DIR/feed-status-$STAMP.txt"
 
 pass=0
 fail=0
@@ -51,53 +80,86 @@ section() {
   printf '\n%s\n' "$1"
 }
 
-section "Controls (already in the app — these should pass)"
-check "ESPN CFB"            "https://www.espn.com/espn/rss/ncf/news"
-check "CBS Sports CFB"      "https://www.cbssports.com/rss/headlines/college-football/"
-check "Yahoo CFB"           "https://sports.yahoo.com/college-football/rss.xml"
-check "Eleven Warriors"     "https://www.elevenwarriors.com/rss.xml"
+# Pulls "name<TAB>url" out of the two source files: object literals with
+# adjacent name/url fields, plus the SB_NATION(id, name, domain) helper, which
+# builds its url from a template.
+extract_in_app_sources() {
+  node -e '
+    const fs = require("fs");
+    const out = [];
+    const NAME_URL = /name:\s*(["\x27])(.+?)\1,\s*url:\s*(["\x27])(.+?)\3/g;
+    for (const file of ["src/lib/feeds.ts", "src/lib/community-sources.ts"]) {
+      const src = fs.readFileSync(file, "utf8");
+      for (const m of src.matchAll(NAME_URL)) out.push([m[2], m[4]]);
+    }
+    const cs = fs.readFileSync("src/lib/community-sources.ts", "utf8");
+    const SBN = /SB_NATION\(\s*["\x27][^"\x27]+["\x27],\s*(["\x27])(.+?)\1,\s*(["\x27])(.+?)\3\s*\)/g;
+    for (const m of cs.matchAll(SBN)) out.push([m[2], `https://www.${m[4]}/rss/index.xml`]);
 
-section "SB Nation network (one per Big Ten program)"
-check "Illinois"            "https://www.thechampaignroom.com/rss/index.xml"
-check "Indiana"             "https://www.crimsonquarry.com/rss/index.xml"
-check "Iowa"                "https://www.blackheartgoldpants.com/rss/index.xml"
-check "Maryland"            "https://www.testudotimes.com/rss/index.xml"
-check "Michigan"            "https://www.maizenbrew.com/rss/index.xml"
-check "Michigan State"      "https://www.theonlycolors.com/rss/index.xml"
-check "Minnesota"           "https://www.thedailygopher.com/rss/index.xml"
-check "Nebraska"            "https://www.cornnation.com/rss/index.xml"
-check "Northwestern"        "https://www.insidenu.com/rss/index.xml"
-check "Ohio State"          "https://www.landgrantholyland.com/rss/index.xml"
-check "Oregon"              "https://www.addictedtoquack.com/rss/index.xml"
-check "Penn State"          "https://www.blackshoediaries.com/rss/index.xml"
-check "Purdue"              "https://www.hammerandrails.com/rss/index.xml"
-check "Rutgers"             "https://www.onthebanks.com/rss/index.xml"
-check "UCLA"                "https://www.bruinsnation.com/rss/index.xml"
-check "USC"                 "https://www.conquestchronicles.com/rss/index.xml"
-check "Washington"          "https://www.uwdawgpound.com/rss/index.xml"
-check "Wisconsin"           "https://www.buckys5thquarter.com/rss/index.xml"
-check "Off Tackle Empire"   "https://www.offtackleempire.com/rss/index.xml"
+    const seen = new Set();
+    for (const [name, url] of out) {
+      if (seen.has(url)) continue;
+      seen.add(url);
+      console.log(`${name}\t${url}`);
+    }
+  '
+}
 
-section "Independent / newsletter"
-check "Extra Points"        "https://www.extrapointsmb.com/feed"
+{
+  printf '%s\n' "Feed liveness report"
+  printf '%s\n' "  generated  $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+  printf '%s\n' "  commit     $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+  printf '%s\n' "  script     scripts/check-feeds.sh$([ "$CANDIDATES" = 1 ] && echo ' --candidates')"
 
-section "Local newsrooms (URLs are guesses — verify failures by hand)"
-check "Cleveland.com"       "https://www.cleveland.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
-check "MLive"               "https://www.mlive.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
-check "PennLive"            "https://www.pennlive.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
-check "NJ.com"              "https://www.nj.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
-check "OregonLive"          "https://www.oregonlive.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
-check "Des Moines Register" "https://rssfeeds.desmoinesregister.com/desmoinesregister/sports"
-check "Indianapolis Star"   "https://rssfeeds.indystar.com/indystar/sports"
-check "Lincoln Journal Star" "https://journalstar.com/search/?f=rss&t=article&c=sports&l=50"
-check "Wisconsin State Jrnl" "https://madison.com/search/?f=rss&t=article&c=sports&l=50"
-check "Omaha World-Herald"  "https://omaha.com/search/?f=rss&t=article&c=sports&l=50"
-check "Chicago Tribune"     "https://www.chicagotribune.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
-check "Baltimore Sun"       "https://www.baltimoresun.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
-check "Seattle Times"       "https://www.seattletimes.com/sports/feed/"
-check "LA Times"            "https://www.latimes.com/sports/rss2.0.xml"
-check "Star Tribune"        "https://www.startribune.com/sports/index.rss2"
+  section "In-app sources (read from src/lib/feeds.ts + src/lib/community-sources.ts)"
+  in_app_count=0
+  while IFS=$'\t' read -r name url; do
+    [ -z "${url:-}" ] && continue
+    check "$name" "$url"
+    in_app_count=$((in_app_count + 1))
+  done <<EOF
+$(extract_in_app_sources)
+EOF
 
-printf '\n%s\n' "----------------------------------------"
-printf '%s\n' "  $pass passing, $fail failing"
-printf '%s\n' "----------------------------------------"
+  if [ "$in_app_count" -eq 0 ]; then
+    printf '  %s\n' "!! extracted no sources — the parser in extract_in_app_sources()"
+    printf '  %s\n' "!! has probably drifted from the shape of those files. Fix it;"
+    printf '  %s\n' "!! an empty run here looks like a clean bill of health."
+  fi
+
+  if [ "$CANDIDATES" = 1 ]; then
+    # Deliberately NOT in the app. Kept so the negative results stay recorded
+    # — most of these are expected to fail, and re-discovering that by hand
+    # every few months is the waste this section exists to prevent. See the
+    # header comment in src/lib/community-sources.ts for the conclusions.
+    section "Candidates not in the app (Gannett / Tribune retired or block RSS)"
+    check "DMR home"            "https://rssfeeds.desmoinesregister.com/desmoinesregister/home"
+    check "DMR sports"          "https://rssfeeds.desmoinesregister.com/desmoinesregister/sports"
+    check "IndyStar home"       "https://rssfeeds.indystar.com/indystar/home"
+    check "IndyStar sports"     "https://rssfeeds.indystar.com/indystar/sports"
+    check "ChiTrib sports"      "https://www.chicagotribune.com/sports/feed/"
+    check "ChiTrib arc"         "https://www.chicagotribune.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
+    check "BaltSun sports"      "https://www.baltimoresun.com/sports/feed/"
+    check "BaltSun arc"         "https://www.baltimoresun.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
+
+    section "Alternates for programs with no local newsroom feed"
+    check "Gazette (Iowa)"      "https://www.thegazette.com/feed/"
+    check "HawkCentral (Iowa)"  "https://rssfeeds.desmoinesregister.com/hawkcentral/home"
+    check "Herald-Times (IU)"   "https://rssfeeds.heraldtimesonline.com/heraldtimesonline/home"
+    check "J&C (Purdue)"        "https://rssfeeds.jconline.com/jconline/home"
+    check "Daily Northwestern"  "https://dailynorthwestern.com/feed/"
+    check "Diamondback (Md)"    "https://dbknews.com/feed/"
+    check "Daily Illini"        "https://dailyillini.com/feed/"
+
+    section "Student papers (not currently used)"
+    check "Lantern (Ohio St)"   "https://www.thelantern.com/feed/"
+    check "Michigan Daily"      "https://www.michigandaily.com/feed/"
+    check "Daily Cardinal (Wis)" "https://www.dailycardinal.com/search/?f=rss&t=article&c=sports&l=50"
+  fi
+
+  printf '\n%s\n' "----------------------------------------"
+  printf '%s\n' "  $pass passing, $fail failing"
+  printf '%s\n' "----------------------------------------"
+} | tee "$OUT"
+
+printf '\nWrote %s\n' "$OUT"

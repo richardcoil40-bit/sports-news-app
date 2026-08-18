@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { filterArticlesForTeams } from '@/lib/conference-filter';
 import { Article, fetchAllFeeds } from '@/lib/feeds';
-import { fetchBigTenTeams } from '@/lib/teams';
+import { fetchTeams } from '@/lib/teams';
 
 export function useArticles() {
   const [articles, setArticles] = useState<Article[]>([]);
@@ -25,7 +25,7 @@ export function useArticles() {
     try {
       const [feedResult, teams] = await Promise.all([
         fetchAllFeeds({ force: isRefresh }),
-        fetchBigTenTeams(),
+        fetchTeams(),
       ]);
       if (id !== requestId.current) return;
 
@@ -50,6 +50,8 @@ export function useArticles() {
   }, []);
 
   useEffect(() => {
+    // Fetch-on-mount: load() sets `loading` synchronously before awaiting.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load(false);
   }, [load]);
 

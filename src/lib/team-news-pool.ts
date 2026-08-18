@@ -1,3 +1,4 @@
+import { createEntityCache } from '@/lib/cache';
 import { communitySourcesForTeam } from '@/lib/community-sources';
 import { filterArticlesForTeams } from '@/lib/conference-filter';
 import { Article, fetchAllFeeds, fetchFeeds } from '@/lib/feeds';
@@ -16,8 +17,7 @@ export interface TeamNewsPool {
 // few minutes, with in-flight requests shared so rapid navigation (team →
 // player, tab → tab) doesn't fire duplicate fetches of the same sources.
 const CACHE_TTL_MS = 3 * 60 * 1000;
-const cache = new Map<string, { pool: TeamNewsPool; cachedAt: number }>();
-const inFlight = new Map<string, Promise<TeamNewsPool>>();
+const poolCache = createEntityCache<string, TeamNewsPool>({ ttlMs: CACHE_TTL_MS });
 
 // Debug: logs how long the four fetch groups take. Every underlying request
 // already has its own 10s timeout, so this pool should never take much more
@@ -132,7 +132,7 @@ const HARD_CAP_MS = 15000;
 function withHardCap(teamId: string, teamShortName: string, work: Promise<TeamNewsPool>): Promise<TeamNewsPool> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      const stale = cache.get(teamId)?.pool;
+      const stale = poolCache.peek(teamId);
       console.log(
         `[pool] ⚠ hard cap hit for ${teamShortName} after ${HARD_CAP_MS}ms — one of the fetches never resolved despite its own timeout. Falling back to ${stale ? 'stale cached' : 'empty'} data.`,
       );
@@ -168,23 +168,9 @@ export async function fetchTeamNewsPool(
   teamShortName: string,
   options?: { force?: boolean },
 ): Promise<TeamNewsPool> {
-  if (!options?.force) {
-    const cached = cache.get(teamId);
-    if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) return cached.pool;
-
-    const existing = inFlight.get(teamId);
-    if (existing) return existing;
-  }
-
-  const promise = withHardCap(teamId, teamShortName, fetchTeamNewsPoolUncached(teamId, teamShortName))
-    .then((pool) => {
-      cache.set(teamId, { pool, cachedAt: Date.now() });
-      return pool;
-    })
-    .finally(() => {
-      inFlight.delete(teamId);
-    });
-
-  inFlight.set(teamId, promise);
-  return promise;
+  return poolCache.get(
+    teamId,
+    () => withHardCap(teamId, teamShortName, fetchTeamNewsPoolUncached(teamId, teamShortName)),
+    { force: options?.force },
+  );
 }

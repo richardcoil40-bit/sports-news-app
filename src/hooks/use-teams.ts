@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { fetchBigTenTeams, Team } from '@/lib/teams';
+import { fetchTeams, Team } from '@/lib/teams';
 
 export function useTeams() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -18,7 +18,7 @@ export function useTeams() {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchBigTenTeams();
+      const result = await fetchTeams();
       if (id !== requestId.current) return;
       setTeams(result);
     } catch {
@@ -30,6 +30,8 @@ export function useTeams() {
   }, []);
 
   useEffect(() => {
+    // Fetch-on-mount: load() sets `loading` synchronously before awaiting.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 

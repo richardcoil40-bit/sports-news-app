@@ -10,21 +10,32 @@ The app persists exactly one thing — which teams you follow — and nothing
 else. No analytics SDK, no user accounts, no article content, no
 behavioral or usage data. See "Persisted stores" below for the detail.
 
-Every other cache in the codebase is a plain in-memory JavaScript `Map` or
-object that exists only for the lifetime of the running app process:
+Every other cache in the codebase is in-memory only and exists for the
+lifetime of the running app process. They're all created through
+`createEntityCache` / `createSingletonCache` in `lib/cache.ts` — one helper,
+so what's cached and for how long is visible in one place rather than
+hand-rolled per module:
 
-| Cache | File | Bound |
-|---|---|---|
-| National feed pool | `lib/feeds.ts` | Single object, replaced (not appended) every fetch |
-| Per-team news pool | `lib/team-news-pool.ts` | Keyed by team ID — max 18 entries (Big Ten only) |
-| Rosters | `lib/roster.ts` | Keyed by team ID — max 18 entries |
-| Stat leaders | `lib/team-leaders.ts` | Keyed by team ID — max 18 entries |
-| Team colors | `lib/team-color.ts` | Keyed by team ID — max 18 entries |
+| Cache | File | Bound | TTL |
+|---|---|---|---|
+| National feed pool | `lib/feeds.ts` | Single entry, replaced (not appended) every fetch | 3 minutes |
+| Per-team news pool | `lib/team-news-pool.ts` | Keyed by team ID — max 18 entries (Big Ten only) | 3 minutes |
+| Team list | `lib/teams.ts` | Keyed by league — 1 entry today | 30 minutes |
+| Rosters | `lib/roster.ts` | Keyed by team ID — max 18 entries | None (process lifetime) |
+| Stat leaders | `lib/team-leaders.ts` | Keyed by team ID — max 18 entries | None (process lifetime) |
+| Team colors | `lib/team-color.ts` | Keyed by team ID — max 18 entries | None (process lifetime) |
+| Player season stats | `lib/player-stats.ts` | Keyed by athlete ID — one per player screen opened | None (process lifetime) |
 
-Force-quitting the app clears all of it. None of these caches can grow
-unbounded — the team-keyed ones are capped by the number of teams that
-exist, not by how long the app has been open or how much you've browsed,
-and the national pool is overwritten rather than accumulated.
+Force-quitting the app clears all of it. None of these can grow without
+limit, but they aren't all bounded the same way. The team-keyed caches are
+capped by the number of teams that exist — 18 entries no matter how long the
+app has been open or how much you've browsed — and the national pool is
+overwritten rather than accumulated. **Player season stats are the one cache
+that does grow with use**: it gains an entry per player detail screen opened,
+so its ceiling is the number of athletes across all 18 rosters (order of
+1,800 entries of a few stat lines each) rather than 18. Still bounded, still
+cleared on quit, but worth stating precisely rather than filing it under
+"capped at 18" with the others.
 
 The auto-refresh added for the morning/noon/night cycle (`lib/refresh-
 schedule.ts`) doesn't change this: it just forces one of these same bounded

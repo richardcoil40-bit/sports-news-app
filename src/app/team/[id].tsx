@@ -1,27 +1,27 @@
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AccentRow } from '@/components/accent-row';
-import { ArticleCard } from '@/components/article-card';
 import { Logo } from '@/components/logo';
-import { PlayerRow } from '@/components/player-row';
-import { ScheduleRow } from '@/components/schedule-row';
 import { TabBar } from '@/components/tab-bar';
+import { NewsTab } from '@/components/team-tabs/news-tab';
+import { PlayersTab } from '@/components/team-tabs/players-tab';
+import { RecruitingTab } from '@/components/team-tabs/recruiting-tab';
+import { ScheduleTab } from '@/components/team-tabs/schedule-tab';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { useAsync } from '@/hooks/use-async';
 import { useTheme } from '@/hooks/use-theme';
 import { Article } from '@/lib/feeds';
-import { RankedPlayer, rankNotablePlayers } from '@/lib/notable-players';
+import { rankNotablePlayers } from '@/lib/notable-players';
+import { filterByReach, ReachFilter } from '@/lib/reach-filter';
 import { filterRecruitingArticles } from '@/lib/recruiting';
 import { Player, fetchTeamRoster } from '@/lib/roster';
-import { ReachFilterBar } from '@/components/reach-filter-bar';
-import { filterByReach, ReachFilter } from '@/lib/reach-filter';
-import { balanceBySource } from '@/lib/source-balance';
 import { fetchGameOdds, fetchTeamSchedule, ScheduledGame } from '@/lib/schedule';
+import { balanceBySource } from '@/lib/source-balance';
 import { fetchTeamColor } from '@/lib/team-color';
 import { StatLeader, fetchTeamStatLeaders } from '@/lib/team-leaders';
 import { fetchTeamNewsPool } from '@/lib/team-news-pool';
@@ -34,6 +34,12 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'players', label: 'Players' },
   { key: 'recruiting', label: 'Recruiting' },
 ];
+
+/** The roster and its stat leaders load together, so they're one async unit. */
+interface RosterData {
+  players: Player[];
+  leaders: StatLeader[];
+}
 
 export default function TeamScreen() {
   const theme = useTheme();
@@ -48,18 +54,34 @@ export default function TeamScreen() {
   const [reachFilter, setReachFilter] = useState<ReachFilter>('all');
   const [teamColor, setTeamColor] = useState<string | null>(null);
 
-  const [newsArticles, setNewsArticles] = useState<Article[] | null>(null);
-  const [newsLoading, setNewsLoading] = useState(false);
-  const [newsError, setNewsError] = useState(false);
+  const news = useAsync<Article[]>(async () => {
+    const pool = await fetchTeamNewsPool(params.id, params.shortName || params.name);
+    return pool.articles;
+  });
 
-  const [schedule, setSchedule] = useState<ScheduledGame[] | null>(null);
-  const [scheduleLoading, setScheduleLoading] = useState(false);
-  const [scheduleError, setScheduleError] = useState(false);
+  const schedule = useAsync<ScheduledGame[]>(async (publish) => {
+    const games = await fetchTeamSchedule(params.id);
+    publish(games);
 
-  const [roster, setRoster] = useState<Player[] | null>(null);
-  const [rosterLoading, setRosterLoading] = useState(false);
-  const [rosterError, setRosterError] = useState(false);
-  const [statLeaders, setStatLeaders] = useState<StatLeader[]>([]);
+    // Odds for just the next few upcoming games — fetching every game
+    // on the schedule (a dozen-plus separate requests) was overkill
+    // and most of those games don't have a line posted yet anyway.
+    const upcoming = games.filter((g) => !g.completed).slice(0, 5);
+    const oddsByGameId = new Map(
+      await Promise.all(
+        upcoming.map(async (game) => [game.id, await fetchGameOdds(game.id).catch(() => null)] as const),
+      ),
+    );
+    return games.map((g) => (oddsByGameId.has(g.id) ? { ...g, odds: oddsByGameId.get(g.id)! } : g));
+  });
+
+  const roster = useAsync<RosterData>(async () => {
+    const [players, leaders] = await Promise.all([
+      fetchTeamRoster(params.id),
+      fetchTeamStatLeaders(params.id),
+    ]);
+    return { players, leaders };
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -75,101 +97,37 @@ export default function TeamScreen() {
   // four up front — the schedule tab in particular fires one odds request
   // per upcoming game, and doing that (plus news plus roster) all at once
   // on mount was slow and stole bandwidth from whatever screen you tapped
-  // into next (e.g. a player's news).
+  // into next (e.g. a player's news). load() is a no-op once a tab's data
+  // has arrived, so re-running this on every tab change is free.
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadNews() {
-      if (newsArticles !== null || newsLoading) return;
-      setNewsLoading(true);
-      setNewsError(false);
-      try {
-        const pool = await fetchTeamNewsPool(params.id, params.shortName || params.name);
-        if (!cancelled) setNewsArticles(pool.articles);
-      } catch {
-        if (!cancelled) setNewsError(true);
-      } finally {
-        if (!cancelled) setNewsLoading(false);
-      }
-    }
-
-    async function loadSchedule() {
-      if (schedule !== null || scheduleLoading) return;
-      setScheduleLoading(true);
-      setScheduleError(false);
-      try {
-        const games = await fetchTeamSchedule(params.id);
-        if (cancelled) return;
-        setSchedule(games);
-
-        // Odds for just the next few upcoming games — fetching every game
-        // on the schedule (a dozen-plus separate requests) was overkill
-        // and most of those games don't have a line posted yet anyway.
-        const upcoming = games.filter((g) => !g.completed).slice(0, 5);
-        const oddsByGameId = new Map(
-          await Promise.all(
-            upcoming.map(async (game) => [game.id, await fetchGameOdds(game.id).catch(() => null)] as const),
-          ),
-        );
-        if (!cancelled) {
-          setSchedule(games.map((g) => (oddsByGameId.has(g.id) ? { ...g, odds: oddsByGameId.get(g.id)! } : g)));
-        }
-      } catch {
-        if (!cancelled) setScheduleError(true);
-      } finally {
-        if (!cancelled) setScheduleLoading(false);
-      }
-    }
-
-    async function loadRoster() {
-      if (roster !== null || rosterLoading) return;
-      setRosterLoading(true);
-      setRosterError(false);
-      try {
-        const [players, leaders] = await Promise.all([
-          fetchTeamRoster(params.id),
-          fetchTeamStatLeaders(params.id),
-        ]);
-        if (!cancelled) {
-          setRoster(players);
-          setStatLeaders(leaders);
-        }
-      } catch {
-        if (!cancelled) setRosterError(true);
-      } finally {
-        if (!cancelled) setRosterLoading(false);
-      }
-    }
-
-    if (tab === 'news' || tab === 'recruiting') loadNews();
-    if (tab === 'schedule') loadSchedule();
+    if (tab === 'news' || tab === 'recruiting') news.load();
+    if (tab === 'schedule') schedule.load();
     // The players tab ranks by article mentions, so it needs the news pool too.
     if (tab === 'players') {
-      loadRoster();
-      loadNews();
+      roster.load();
+      news.load();
     }
-
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, params.id, params.shortName, params.name]);
 
   const visibleNews = useMemo(() => {
-    if (!newsArticles) return [];
+    if (!news.data) return [];
     // Balanced after filtering, so it operates on whatever survived
     // rather than reserving slots for sources just filtered out.
-    return balanceBySource(filterByReach(newsArticles, reachFilter));
-  }, [newsArticles, reachFilter]);
+    return balanceBySource(filterByReach(news.data, reachFilter));
+  }, [news.data, reachFilter]);
 
   const recruitingArticles = useMemo(
-    () => (newsArticles ? filterRecruitingArticles(newsArticles) : []),
-    [newsArticles],
+    () => (news.data ? filterRecruitingArticles(news.data) : []),
+    [news.data],
   );
 
   const notablePlayers = useMemo(
-    () => (roster ? rankNotablePlayers(roster, newsArticles ?? [], statLeaders, 10) : []),
-    [roster, newsArticles, statLeaders],
+    () =>
+      roster.data
+        ? rankNotablePlayers(roster.data.players, news.data ?? [], roster.data.leaders, 10)
+        : [],
+    [roster.data, news.data],
   );
 
   const openArticle = (article: Article) => {
@@ -231,8 +189,8 @@ export default function TeamScreen() {
         {tab === 'news' ? (
           <NewsTab
             articles={visibleNews}
-            loading={newsArticles === null && !newsError}
-            error={newsError}
+            loading={news.data === null && !news.error}
+            error={news.error}
             reachFilter={reachFilter}
             onChangeReach={setReachFilter}
             onOpenArticle={openArticle}
@@ -242,9 +200,9 @@ export default function TeamScreen() {
 
         {tab === 'schedule' ? (
           <ScheduleTab
-            games={schedule}
-            loading={schedule === null && !scheduleError}
-            error={scheduleError}
+            games={schedule.data}
+            loading={schedule.data === null && !schedule.error}
+            error={schedule.error}
             accentColor={teamColor}
           />
         ) : null}
@@ -252,8 +210,8 @@ export default function TeamScreen() {
         {tab === 'players' ? (
           <PlayersTab
             players={notablePlayers}
-            loading={(roster === null || newsArticles === null) && !rosterError && !newsError}
-            error={rosterError}
+            loading={(roster.data === null || news.data === null) && !roster.error && !news.error}
+            error={roster.error}
             onOpenPlayer={openPlayer}
             accentColor={teamColor}
           />
@@ -262,226 +220,14 @@ export default function TeamScreen() {
         {tab === 'recruiting' ? (
           <RecruitingTab
             articles={recruitingArticles}
-            loading={newsArticles === null && !newsError}
-            error={newsError}
+            loading={news.data === null && !news.error}
+            error={news.error}
             onOpenArticle={openArticle}
             accentColor={teamColor}
           />
         ) : null}
       </SafeAreaView>
     </ThemedView>
-  );
-}
-
-function Centered({ children }: { children: ReactNode }) {
-  return <View style={styles.centered}>{children}</View>;
-}
-
-function NewsTab({
-  articles,
-  loading,
-  error,
-  reachFilter,
-  onChangeReach,
-  onOpenArticle,
-  accentColor,
-}: {
-  articles: Article[];
-  loading: boolean;
-  error: boolean;
-  reachFilter: ReachFilter;
-  onChangeReach: (next: ReachFilter) => void;
-  onOpenArticle: (a: Article) => void;
-  accentColor: string | null;
-}) {
-  const theme = useTheme();
-
-  if (loading) {
-    return (
-      <Centered>
-        <ActivityIndicator />
-      </Centered>
-    );
-  }
-
-  return (
-    <FlatList
-      data={articles}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <AccentRow color={accentColor}>
-          <ArticleCard article={item} onPress={() => onOpenArticle(item)} />
-        </AccentRow>
-      )}
-      ItemSeparatorComponent={() => (
-        <View style={[styles.separator, { backgroundColor: theme.text }]} />
-      )}
-      ListHeaderComponent={<ReachFilterBar active={reachFilter} onChange={onChangeReach} />}
-      ListEmptyComponent={
-        <Centered>
-          <ThemedText themeColor="textSecondary" style={styles.centeredText}>
-            {error
-              ? "Couldn't load headlines right now. Try again later."
-              : reachFilter !== 'all'
-                ? 'Nothing matches that filter right now.'
-                : 'No recent headlines found for this team.'}
-          </ThemedText>
-        </Centered>
-      }
-      contentContainerStyle={styles.listContent}
-    />
-  );
-}
-
-function RecruitingTab({
-  articles,
-  loading,
-  error,
-  onOpenArticle,
-  accentColor,
-}: {
-  articles: Article[];
-  loading: boolean;
-  error: boolean;
-  onOpenArticle: (a: Article) => void;
-  accentColor: string | null;
-}) {
-  const theme = useTheme();
-
-  if (loading) {
-    return (
-      <Centered>
-        <ActivityIndicator />
-      </Centered>
-    );
-  }
-
-  return (
-    <FlatList
-      data={articles}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <AccentRow color={accentColor}>
-          <ArticleCard article={item} onPress={() => onOpenArticle(item)} />
-        </AccentRow>
-      )}
-      ItemSeparatorComponent={() => (
-        <View style={[styles.separator, { backgroundColor: theme.text }]} />
-      )}
-      ListEmptyComponent={
-        <Centered>
-          <ThemedText themeColor="textSecondary" style={styles.centeredText}>
-            {error
-              ? "Couldn't load recruiting news right now. Try again later."
-              : 'No recruiting news found for this team right now.'}
-          </ThemedText>
-        </Centered>
-      }
-      contentContainerStyle={styles.listContent}
-    />
-  );
-}
-
-function ScheduleTab({
-  games,
-  loading,
-  error,
-  accentColor,
-}: {
-  games: ScheduledGame[] | null;
-  loading: boolean;
-  error: boolean;
-  accentColor: string | null;
-}) {
-  const theme = useTheme();
-
-  if (loading && !games) {
-    return (
-      <Centered>
-        <ActivityIndicator />
-      </Centered>
-    );
-  }
-
-  return (
-    <FlatList
-      data={games ?? []}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <AccentRow color={accentColor}>
-          <ScheduleRow game={item} />
-        </AccentRow>
-      )}
-      ItemSeparatorComponent={() => (
-        <View style={[styles.separator, { backgroundColor: theme.text }]} />
-      )}
-      ListEmptyComponent={
-        <Centered>
-          <ThemedText themeColor="textSecondary" style={styles.centeredText}>
-            {error ? "Couldn't load the schedule right now. Try again later." : 'No schedule found.'}
-          </ThemedText>
-        </Centered>
-      }
-      contentContainerStyle={styles.listContent}
-    />
-  );
-}
-
-function PlayersTab({
-  players,
-  loading,
-  error,
-  onOpenPlayer,
-  accentColor,
-}: {
-  players: RankedPlayer[];
-  loading: boolean;
-  error: boolean;
-  onOpenPlayer: (p: Player) => void;
-  accentColor: string | null;
-}) {
-  const theme = useTheme();
-
-  if (loading) {
-    return (
-      <Centered>
-        <ActivityIndicator />
-      </Centered>
-    );
-  }
-
-  return (
-    <FlatList
-      data={players}
-      keyExtractor={(item) => item.player.id}
-      renderItem={({ item }) => (
-        <AccentRow color={accentColor}>
-          <PlayerRow
-            player={item.player}
-            detail={item.detail}
-            onPress={() => onOpenPlayer(item.player)}
-          />
-        </AccentRow>
-      )}
-      ItemSeparatorComponent={() => (
-        <View style={[styles.separator, { backgroundColor: theme.text }]} />
-      )}
-      ListHeaderComponent={
-        <ThemedText type="small" themeColor="textSecondary" style={styles.playersNote}>
-          Most talked about — ranked by recent coverage and last season&apos;s stat leaders.
-        </ThemedText>
-      }
-      ListEmptyComponent={
-        <Centered>
-          <ThemedText themeColor="textSecondary" style={styles.centeredText}>
-            {error
-              ? "Couldn't load the roster right now. Try again later."
-              : 'No players stand out in recent coverage yet.'}
-          </ThemedText>
-        </Centered>
-      }
-      contentContainerStyle={styles.listContent}
-    />
   );
 }
 
@@ -513,29 +259,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'uppercase',
     letterSpacing: 1,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.five,
-    paddingVertical: Spacing.five,
-  },
-  centeredText: {
-    textAlign: 'center',
-  },
-  separator: {
-    height: 1.5,
-    marginLeft: Spacing.three,
-  },
-  listContent: {
-    paddingBottom: Spacing.five,
-  },
-  playersNote: {
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.two,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontSize: 11,
   },
 });
