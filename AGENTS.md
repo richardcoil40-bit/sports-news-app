@@ -225,6 +225,24 @@ running locally with full access:
   folders are generated once and reused. Regenerate with
   `npx expo prebuild --clean` before rebuilding, or the change silently
   won't show up and will look like a bug.
+- **CocoaPods needs a UTF-8 locale, and fails obscurely without one.**
+  If `pod install` dies with `Unicode Normalization not appropriate for
+  ASCII-8BIT (Encoding::CompatibilityError)`, Ruby's default external
+  encoding is US-ASCII (check with
+  `ruby -e 'puts Encoding.default_external'`). Prefix the build:
+
+  ```
+  LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 npx expo run:ios
+  ```
+
+  The traceback points into `Pod::Config#installation_root` and looks
+  like a corrupt Podfile, which it isn't.
+- **`expo run:ios` does not exit.** After building, installing and
+  launching, it stays in the foreground streaming device logs. Piping it
+  to `tail` therefore shows nothing and looks like a hang — the build
+  has usually finished long before. To check, look at what it's actually
+  doing: a child process of `simctl spawn … log stream` means the build
+  succeeded and it's only tailing logs.
 
 ## Scope
 
