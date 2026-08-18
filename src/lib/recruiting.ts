@@ -6,7 +6,11 @@ import { Article } from '@/lib/feeds';
  * to recruiting-flavored coverage of a team by keyword, same honest-match
  * approach used elsewhere in the app.
  */
-const RECRUITING_KEYWORDS = [
+/**
+ * Exported so program-moves.ts can reuse it rather than keeping a second
+ * list of commitment words that drifts away from this one.
+ */
+export const RECRUITING_KEYWORDS = [
   'recruit',
   'recruiting',
   'commit',

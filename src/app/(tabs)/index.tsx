@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArticleCard } from '@/components/article-card';
 import { CaughtUpMarker } from '@/components/caught-up-marker';
 import { CollapsibleSection } from '@/components/collapsible-section';
+import { ContextStrip } from '@/components/context-strip';
 import { Logo } from '@/components/logo';
 import { FilterBar } from '@/components/filter-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -13,6 +14,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BRIEF_MODE } from '@/constants/flags';
 import { Spacing } from '@/constants/theme';
 import { useBrief } from '@/hooks/use-brief';
+import { useContextStrip } from '@/hooks/use-context-strip';
 import { useFeed } from '@/hooks/use-feed';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
@@ -23,6 +25,7 @@ import {
   withClaimTypes,
 } from '@/lib/claim-type';
 import { caughtUpMessage, splitBrief } from '@/lib/brief';
+import { detectMove } from '@/lib/program-moves';
 import { clusterArticles, leadsWithDuplicates } from '@/lib/cluster';
 import { Article } from '@/lib/feeds';
 import { balanceBySource } from '@/lib/source-balance';
@@ -43,6 +46,7 @@ export default function FeedScreen() {
   const { teams } = useTeams();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
   const { ready: briefReady, cutoff, periodLabel, reachedEnd } = useBrief();
+  const contexts = useContextStrip(followedTeams);
 
   // Classified and tagged once, then filtered — every card needs both for
   // its badges whether or not a filter is active, so this is one pass
@@ -84,6 +88,21 @@ export default function FeedScreen() {
     () => (cutoff ? splitBrief(visibleArticles, cutoff) : null),
     [visibleArticles, cutoff],
   );
+
+  // Out of season the strip shows each team's latest roster or staff
+  // move, taken from news already loaded rather than fetched again. Keyed
+  // by team so a strip row can find its own.
+  const offseasonHeadlines = useMemo(() => {
+    const byTeam: Record<string, string | undefined> = {};
+    for (const article of classified) {
+      const team = article.mentionedTeam;
+      if (!team) continue;
+      const key = `${team.leagueId}:${team.id}`;
+      if (byTeam[key] || !detectMove(article)) continue;
+      byTeam[key] = article.title;
+    }
+    return byTeam;
+  }, [classified]);
 
   const openArticle = (article: Article) => {
     router.push({
@@ -165,7 +184,14 @@ export default function FeedScreen() {
               <View style={[styles.separator, { backgroundColor: theme.text }]} />
             )}
             ListHeaderComponent={
-              <FilterBar tabs={CLAIM_FILTER_TABS} active={claimFilter} onChange={setClaimFilter} />
+              <View>
+                <ContextStrip contexts={contexts} offseasonHeadlines={offseasonHeadlines} />
+                <FilterBar
+                  tabs={CLAIM_FILTER_TABS}
+                  active={claimFilter}
+                  onChange={setClaimFilter}
+                />
+              </View>
             }
             ListFooterComponent={
               sectioned && sections ? (
