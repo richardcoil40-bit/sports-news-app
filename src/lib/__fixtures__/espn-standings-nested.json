@@ -14,7 +14,8 @@
                 {
                   "href": "https://a.espncdn.com/i/teamlogos/nba/500/det.png"
                 }
-              ]
+              ],
+              "location": "Detroit"
             }
           },
           {
@@ -27,7 +28,8 @@
                 {
                   "href": "https://a.espncdn.com/i/teamlogos/nba/500/atl.png"
                 }
-              ]
+              ],
+              "location": "Atlanta"
             }
           },
           {
@@ -35,7 +37,8 @@
               "id": "2",
               "displayName": "Boston Celtics",
               "shortDisplayName": "Celtics",
-              "abbreviation": "BOS"
+              "abbreviation": "BOS",
+              "location": "Boston"
             }
           }
         ]
@@ -55,7 +58,8 @@
                 {
                   "href": "https://a.espncdn.com/i/teamlogos/nba/500/lal.png"
                 }
-              ]
+              ],
+              "location": "Los Angeles"
             }
           },
           {
@@ -68,7 +72,8 @@
                 {
                   "href": "https://a.espncdn.com/i/teamlogos/nba/500/sa.png"
                 }
-              ]
+              ],
+              "location": "San Antonio"
             }
           }
         ]

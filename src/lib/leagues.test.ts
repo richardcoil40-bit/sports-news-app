@@ -153,6 +153,7 @@ describe('fetchTeams across league shapes', () => {
       id: '13',
       name: 'Los Angeles Lakers',
       shortName: 'Lakers',
+      location: 'Los Angeles',
       abbreviation: 'LAL',
       logoUrl: 'https://a.espncdn.com/i/teamlogos/nba/500/lal.png',
       leagueId: 'nba-test',

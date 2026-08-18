@@ -121,6 +121,7 @@ describe('ESPN parsers on a well-formed response', () => {
       id: '194',
       name: 'Ohio State Buckeyes',
       shortName: 'Ohio State',
+      location: 'Ohio State',
       abbreviation: 'OSU',
       logoUrl: 'https://a.espncdn.com/i/teamlogos/ncaa/500/194.png',
       leagueId: 'big-ten',

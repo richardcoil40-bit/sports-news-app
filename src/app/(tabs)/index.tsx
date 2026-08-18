@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useFeed } from '@/hooks/use-feed';
+import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
 import {
   ClaimFilter,
@@ -19,6 +20,7 @@ import {
 } from '@/lib/claim-type';
 import { FeedArticle } from '@/lib/multi-team-feed';
 import { balanceBySource } from '@/lib/source-balance';
+import { withTeamMentions } from '@/lib/team-mentions';
 
 /**
  * The home screen is a feed of the teams you follow, not a directory of
@@ -29,12 +31,19 @@ export default function FeedScreen() {
   const theme = useTheme();
   const { articles, loading, refreshing, error, refresh, followedTeams, hasFollowedTeams, ready } =
     useFeed();
+  // The whole league, not just followed teams: a Michigan follower's pool
+  // legitimately contains Michigan State stories, and tagging those
+  // MICHIGAN would be worse than not tagging them at all.
+  const { teams } = useTeams();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
 
-  // Classified once, then filtered — every card needs its claim type for
-  // the badge whether or not a filter is active, so doing it here means
-  // one pass instead of one per consumer.
-  const classified = useMemo(() => withClaimTypes(articles), [articles]);
+  // Classified and tagged once, then filtered — every card needs both for
+  // its badges whether or not a filter is active, so this is one pass
+  // instead of one per consumer.
+  const classified = useMemo(
+    () => withTeamMentions(withClaimTypes(articles), teams),
+    [articles, teams],
+  );
 
   // Re-balanced after filtering, matching the team screen: the feed
   // arrives already balanced across all sources, but once a claim type is
@@ -110,10 +119,10 @@ export default function FeedScreen() {
               <ArticleCard
                 article={item}
                 onPress={() => openArticle(item)}
-                // Only worth showing when more than one team's news is
-                // mixed together — with a single followed team every tag
-                // would say the same thing.
-                tagLabel={followedTeams.length > 1 ? item.teamName : undefined}
+                // The team the headline actually names, which is not
+                // always the followed team whose pool surfaced it.
+                // Omitted when no team is named rather than guessed at.
+                tagLabel={item.mentionedTeam?.shortName}
                 claimType={item.claimType}
                 onPressClaim={setClaimFilter}
               />

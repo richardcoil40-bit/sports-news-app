@@ -26,7 +26,17 @@ function standingsUrl(league: League): string {
 export interface Team {
   id: string;
   name: string; // "Georgia Bulldogs"
-  shortName: string; // "Georgia"
+  shortName: string; // "Georgia" — ESPN abbreviates some of these ("Michigan St")
+  /**
+   * The school or city as ESPN writes it out in full ("Michigan State").
+   *
+   * Kept separately from shortName because ESPN abbreviates the latter:
+   * Michigan State's shortDisplayName is "Michigan St", which never matches
+   * a headline saying "Michigan State" — and that silently tagged every
+   * Spartans story MICHIGAN. Anything matching team names against prose
+   * wants this field, not shortName.
+   */
+  location: string;
   abbreviation: string; // "UGA"
   logoUrl: string | null;
   /**
@@ -43,6 +53,7 @@ interface RawTeam {
   id: string;
   displayName: string;
   shortDisplayName: string;
+  location?: string;
   abbreviation: string;
   logos?: { href: string }[];
 }
@@ -100,6 +111,7 @@ async function fetchTeamsUncached(league: League): Promise<Team[]> {
       id: t.id,
       name: t.displayName,
       shortName: t.shortDisplayName,
+      location: t.location ?? t.shortDisplayName,
       abbreviation: t.abbreviation,
       logoUrl: t.logos?.[0]?.href ?? null,
       leagueId: league.id,

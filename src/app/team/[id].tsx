@@ -14,6 +14,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useAsync } from '@/hooks/use-async';
+import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
 import { Article } from '@/lib/feeds';
 import { rankNotablePlayers } from '@/lib/notable-players';
@@ -26,6 +27,7 @@ import { filterRecruitingArticles } from '@/lib/recruiting';
 import { Player, fetchTeamRoster } from '@/lib/roster';
 import { fetchGameOdds, fetchTeamSchedule, ScheduledGame } from '@/lib/schedule';
 import { balanceBySource } from '@/lib/source-balance';
+import { withTeamMentions } from '@/lib/team-mentions';
 import { fetchTeamColor } from '@/lib/team-color';
 import { StatLeader, fetchTeamStatLeaders } from '@/lib/team-leaders';
 import { fetchTeamNewsPool } from '@/lib/team-news-pool';
@@ -55,6 +57,9 @@ export default function TeamScreen() {
   }>();
 
   const [tab, setTab] = useState<TabKey>('news');
+  // The whole league: this team's pool carries stories about its
+  // opponents and neighbours, and those should be tagged as such.
+  const { teams } = useTeams();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
   const [teamColor, setTeamColor] = useState<string | null>(null);
 
@@ -114,9 +119,14 @@ export default function TeamScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, params.id, params.shortName, params.name]);
 
-  // Classified once here, so the News and Recruiting tabs share one pass
-  // and every card has its badge whether or not a filter is active.
-  const classifiedNews = useMemo(() => withClaimTypes(news.data ?? []), [news.data]);
+  // Classified and tagged once here, so the News and Recruiting tabs
+  // share one pass and every card has its badges whether or not a filter
+  // is active. Tagged against the whole league because this team's pool
+  // carries stories about its opponents and neighbours too.
+  const classifiedNews = useMemo(
+    () => withTeamMentions(withClaimTypes(news.data ?? []), teams),
+    [news.data, teams],
+  );
 
   const visibleNews = useMemo(
     // Balanced after filtering, so it operates on whatever survived
