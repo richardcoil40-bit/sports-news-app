@@ -38,19 +38,6 @@ export interface League {
 }
 
 /**
- * group=5 is the Big Ten — verified against ESPN's response, which tags the
- * conference "big10" and returns its current 18 members.
- */
-export const BIG_TEN: League = {
-  id: 'big-ten',
-  displayName: 'Big Ten',
-  espnSport: 'football',
-  espnLeaguePath: 'college-football',
-  espnGroup: 5,
-  seasonStartMonth: 8,
-};
-
-/**
  * The `site.api` / `site.web.api` path shape: `<sport>/<league>`.
  * Used by rosters, schedules, team pages, team news and player stats.
  */

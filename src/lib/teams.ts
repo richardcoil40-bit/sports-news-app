@@ -1,6 +1,7 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
-import { BIG_TEN, espnSitePath, League } from '@/lib/leagues';
+import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
+import { espnSitePath, League } from '@/lib/leagues';
 
 /**
  * ESPN's public site API — the same JSON endpoints ESPN's own site and apps
@@ -111,7 +112,7 @@ const teamsCache = createEntityCache<string, Team[]>({ ttlMs: CACHE_TTL_MS });
 
 /** Defaults to the Big Ten — the only league wired up today. */
 export async function fetchTeams(
-  league: League = BIG_TEN,
+  league: League = DEFAULT_LEAGUE,
   options?: { force?: boolean },
 ): Promise<Team[]> {
   return teamsCache.get(league.id, () => fetchTeamsUncached(league), { force: options?.force });

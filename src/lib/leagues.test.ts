@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import nestedStandingsFixture from '@/lib/__fixtures__/espn-standings-nested.json';
+import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import {
-  BIG_TEN,
   espnCacheKey,
   espnCorePath,
   espnSitePath,
@@ -45,7 +45,7 @@ afterEach(() => {
 
 describe('URL construction', () => {
   it('builds the site path used by rosters, schedules, news and stats', () => {
-    expect(espnSitePath(BIG_TEN)).toBe('football/college-football');
+    expect(espnSitePath(DEFAULT_LEAGUE)).toBe('football/college-football');
     expect(espnSitePath(NBA_FOR_TEST)).toBe('basketball/nba');
   });
 
@@ -53,7 +53,7 @@ describe('URL construction', () => {
   // wrong, because only two callers use it and grepping for the site path
   // silently misses them.
   it('builds the core path with its extra leagues segment', () => {
-    expect(espnCorePath(BIG_TEN)).toBe('football/leagues/college-football');
+    expect(espnCorePath(DEFAULT_LEAGUE)).toBe('football/leagues/college-football');
     expect(espnCorePath(NBA_FOR_TEST)).toBe('basketball/leagues/nba');
   });
 });
@@ -63,14 +63,14 @@ describe('espnCacheKey', () => {
   // and a completely different team in college football. Keyed on the raw id
   // alone, one would serve the other's roster.
   it('separates the same entity id across sports', () => {
-    expect(espnCacheKey(BIG_TEN, '13')).not.toBe(espnCacheKey(NBA_FOR_TEST, '13'));
+    expect(espnCacheKey(DEFAULT_LEAGUE, '13')).not.toBe(espnCacheKey(NBA_FOR_TEST, '13'));
   });
 
   // Two conferences of the same sport share ESPN's id space, so they should
   // share a cached roster rather than fetch it twice.
   it('shares a key between two conferences of the same sport', () => {
-    const bigTwelve: League = { ...BIG_TEN, id: 'big-12', displayName: 'Big 12', espnGroup: 4 };
-    expect(espnCacheKey(bigTwelve, '130')).toBe(espnCacheKey(BIG_TEN, '130'));
+    const bigTwelve: League = { ...DEFAULT_LEAGUE, id: 'big-12', displayName: 'Big 12', espnGroup: 4 };
+    expect(espnCacheKey(bigTwelve, '130')).toBe(espnCacheKey(DEFAULT_LEAGUE, '130'));
   });
 });
 
@@ -87,19 +87,19 @@ const localDate = (year: number, monthIndex: number, day: number) =>
 describe('lastCompletedSeason', () => {
   it('uses the league season start, not a hardcoded month', () => {
     // Mid-season and deep offseason.
-    expect(lastCompletedSeason(BIG_TEN, localDate(2026, 10, 15))).toBe(2026);
-    expect(lastCompletedSeason(BIG_TEN, localDate(2026, 0, 15))).toBe(2025);
+    expect(lastCompletedSeason(DEFAULT_LEAGUE, localDate(2026, 10, 15))).toBe(2026);
+    expect(lastCompletedSeason(DEFAULT_LEAGUE, localDate(2026, 0, 15))).toBe(2025);
 
     // September separates the two: college football's new season counts by
     // then, basketball's does not until October. That divergence is the
     // whole point of the field.
     const september = localDate(2026, 8, 15);
-    expect(lastCompletedSeason(BIG_TEN, september)).toBe(2026);
+    expect(lastCompletedSeason(DEFAULT_LEAGUE, september)).toBe(2026);
     expect(lastCompletedSeason(NBA_FOR_TEST, september)).toBe(2025);
   });
 
   it('defaults to September when a league omits the field', () => {
-    const noStart: League = { ...BIG_TEN, seasonStartMonth: undefined };
+    const noStart: League = { ...DEFAULT_LEAGUE, seasonStartMonth: undefined };
     expect(lastCompletedSeason(noStart, localDate(2026, 8, 15))).toBe(2026);
   });
 
@@ -109,9 +109,9 @@ describe('lastCompletedSeason', () => {
   // returns an empty leaders list. Caught by a live call: stat leaders
   // silently went from 154 to 0 when this was set one month early.
   it('does not roll over during the pre-season weeks of August', () => {
-    expect(lastCompletedSeason(BIG_TEN, localDate(2026, 7, 18))).toBe(2025);
-    expect(lastCompletedSeason(BIG_TEN, localDate(2026, 7, 31))).toBe(2025);
-    expect(lastCompletedSeason(BIG_TEN, localDate(2026, 8, 1))).toBe(2026);
+    expect(lastCompletedSeason(DEFAULT_LEAGUE, localDate(2026, 7, 18))).toBe(2025);
+    expect(lastCompletedSeason(DEFAULT_LEAGUE, localDate(2026, 7, 31))).toBe(2025);
+    expect(lastCompletedSeason(DEFAULT_LEAGUE, localDate(2026, 8, 1))).toBe(2026);
   });
 });
 
@@ -129,7 +129,7 @@ describe('fetchTeams across league shapes', () => {
   it('still sends the group filter for a conference', async () => {
     const fetchMock = respondWith({ standings: { entries: [] } });
 
-    await fetchTeams(BIG_TEN, { force: true });
+    await fetchTeams(DEFAULT_LEAGUE, { force: true });
 
     expect(String(fetchMock.mock.calls[0][0])).toContain('group=5');
   });

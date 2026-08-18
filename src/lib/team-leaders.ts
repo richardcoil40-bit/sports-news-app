@@ -1,6 +1,7 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
-import { BIG_TEN, espnCacheKey, espnCorePath, lastCompletedSeason, League } from '@/lib/leagues';
+import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
+import { espnCacheKey, espnCorePath, lastCompletedSeason, League } from '@/lib/leagues';
 
 export interface StatLeader {
   athleteId: string;
@@ -67,7 +68,7 @@ async function fetchUncached(teamId: string, league: League): Promise<StatLeader
  */
 export async function fetchTeamStatLeaders(
   teamId: string,
-  league: League = BIG_TEN,
+  league: League = DEFAULT_LEAGUE,
 ): Promise<StatLeader[]> {
   // Failures degrade to (and are cached as) empty — leaders are a nice-to-have
   // second opinion, not something worth failing a screen over.

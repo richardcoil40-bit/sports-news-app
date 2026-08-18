@@ -1,6 +1,7 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
-import { BIG_TEN, espnCacheKey, espnSitePath, League } from '@/lib/leagues';
+import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
+import { espnCacheKey, espnSitePath, League } from '@/lib/leagues';
 
 /**
  * Pinned to the 2025 season for this first pass rather than computed from
@@ -77,7 +78,7 @@ async function fetchUncached(athleteId: string, league: League): Promise<PlayerS
  */
 export async function fetchPlayerSeasonStats(
   athleteId: string,
-  league: League = BIG_TEN,
+  league: League = DEFAULT_LEAGUE,
 ): Promise<PlayerStatCategory[]> {
   // Failures degrade to (and are cached as) empty — a player screen without a
   // stats card is fine; one that fails to load isn't.

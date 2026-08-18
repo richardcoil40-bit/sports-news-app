@@ -1,0 +1,10 @@
+[
+  {
+    "id": "big-ten",
+    "displayName": "Big Ten",
+    "espnSport": "football",
+    "espnLeaguePath": "college-football",
+    "espnGroup": 5,
+    "seasonStartMonth": 8
+  }
+]
