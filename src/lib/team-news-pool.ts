@@ -1,5 +1,6 @@
 import { createEntityCache } from '@/lib/cache';
 import { filterArticlesForTeams } from '@/lib/conference-filter';
+import { filterOffTopic } from '@/lib/off-topic';
 import { Article, fetchFeeds } from '@/lib/feeds';
 import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import { espnCacheKey, League } from '@/lib/leagues';
@@ -106,11 +107,18 @@ async function fetchTeamNewsPoolUncached(
   }
 
   const seen = new Set<string>();
-  const articles = lists.flat().filter((a) => {
+  const deduped = lists.flat().filter((a) => {
     if (seen.has(a.link)) return false;
     seen.add(a.link);
     return true;
   });
+
+  // Dropped here, alongside the team-name filter above, rather than at
+  // render: affiliate copy and campus-governance stories aren't news at
+  // all, so nothing downstream should count them either. notable-players.ts
+  // ranks by how often a player is named, and a jersey ad naming a star
+  // would inflate that.
+  const articles = filterOffTopic(deduped);
 
   articles.sort((a, b) => {
     if (!a.publishedAt) return 1;
