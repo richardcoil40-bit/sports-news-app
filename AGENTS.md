@@ -198,6 +198,12 @@ code comments:
   else is in-memory and dies with the process. It carries the table of
   every cache and its TTL, so update it when you add or retime one, and
   it has the rule any future persistent store has to follow.
+- `docs/deferred-work.md` — what was deliberately left unbuilt and why.
+  Almost everything outstanding depends on one missing piece (a small
+  service holding an API key), and that file records what it unlocks,
+  why nothing built meanwhile becomes rework, and the one decision in it
+  that can't be reverted. Read it before concluding something is simply
+  missing.
 - `docs/evidence/` — dated output from `scripts/check-feeds.sh`, the
   record of when each source was last verified to be returning items.
   Re-run it rather than assuming; feeds rot silently. Reports print the
