@@ -454,7 +454,20 @@ function build<T extends ClusterableArticle>(members: T[]): Cluster<T> {
   };
 }
 
-/** Just the leads, for call sites not rendering the "+N" affordance. */
-export function leadArticles<T extends ClusterableArticle>(clusters: Cluster<T>[]): T[] {
-  return clusters.map((cluster) => cluster.lead);
+/** A lead carrying what it absorbed, so the rest of the pipeline sees articles. */
+export type WithDuplicates<T> = T & { duplicates: T[] };
+
+/**
+ * Flattens clusters back to a list of articles, each carrying the ones it
+ * absorbed. Everything downstream — `balanceBySource`, the FlatList, the
+ * card — then works on articles as before rather than learning about
+ * clusters.
+ */
+export function leadsWithDuplicates<T extends ClusterableArticle>(
+  clusters: Cluster<T>[],
+): WithDuplicates<T>[] {
+  return clusters.map((cluster) => ({
+    ...cluster.lead,
+    duplicates: cluster.members.filter((m) => m.link !== cluster.lead.link),
+  }));
 }

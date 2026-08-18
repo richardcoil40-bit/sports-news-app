@@ -6,6 +6,7 @@ import { FilterBar } from '@/components/filter-bar';
 import { Centered, Separator, tabStyles } from '@/components/team-tabs/shared';
 import { ThemedText } from '@/components/themed-text';
 import { ClaimFilter, CLAIM_FILTER_TABS, Classified } from '@/lib/claim-type';
+import { WithDuplicates } from '@/lib/cluster';
 import { Article } from '@/lib/feeds';
 
 export function NewsTab({
@@ -17,7 +18,7 @@ export function NewsTab({
   onOpenArticle,
   accentColor,
 }: {
-  articles: Classified<Article>[];
+  articles: WithDuplicates<Classified<Article>>[];
   loading: boolean;
   error: boolean;
   claimFilter: ClaimFilter;
@@ -44,6 +45,8 @@ export function NewsTab({
             onPress={() => onOpenArticle(item)}
             claimType={item.claimType}
             onPressClaim={onChangeClaim}
+            duplicates={item.duplicates}
+            onOpenDuplicate={onOpenArticle}
           />
         </AccentRow>
       )}

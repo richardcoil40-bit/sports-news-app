@@ -18,7 +18,8 @@ import {
   filterByClaimType,
   withClaimTypes,
 } from '@/lib/claim-type';
-import { FeedArticle } from '@/lib/multi-team-feed';
+import { clusterArticles, leadsWithDuplicates } from '@/lib/cluster';
+import { Article } from '@/lib/feeds';
 import { balanceBySource } from '@/lib/source-balance';
 import { withTeamMentions } from '@/lib/team-mentions';
 
@@ -50,12 +51,24 @@ export default function FeedScreen() {
   // filtered out that balance no longer describes what's left, so the
   // remaining sources need re-spreading against each other. A no-op when
   // the filter is 'all'.
+  // Filter, then cluster, then balance — in that order.
+  //
+  // Filtering first means every member of every cluster is already
+  // eligible, so a cluster can't end up led by an article the active filter
+  // removed. Balancing last means it sees the post-cluster distribution:
+  // clustering is precisely what removes the duplicates that were inflating
+  // an outlet's share.
   const visibleArticles = useMemo(
-    () => balanceBySource(filterByClaimType(classified, claimFilter)),
+    () =>
+      balanceBySource(
+        leadsWithDuplicates(clusterArticles(filterByClaimType(classified, claimFilter))),
+      ),
     [classified, claimFilter],
   );
 
-  const openArticle = (article: FeedArticle) => {
+  // Widened to Article because it is also handed the duplicates a cluster
+  // absorbed, which carry no team attribution of their own.
+  const openArticle = (article: Article) => {
     router.push({
       pathname: '/article',
       params: {
@@ -125,6 +138,8 @@ export default function FeedScreen() {
                 tagLabel={item.mentionedTeam?.shortName}
                 claimType={item.claimType}
                 onPressClaim={setClaimFilter}
+                duplicates={item.duplicates}
+                onOpenDuplicate={openArticle}
               />
             )}
             ItemSeparatorComponent={() => (

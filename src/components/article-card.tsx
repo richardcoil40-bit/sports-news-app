@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -19,6 +20,8 @@ export function ArticleCard({
    * where it would just repeat the header.
    */
   tagLabel,
+  duplicates,
+  onOpenDuplicate,
   /**
    * What kind of claim the headline makes. Passed in rather than computed
    * here because the screen already classified the list to filter it, and
@@ -32,8 +35,17 @@ export function ArticleCard({
   tagLabel?: string;
   claimType: ClaimType;
   onPressClaim?: (type: ClaimType) => void;
+  /**
+   * Other outlets that ran the same story. Shown as a count that expands,
+   * rather than as more cards — the whole point of grouping them is that
+   * one story should take up one slot.
+   */
+  duplicates?: Article[];
+  onOpenDuplicate?: (article: Article) => void;
 }) {
   const theme = useTheme();
+  const [expanded, setExpanded] = useState(false);
+  const duplicateCount = duplicates?.length ?? 0;
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
@@ -96,6 +108,41 @@ export function ArticleCard({
         <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
           {formatRelativeTime(article.publishedAt)} · {tierLabel(article.tier)}
         </ThemedText>
+
+        {/*
+          On its own line rather than appended to the meta above: that line
+          is 11pt in a column already narrowed by a 96px thumbnail, and
+          "2H AGO · NEWSROOM · +5 OTHER SOURCES" runs past the edge.
+        */}
+        {duplicateCount > 0 ? (
+          <TouchableOpacity
+            onPress={() => setExpanded((v) => !v)}
+            activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            hitSlop={6}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
+              {expanded ? '▾' : '▸'} {duplicateCount} other{' '}
+              {duplicateCount === 1 ? 'source' : 'sources'}
+            </ThemedText>
+          </TouchableOpacity>
+        ) : null}
+
+        {expanded
+          ? duplicates?.map((duplicate) => (
+              <TouchableOpacity
+                key={duplicate.link}
+                onPress={() => onOpenDuplicate?.(duplicate)}
+                disabled={!onOpenDuplicate}
+                activeOpacity={0.6}
+                accessibilityRole={onOpenDuplicate ? 'button' : undefined}
+                style={styles.duplicateRow}>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
+                  {duplicate.source}
+                </ThemedText>
+              </TouchableOpacity>
+            ))
+          : null}
       </View>
     </TouchableOpacity>
   );
@@ -132,6 +179,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     fontSize: 11,
+  },
+  duplicateRow: {
+    paddingLeft: Spacing.two,
+    paddingVertical: 1,
   },
   metaRow: {
     flexDirection: 'row',

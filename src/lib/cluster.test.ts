@@ -5,7 +5,7 @@ import {
   Cluster,
   ClusterableArticle,
   clusterArticles,
-  leadArticles,
+  leadsWithDuplicates,
   normalizeTitle,
 } from '@/lib/cluster';
 
@@ -267,20 +267,37 @@ describe('degenerate inputs', () => {
   });
 });
 
-describe('leadArticles', () => {
-  it('unwraps to the leads', () => {
+describe('leadsWithDuplicates', () => {
+  it('flattens back to articles', () => {
     const clusters = clusterArticles([
       article('Michigan hires a coordinator'),
       article('Iowa announces its captains'),
     ]);
-    expect(leadArticles(clusters)).toHaveLength(2);
+    expect(leadsWithDuplicates(clusters)).toHaveLength(2);
+  });
+
+  it('carries the absorbed articles on the lead', () => {
+    const same = 'Michigan hires Brian Hartline as offensive coordinator';
+    const clusters = clusterArticles([
+      article(same, { source: 'First', publishedAt: hoursAgo(5) }),
+      article(same, { source: 'Second', publishedAt: hoursAgo(1) }),
+    ]);
+    const [lead] = leadsWithDuplicates(clusters);
+
+    expect(lead.source).toBe('First');
+    expect(lead.duplicates.map((d) => d.source)).toEqual(['Second']);
+  });
+
+  it('gives a singleton an empty list rather than undefined', () => {
+    const clusters = clusterArticles([article('Michigan hires a coordinator')]);
+    expect(leadsWithDuplicates(clusters)[0].duplicates).toEqual([]);
   });
 
   it('passes extra fields through', () => {
     const clusters = clusterArticles([
       { ...article('Michigan hires a coordinator'), claimType: 'reported' as const },
     ]);
-    expect(leadArticles(clusters)[0].claimType).toBe('reported');
+    expect(leadsWithDuplicates(clusters)[0].claimType).toBe('reported');
   });
 });
 

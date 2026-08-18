@@ -26,6 +26,7 @@ import {
 import { filterRecruitingArticles } from '@/lib/recruiting';
 import { Player, fetchTeamRoster } from '@/lib/roster';
 import { fetchGameOdds, fetchTeamSchedule, ScheduledGame } from '@/lib/schedule';
+import { clusterArticles, leadsWithDuplicates } from '@/lib/cluster';
 import { balanceBySource } from '@/lib/source-balance';
 import { withTeamMentions } from '@/lib/team-mentions';
 import { fetchTeamColor } from '@/lib/team-color';
@@ -128,10 +129,13 @@ export default function TeamScreen() {
     [news.data, teams],
   );
 
+  // Filter, cluster, balance — see the note on the home feed for why the
+  // order matters.
   const visibleNews = useMemo(
-    // Balanced after filtering, so it operates on whatever survived
-    // rather than reserving slots for sources just filtered out.
-    () => balanceBySource(filterByClaimType(classifiedNews, claimFilter)),
+    () =>
+      balanceBySource(
+        leadsWithDuplicates(clusterArticles(filterByClaimType(classifiedNews, claimFilter))),
+      ),
     [classifiedNews, claimFilter],
   );
 
