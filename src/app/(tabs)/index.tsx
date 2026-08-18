@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -46,6 +46,16 @@ export default function FeedScreen() {
   const { teams } = useTeams();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
   const { ready: briefReady, cutoff, periodLabel, reachedEnd } = useBrief();
+  // "Did the reader actually get to the bottom?" — two ways for that to be
+  // true, and both are needed. Requiring a scroll alone means a brief that
+  // fits on one screen can never be marked read, so it would greet the
+  // reader with the same stories forever.
+  const hasScrolled = useRef(false);
+  const contentHeight = useRef(0);
+  const viewportHeight = useRef(0);
+  const briefWasSeen = () =>
+    hasScrolled.current ||
+    (viewportHeight.current > 0 && contentHeight.current <= viewportHeight.current);
   const contexts = useContextStrip(followedTeams);
 
   // Classified and tagged once, then filtered — every card needs both for
@@ -210,9 +220,28 @@ export default function FeedScreen() {
                 </View>
               ) : null
             }
-            onEndReached={sectioned ? reachedEnd : undefined}
+            // A brief longer than the viewport reaches its "end" during
+            // initial layout, so onEndReached alone would retire stories
+            // nobody scrolled to. briefWasSeen() distinguishes that from a
+            // brief that simply fit on screen, which genuinely was read.
+            onLayout={(e) => {
+              viewportHeight.current = e.nativeEvent.layout.height;
+            }}
+            onContentSizeChange={(_w, h) => {
+              contentHeight.current = h;
+            }}
+            onScroll={(e) => {
+              if (e.nativeEvent.contentOffset.y > 8) hasScrolled.current = true;
+            }}
+            scrollEventThrottle={200}
+            onEndReached={sectioned ? () => reachedEnd(briefWasSeen()) : undefined}
             onEndReachedThreshold={0.1}
+            // Suppressed in sectioned mode: the caught-up marker in the
+            // footer already says there's nothing new, and this copy is
+            // written for the whole feed — it would claim the feed is empty
+            // while Earlier sits one tap below holding two dozen stories.
             ListEmptyComponent={
+              sectioned ? null : (
               <View style={styles.centered}>
                 <ThemedText themeColor="textSecondary" style={styles.centeredText}>
                   {claimFilter === 'rumor'
@@ -224,6 +253,7 @@ export default function FeedScreen() {
                         : 'Nothing new for your teams right now.'}
                 </ThemedText>
               </View>
+              )
             }
             contentContainerStyle={styles.listContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}

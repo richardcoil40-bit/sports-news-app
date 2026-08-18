@@ -19,24 +19,26 @@ const item = (claimType: ClaimType, hoursAgo: number, id = '') => ({
 });
 
 describe('briefCutoff', () => {
-  // Biased toward showing more: re-reading half an hour is a smaller error
-  // than hiding something never seen.
-  it('takes whichever of the two is further back', () => {
-    const cutoff = briefCutoff({
-      now: NOW,
-      periodStart: ago(1 * HOUR),
-      lastCaughtUpAt: ago(4 * HOUR),
-    });
-    expect(cutoff).toEqual(ago(4 * HOUR));
-  });
-
-  it('uses the period start when it is the earlier of the two', () => {
+  // The rule that makes "since you last looked" mean anything. Taking the
+  // *earlier* of the two, as an earlier version did, meant the period start
+  // always won and catching up never shrank the brief.
+  it('moves forward to the last catch-up within a period', () => {
     const cutoff = briefCutoff({
       now: NOW,
       periodStart: ago(5 * HOUR),
       lastCaughtUpAt: ago(1 * HOUR),
     });
-    expect(cutoff).toEqual(ago(5 * HOUR));
+    expect(cutoff).toEqual(ago(1 * HOUR));
+  });
+
+  // A new period brings back a full window even though the mark is older.
+  it('falls back to the period start once the mark predates it', () => {
+    const cutoff = briefCutoff({
+      now: NOW,
+      periodStart: ago(1 * HOUR),
+      lastCaughtUpAt: ago(4 * HOUR),
+    });
+    expect(cutoff).toEqual(ago(1 * HOUR));
   });
 
   // A first launch at 5:01am would otherwise get a brief covering one
@@ -50,10 +52,12 @@ describe('briefCutoff', () => {
     expect(cutoff).toEqual(ago(MAX_BRIEF_AGE_MS));
   });
 
+  // Both inputs older than the floor — e.g. an overnight window plus a mark
+  // from last week — must still clamp.
   it('never reaches back further than the floor', () => {
     const cutoff = briefCutoff({
       now: NOW,
-      periodStart: ago(1 * HOUR),
+      periodStart: ago(90 * HOUR),
       lastCaughtUpAt: ago(30 * 24 * HOUR),
     });
     expect(cutoff).toEqual(ago(MAX_BRIEF_AGE_MS));
@@ -67,7 +71,9 @@ describe('briefCutoff', () => {
       periodStart: ago(2 * HOUR),
       lastCaughtUpAt: new Date(NOW.getTime() + 10 * HOUR),
     });
-    expect(cutoff).toEqual(ago(2 * HOUR));
+    // Clamped to now, not ten hours ahead — otherwise the brief would be
+    // permanently empty on a device whose clock ran fast.
+    expect(cutoff).toEqual(NOW);
   });
 });
 

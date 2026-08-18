@@ -30,13 +30,22 @@ export interface BriefWindow {
 }
 
 /**
- * The moment the brief starts from.
+ * The moment the brief starts from: the **later** of the period start and
+ * the last catch-up.
  *
- * Takes whichever of the period start and the last catch-up is **further
- * back**, deliberately biased toward showing more. If you caught up at
- * 11:30 and the noon window opened at 11:00, you'll see 11:00 onward and
- * re-encounter half an hour you've already read. That's the right way round
- * — the opposite error hides something you never saw.
+ * An earlier version took whichever was further back, reasoning that
+ * re-showing something is a smaller error than hiding it. Running it proved
+ * that wrong in a way the reasoning missed: the period start is almost
+ * always the earlier of the two, so it always won, and catching up could
+ * never shrink the brief. Read everything at 11:30 and come back at 12:00
+ * and the whole 11:00 window is still sitting there — the finish line was
+ * honest but "since you last looked" never actually engaged.
+ *
+ * Taking the later of the two hides nothing unseen, because the mark is
+ * only written once the reader has reached the end of the brief. It moves
+ * forward within a period, and the period start takes over again whenever
+ * the mark is older than it — which is what makes a new morning bring back
+ * a full window.
  *
  * With no catch-up recorded, the floor does the work: a first launch gets a
  * full two days rather than whatever happens to have landed since the
@@ -49,9 +58,9 @@ export function briefCutoff({ now, periodStart, lastCaughtUpAt }: BriefWindow): 
   // Clock skew, or a device whose time moved backwards: a mark in the
   // future would otherwise produce a permanently empty brief.
   const mark = lastCaughtUpAt.getTime() > now.getTime() ? now : lastCaughtUpAt;
-  const furtherBack = new Date(Math.min(periodStart.getTime(), mark.getTime()));
+  const start = new Date(Math.max(periodStart.getTime(), mark.getTime()));
 
-  return furtherBack < floor ? floor : furtherBack;
+  return start < floor ? floor : start;
 }
 
 export interface BriefSections<T> {
