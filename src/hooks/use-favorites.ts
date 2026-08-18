@@ -1,5 +1,6 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
+import { favoriteKey } from '@/lib/favorite-keys';
 import {
   getFavoriteIds,
   hydrateFavorites,
@@ -7,6 +8,7 @@ import {
   subscribeToFavorites,
   toggleFavorite,
 } from '@/lib/favorites';
+import { Team } from '@/lib/teams';
 
 /**
  * Binds React to the favorites store. useSyncExternalStore is the right
@@ -23,5 +25,19 @@ export function useFavorites() {
     hydrateFavorites();
   }, []);
 
-  return { favoriteIds, hydrated, toggleFavorite };
+  // Handed out rather than letting screens test
+  // `favoriteIds.includes(team.id)` themselves. Stored keys are
+  // league-qualified, so a bare id silently never matches — a bug that
+  // still type-checks, because both sides are strings.
+  //
+  // Derived from the rendered snapshot rather than reading the store
+  // directly, so it is consistent with what this render actually saw and
+  // its identity changes exactly when the favorites do.
+  const isFavorite = useCallback(
+    (team: Pick<Team, 'id' | 'leagueId'>) =>
+      favoriteIds.includes(favoriteKey(team.leagueId, team.id)),
+    [favoriteIds],
+  );
+
+  return { favoriteIds, hydrated, isFavorite, toggleFavorite };
 }

@@ -1,9 +1,15 @@
+import { favoriteKey, migrateFavoriteIds } from '@/lib/favorite-keys';
+import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import { readValue, writeValue } from '@/lib/storage';
+import { Team } from '@/lib/teams';
 
 /**
  * The teams you follow. This is the piece of state that turns the app
- * from a directory of every Big Ten team into a feed of the two or three
- * you actually care about, so it's read by nearly every screen.
+ * from a directory of every team into a feed of the two or three you
+ * actually care about, so it's read by nearly every screen.
+ *
+ * Entries are league-qualified keys (`"big-ten:130"`), not bare ESPN ids —
+ * see favorite-keys.ts for why, and for the migration off the old format.
  *
  * Implemented as a module-level store with subscribers rather than React
  * context, for two reasons: starring a team on the Teams tab has to
@@ -47,8 +53,8 @@ export function isHydrated(): boolean {
   return hydrated;
 }
 
-export function isFavorite(teamId: string): boolean {
-  return favoriteIds.includes(teamId);
+export function isFavorite(team: Pick<Team, 'id' | 'leagueId'>): boolean {
+  return favoriteIds.includes(favoriteKey(team.leagueId, team.id));
 }
 
 /**
@@ -65,10 +71,9 @@ export async function hydrateFavorites(): Promise<void> {
       const parsed: unknown = JSON.parse(raw);
       // Guard the shape rather than trusting it: this value survives app
       // upgrades, so a future version writing a different format
-      // shouldn't be able to crash this one on launch.
-      if (Array.isArray(parsed)) {
-        favoriteIds = parsed.filter((id): id is string => typeof id === 'string');
-      }
+      // shouldn't be able to crash this one on launch. Bare ids written by
+      // older builds are upgraded here rather than rejected.
+      favoriteIds = migrateFavoriteIds(parsed, DEFAULT_LEAGUE.id);
     } catch {
       favoriteIds = [];
     }
@@ -76,16 +81,23 @@ export async function hydrateFavorites(): Promise<void> {
 
   hydrated = true;
   emit();
+
+  // Write the upgraded shape back so the migration runs once rather than on
+  // every launch. Not awaited, and safe to lose: hydrate would simply
+  // migrate again next time. Skipped when nothing changed so a normal launch
+  // doesn't touch disk.
+  if (raw && raw !== JSON.stringify(favoriteIds)) persist();
 }
 
 async function persist() {
   await writeValue(FAVORITES_KEY, JSON.stringify(favoriteIds));
 }
 
-export function toggleFavorite(teamId: string) {
-  favoriteIds = favoriteIds.includes(teamId)
-    ? favoriteIds.filter((id) => id !== teamId)
-    : [...favoriteIds, teamId];
+export function toggleFavorite(team: Pick<Team, 'id' | 'leagueId'>) {
+  const key = favoriteKey(team.leagueId, team.id);
+  favoriteIds = favoriteIds.includes(key)
+    ? favoriteIds.filter((id) => id !== key)
+    : [...favoriteIds, key];
   emit();
   // Not awaited: the UI shouldn't wait on a disk write to show a star
   // filling in. A failed write is already handled (and logged) in
@@ -93,8 +105,8 @@ export function toggleFavorite(teamId: string) {
   persist();
 }
 
-export function setFavorites(teamIds: string[]) {
-  favoriteIds = [...teamIds];
+export function setFavorites(teams: Pick<Team, 'id' | 'leagueId'>[]) {
+  favoriteIds = teams.map((team) => favoriteKey(team.leagueId, team.id));
   emit();
   persist();
 }

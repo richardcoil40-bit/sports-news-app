@@ -11,7 +11,7 @@ import { fetchMultiTeamFeed, FeedArticle } from '@/lib/multi-team-feed';
  * those teams' news.
  */
 export function useFeed() {
-  const { favoriteIds, hydrated } = useFavorites();
+  const { hydrated, isFavorite } = useFavorites();
   const { teams, loading: teamsLoading } = useTeams();
 
   const [articles, setArticles] = useState<FeedArticle[]>([]);
@@ -24,8 +24,8 @@ export function useFeed() {
   const requestId = useRef(0);
 
   const followedTeams = useMemo(
-    () => teams.filter((team) => favoriteIds.includes(team.id)),
-    [teams, favoriteIds],
+    () => teams.filter((team) => isFavorite(team)),
+    [teams, isFavorite],
   );
 
   // Depend on the ID string rather than the array so the effect below

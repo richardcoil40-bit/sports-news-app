@@ -155,6 +155,7 @@ describe('fetchTeams across league shapes', () => {
       shortName: 'Lakers',
       abbreviation: 'LAL',
       logoUrl: 'https://a.espncdn.com/i/teamlogos/nba/500/lal.png',
+      leagueId: 'nba-test',
     });
     // Celtics have no logos array in the fixture.
     expect(teams.find((t) => t.shortName === 'Celtics')?.logoUrl).toBeNull();

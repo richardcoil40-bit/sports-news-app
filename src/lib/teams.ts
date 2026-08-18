@@ -29,6 +29,14 @@ export interface Team {
   shortName: string; // "Georgia"
   abbreviation: string; // "UGA"
   logoUrl: string | null;
+  /**
+   * Which league this team came from. Carried on the team rather than
+   * inferred at the call site because ESPN ids are only unique within a
+   * sport — anything that stores or compares a team (favorites, caches)
+   * needs the league to disambiguate, and asking each screen to remember
+   * that is how the two drift apart.
+   */
+  leagueId: string;
 }
 
 interface RawTeam {
@@ -94,6 +102,7 @@ async function fetchTeamsUncached(league: League): Promise<Team[]> {
       shortName: t.shortDisplayName,
       abbreviation: t.abbreviation,
       logoUrl: t.logos?.[0]?.href ?? null,
+      leagueId: league.id,
     });
   }
 

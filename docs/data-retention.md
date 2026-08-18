@@ -88,7 +88,7 @@ it, decided at the same time as the feature, not bolted on later:
 
 | What | Where | Cap | Why that cap |
 |---|---|---|---|
-| Followed team IDs (`nofrills.favoriteTeamIds`) | AsyncStorage, via `lib/storage.ts` | Structurally capped at 18 (the number of Big Ten teams); an array of short ID strings, a few hundred bytes at most | No eviction policy needed — the set of teams that exist is small and fixed, so this cannot grow with use, only with conference realignment |
+| Followed teams (`nofrills.favoriteTeamIds`) | AsyncStorage, via `lib/storage.ts` | An array of short `"<leagueId>:<teamId>"` strings — bounded by the number of teams in the leagues the app ships, a few hundred bytes at most | No eviction policy needed: a user can only follow teams that exist, so this grows with the league catalog, never with use. Revisit if the catalog ever spans many sports |
 | Onboarding-complete flag (`nofrills.hasOnboarded`) | AsyncStorage, via `lib/storage.ts` | A single boolean | Nothing to cap |
 
 Both are written and read only through `lib/storage.ts`, which is the
@@ -100,3 +100,22 @@ same time it gets written, per the rule above.
 Neither value is transmitted off the device, and neither contains
 anything identifying — team IDs are ESPN's public identifiers, the same
 for every user who follows that team.
+
+### Format change: followed teams became league-qualified
+
+Entries were bare ESPN ids (`"130"`) and are now qualified with the
+league (`"big-ten:130"`). ESPN ids are unique only within a sport — id 13
+is the Los Angeles Lakers in the NBA and a different team entirely in
+college football — so bare ids are correct with exactly one league and
+silently wrong with two.
+
+`hydrateFavorites` upgrades the old format on read and writes the result
+back once, so the migration runs once rather than on every launch. It is
+idempotent and it collapses a bare id against its qualified equivalent,
+because those are the same team and keeping both would show the row
+twice.
+
+**The migration has no expiry.** This value lives on the device with no
+server behind it, so a user who skips many versions still arrives with
+the old shape. Nothing here should ever assume the migration has already
+run everywhere; see `lib/favorite-keys.ts` and its tests.
