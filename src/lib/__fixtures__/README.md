@@ -11,6 +11,7 @@ deliberate edge case:
 | File | Parser | Edge case it carries |
 | --- | --- | --- |
 | `espn-standings.json` | `teams.ts` | Third team has no `logos` array |
+| `espn-standings-nested.json` | `teams.ts` | The *other* standings shape — a whole-league query with no `group` filter, which nests entries under `children[]` instead of a root `standings`. Trimmed from ESPN's live NBA response so the alternate shape is real rather than imagined; one team has no `logos`. Not a sign the app supports basketball — it's the fixture that proves the league boundary is closed. |
 | `espn-roster.json` | `roster.ts` | A `coaches` group that must be filtered out |
 | `espn-team-leaders.json` | `team-leaders.ts` | A `$ref` with no extractable athlete id |
 | `espn-player-stats.json` | `player-stats.ts` | An all-zero category, and an off-season year |
@@ -19,6 +20,8 @@ deliberate edge case:
 | `espn-team.json` | `team-color.ts` | — (the white-color case is inline in the test) |
 | `rss-valid.xml` | `feeds.ts` | CDATA with pre-encoded entities, and an item with no link |
 | `rss-malformed.xml` | `feeds.ts` | Truncated mid-document, as a dying CDN returns |
+| `cluster-corpus.json` | `cluster.ts` | **Not an API response** — 90 real headlines captured from four teams' live pools on 2026-08-18, trimmed to the fields the clusterer reads. Clustering weights words by how common they are *in the batch*, so it cannot be tested against a handful of invented headlines: synthetic filler gives synthetic statistics, and early attempts passed or failed depending on how the filler was worded rather than on the code. Deliberately retains three real over-merges that had to be fixed (a numbered series, an offensive/defensive pair, and one story about two different teams) alongside the five merges that are correct. |
+| `atom-valid.xml` | `feeds.ts` | A `link` array whose first entry is `rel="replies"`; an entry with a `rel`-less link; an entry with no resolvable `href` (dropped); a bare-string title alongside `type="html"` CDATA titles; an entry with `<updated>` but no `<published>`; `media:thumbnail` |
 
 Malformed *shapes* (null bodies, wrong types, missing keys) are generated in
 the tests rather than saved as files — they're one-liners and reading them

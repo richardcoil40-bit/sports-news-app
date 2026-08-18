@@ -1,11 +1,13 @@
 import { Image } from 'expo-image';
+import { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatRelativeTime } from '@/lib/format';
+import { ClaimType, claimTypeLabel } from '@/lib/claim-type';
 import { Article } from '@/lib/feeds';
+import { formatRelativeTime } from '@/lib/format';
 import { tierLabel } from '@/lib/source-tier';
 
 export function ArticleCard({
@@ -18,12 +20,32 @@ export function ArticleCard({
    * where it would just repeat the header.
    */
   tagLabel,
+  duplicates,
+  onOpenDuplicate,
+  /**
+   * What kind of claim the headline makes. Passed in rather than computed
+   * here because the screen already classified the list to filter it, and
+   * classifying is a few hundred regex tests per article.
+   */
+  claimType,
+  onPressClaim,
 }: {
   article: Article;
   onPress: () => void;
   tagLabel?: string;
+  claimType: ClaimType;
+  onPressClaim?: (type: ClaimType) => void;
+  /**
+   * Other outlets that ran the same story. Shown as a count that expands,
+   * rather than as more cards — the whole point of grouping them is that
+   * one story should take up one slot.
+   */
+  duplicates?: Article[];
+  onOpenDuplicate?: (article: Article) => void;
 }) {
   const theme = useTheme();
+  const [expanded, setExpanded] = useState(false);
+  const duplicateCount = duplicates?.length ?? 0;
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
@@ -42,13 +64,36 @@ export function ArticleCard({
 
       <View style={styles.textColumn}>
         <View style={styles.metaRow}>
+          {/*
+            Solid, and first. This is the app's primary signal, and it has
+            to read as a different *kind* of thing from the tier on the line
+            below — rendered as more grey text, "NEWSROOM · RUMOR" reads as
+            one label rather than two judgments about different things.
+          */}
+          <TouchableOpacity
+            onPress={() => onPressClaim?.(claimType)}
+            disabled={!onPressClaim}
+            activeOpacity={0.6}
+            accessibilityRole={onPressClaim ? 'button' : undefined}
+            accessibilityLabel={`${claimTypeLabel(claimType)} — filter by this`}
+            hitSlop={6}
+            style={[styles.claimChip, { backgroundColor: theme.text }]}>
+            <ThemedText style={[styles.chipText, { color: theme.background }]}>
+              {claimTypeLabel(claimType)}
+            </ThemedText>
+          </TouchableOpacity>
+
+          {/*
+            Outlined rather than solid, so the two chips don't compete. The
+            claim matters more than which of your teams it concerns, and two
+            filled blocks side by side read as noise.
+          */}
           {tagLabel ? (
-            <View style={[styles.tag, { backgroundColor: theme.text }]}>
-              <ThemedText style={[styles.tagText, { color: theme.background }]}>
-                {tagLabel}
-              </ThemedText>
+            <View style={[styles.teamTag, { borderColor: theme.text }]}>
+              <ThemedText style={[styles.chipText, { color: theme.text }]}>{tagLabel}</ThemedText>
             </View>
           ) : null}
+
           <ThemedText
             type="small"
             themeColor="textSecondary"
@@ -63,6 +108,41 @@ export function ArticleCard({
         <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
           {formatRelativeTime(article.publishedAt)} · {tierLabel(article.tier)}
         </ThemedText>
+
+        {/*
+          On its own line rather than appended to the meta above: that line
+          is 11pt in a column already narrowed by a 96px thumbnail, and
+          "2H AGO · NEWSROOM · +5 OTHER SOURCES" runs past the edge.
+        */}
+        {duplicateCount > 0 ? (
+          <TouchableOpacity
+            onPress={() => setExpanded((v) => !v)}
+            activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            hitSlop={6}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
+              {expanded ? '▾' : '▸'} {duplicateCount} other{' '}
+              {duplicateCount === 1 ? 'source' : 'sources'}
+            </ThemedText>
+          </TouchableOpacity>
+        ) : null}
+
+        {expanded
+          ? duplicates?.map((duplicate) => (
+              <TouchableOpacity
+                key={duplicate.link}
+                onPress={() => onOpenDuplicate?.(duplicate)}
+                disabled={!onOpenDuplicate}
+                activeOpacity={0.6}
+                accessibilityRole={onOpenDuplicate ? 'button' : undefined}
+                style={styles.duplicateRow}>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
+                  {duplicate.source}
+                </ThemedText>
+              </TouchableOpacity>
+            ))
+          : null}
       </View>
     </TouchableOpacity>
   );
@@ -100,6 +180,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     fontSize: 11,
   },
+  duplicateRow: {
+    paddingLeft: Spacing.two,
+    paddingVertical: 1,
+  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -108,12 +192,20 @@ const styles = StyleSheet.create({
   metaFlex: {
     flex: 1,
   },
-  tag: {
+  claimChip: {
     paddingHorizontal: Spacing.one,
     paddingVertical: 1,
     borderRadius: 0,
   },
-  tagText: {
+  teamTag: {
+    paddingHorizontal: Spacing.one,
+    // 1px less vertical padding than the solid chip so the 1.5px border
+    // doesn't make the outlined one visibly taller than its neighbour.
+    paddingVertical: 0,
+    borderWidth: 1.5,
+    borderRadius: 0,
+  },
+  chipText: {
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',

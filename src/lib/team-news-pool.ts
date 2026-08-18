@@ -1,7 +1,10 @@
 import { createEntityCache } from '@/lib/cache';
-import { communitySourcesForTeam } from '@/lib/community-sources';
 import { filterArticlesForTeams } from '@/lib/conference-filter';
-import { Article, fetchAllFeeds, fetchFeeds } from '@/lib/feeds';
+import { filterOffTopic } from '@/lib/off-topic';
+import { Article, fetchFeeds } from '@/lib/feeds';
+import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
+import { espnCacheKey, League } from '@/lib/leagues';
+import { fetchLeagueFeeds, teamSourcesFor } from '@/lib/source-catalog';
 import { fetchTeamArticles } from '@/lib/team-news';
 
 export interface TeamNewsPool {
@@ -26,11 +29,15 @@ const poolCache = createEntityCache<string, TeamNewsPool>({ ttlMs: CACHE_TTL_MS 
 // or whether it's genuinely stuck (never resolves at all).
 const DEBUG_TIMING = false;
 
-async function fetchTeamNewsPoolUncached(teamId: string, teamShortName: string): Promise<TeamNewsPool> {
+async function fetchTeamNewsPoolUncached(
+  teamId: string,
+  teamShortName: string,
+  league: League,
+): Promise<TeamNewsPool> {
   const poolStartedAt = Date.now();
   if (DEBUG_TIMING) console.log(`[pool] start for team ${teamId} (${teamShortName})`);
 
-  const sources = communitySourcesForTeam(teamShortName);
+  const sources = teamSourcesFor(league, teamShortName);
   const teamScoped = sources.filter((s) => s.scope !== 'broad');
   const broadScoped = sources.filter((s) => s.scope === 'broad');
 
@@ -51,10 +58,10 @@ async function fetchTeamNewsPoolUncached(teamId: string, teamShortName: string):
   };
 
   const [espnResult, teamSiteResult, localResult, generalResult] = await Promise.allSettled([
-    timeGroup('espn team news', fetchTeamArticles(teamId)),
+    timeGroup('espn team news', fetchTeamArticles(teamId, league)),
     timeGroup('community/team sites', teamScoped.length > 0 ? fetchFeeds(teamScoped) : Promise.resolve(empty)),
     timeGroup('local newsroom', broadScoped.length > 0 ? fetchFeeds(broadScoped) : Promise.resolve(empty)),
-    timeGroup('national pool', fetchAllFeeds()),
+    timeGroup('national pool', fetchLeagueFeeds(league)),
   ]);
 
   if (DEBUG_TIMING) console.log(`[pool] all groups settled after ${Date.now() - poolStartedAt}ms`);
@@ -100,11 +107,18 @@ async function fetchTeamNewsPoolUncached(teamId: string, teamShortName: string):
   }
 
   const seen = new Set<string>();
-  const articles = lists.flat().filter((a) => {
+  const deduped = lists.flat().filter((a) => {
     if (seen.has(a.link)) return false;
     seen.add(a.link);
     return true;
   });
+
+  // Dropped here, alongside the team-name filter above, rather than at
+  // render: affiliate copy and campus-governance stories aren't news at
+  // all, so nothing downstream should count them either. notable-players.ts
+  // ranks by how often a player is named, and a jersey ad naming a star
+  // would inflate that.
+  const articles = filterOffTopic(deduped);
 
   articles.sort((a, b) => {
     if (!a.publishedAt) return 1;
@@ -166,11 +180,13 @@ function withHardCap(teamId: string, teamShortName: string, work: Promise<TeamNe
 export async function fetchTeamNewsPool(
   teamId: string,
   teamShortName: string,
+  league: League = DEFAULT_LEAGUE,
   options?: { force?: boolean },
 ): Promise<TeamNewsPool> {
   return poolCache.get(
-    teamId,
-    () => withHardCap(teamId, teamShortName, fetchTeamNewsPoolUncached(teamId, teamShortName)),
+    espnCacheKey(league, teamId),
+    () =>
+      withHardCap(teamId, teamShortName, fetchTeamNewsPoolUncached(teamId, teamShortName, league)),
     { force: options?.force },
   );
 }

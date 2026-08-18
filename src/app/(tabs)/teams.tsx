@@ -16,7 +16,7 @@ import { Team } from '@/lib/teams';
 export default function TeamsScreen() {
   const theme = useTheme();
   const { teams, loading, error } = useTeams();
-  const { favoriteIds, toggleFavorite } = useFavorites();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
@@ -31,10 +31,10 @@ export default function TeamsScreen() {
     // who you follow rather than needing a separate screen for it.
     // Alphabetical within each group, preserving the order from lib/teams.
     return [
-      ...matching.filter((t) => favoriteIds.includes(t.id)),
-      ...matching.filter((t) => !favoriteIds.includes(t.id)),
+      ...matching.filter((t) => isFavorite(t)),
+      ...matching.filter((t) => !isFavorite(t)),
     ];
-  }, [teams, query, favoriteIds]);
+  }, [teams, query, isFavorite]);
 
   const openTeam = (team: Team) => {
     router.push({
@@ -92,8 +92,8 @@ export default function TeamsScreen() {
               <TeamRow
                 team={item}
                 onPress={() => openTeam(item)}
-                following={favoriteIds.includes(item.id)}
-                onToggleFollow={() => toggleFavorite(item.id)}
+                following={isFavorite(item)}
+                onToggleFollow={() => toggleFavorite(item)}
               />
             )}
             ItemSeparatorComponent={() => (

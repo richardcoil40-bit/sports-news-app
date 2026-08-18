@@ -14,14 +14,21 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useAsync } from '@/hooks/use-async';
+import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
 import { Article } from '@/lib/feeds';
 import { rankNotablePlayers } from '@/lib/notable-players';
-import { filterByReach, ReachFilter } from '@/lib/reach-filter';
+import {
+  ClaimFilter,
+  filterByClaimType,
+  withClaimTypes,
+} from '@/lib/claim-type';
 import { filterRecruitingArticles } from '@/lib/recruiting';
 import { Player, fetchTeamRoster } from '@/lib/roster';
 import { fetchGameOdds, fetchTeamSchedule, ScheduledGame } from '@/lib/schedule';
+import { clusterArticles, leadsWithDuplicates } from '@/lib/cluster';
 import { balanceBySource } from '@/lib/source-balance';
+import { withTeamMentions } from '@/lib/team-mentions';
 import { fetchTeamColor } from '@/lib/team-color';
 import { StatLeader, fetchTeamStatLeaders } from '@/lib/team-leaders';
 import { fetchTeamNewsPool } from '@/lib/team-news-pool';
@@ -51,7 +58,10 @@ export default function TeamScreen() {
   }>();
 
   const [tab, setTab] = useState<TabKey>('news');
-  const [reachFilter, setReachFilter] = useState<ReachFilter>('all');
+  // The whole league: this team's pool carries stories about its
+  // opponents and neighbours, and those should be tagged as such.
+  const { teams } = useTeams();
+  const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
   const [teamColor, setTeamColor] = useState<string | null>(null);
 
   const news = useAsync<Article[]>(async () => {
@@ -110,16 +120,28 @@ export default function TeamScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, params.id, params.shortName, params.name]);
 
-  const visibleNews = useMemo(() => {
-    if (!news.data) return [];
-    // Balanced after filtering, so it operates on whatever survived
-    // rather than reserving slots for sources just filtered out.
-    return balanceBySource(filterByReach(news.data, reachFilter));
-  }, [news.data, reachFilter]);
+  // Classified and tagged once here, so the News and Recruiting tabs
+  // share one pass and every card has its badges whether or not a filter
+  // is active. Tagged against the whole league because this team's pool
+  // carries stories about its opponents and neighbours too.
+  const classifiedNews = useMemo(
+    () => withTeamMentions(withClaimTypes(news.data ?? []), teams),
+    [news.data, teams],
+  );
+
+  // Filter, cluster, balance — see the note on the home feed for why the
+  // order matters.
+  const visibleNews = useMemo(
+    () =>
+      balanceBySource(
+        leadsWithDuplicates(clusterArticles(filterByClaimType(classifiedNews, claimFilter))),
+      ),
+    [classifiedNews, claimFilter],
+  );
 
   const recruitingArticles = useMemo(
-    () => (news.data ? filterRecruitingArticles(news.data) : []),
-    [news.data],
+    () => filterRecruitingArticles(classifiedNews),
+    [classifiedNews],
   );
 
   const notablePlayers = useMemo(
@@ -191,8 +213,8 @@ export default function TeamScreen() {
             articles={visibleNews}
             loading={news.data === null && !news.error}
             error={news.error}
-            reachFilter={reachFilter}
-            onChangeReach={setReachFilter}
+            claimFilter={claimFilter}
+            onChangeClaim={setClaimFilter}
             onOpenArticle={openArticle}
             accentColor={teamColor}
           />

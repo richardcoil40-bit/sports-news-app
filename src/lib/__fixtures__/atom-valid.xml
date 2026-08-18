@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <title type="text">Off Tackle Empire</title>
+  <updated>2026-08-09T20:11:48+00:00</updated>
+  <link rel="alternate" type="text/html" href="https://www.offtackleempire.com" />
+  <id>https://www.offtackleempire.com/rss/index.xml</id>
+
+  <entry>
+    <author>
+      <name>MN Wildcat</name>
+    </author>
+    <title type="html"><![CDATA[A Blog, If We Could Keep It]]></title>
+    <link rel="alternate" type="text/html" href="https://www.offtackleempire.com/latest-news/50084/a-blog-if-we-could-keep-it" />
+    <id>https://www.offtackleempire.com/?p=50084</id>
+    <updated>2026-08-09T16:11:48-04:00</updated>
+    <published>2026-08-10T07:00:00-04:00</published>
+    <summary type="html"><![CDATA[Off Tackle Empire makes no claim to be important; rather, it is a silly place on the internet.]]></summary>
+    <content type="html"><![CDATA[<figure><img alt="" src="https://platform.offtackleempire.com/wp-content/uploads/notre-dame.jpg" /></figure><p>In 1797, a Philadelphia socialite asked Benjamin Franklin&#8230;</p>]]></content>
+  </entry>
+
+  <entry>
+    <author>
+      <name>Candystripes</name>
+    </author>
+    <title type="html"><![CDATA[Indiana&#39;s defense travels well]]></title>
+    <link rel="replies" type="text/html" href="https://www.offtackleempire.com/50083/comments" />
+    <link rel="alternate" type="text/html" href="https://www.offtackleempire.com/latest-news/50083/indiana-defense" />
+    <id>https://www.offtackleempire.com/?p=50083</id>
+    <updated>2026-08-08T12:00:00-04:00</updated>
+    <content type="html"><![CDATA[<p>The Hoosiers held Purdue to 61 rushing yards.</p>]]></content>
+  </entry>
+
+  <entry>
+    <title>Bare text title with a thumbnail</title>
+    <link href="https://www.offtackleempire.com/latest-news/50082/bare-title" />
+    <id>https://www.offtackleempire.com/?p=50082</id>
+    <updated>2026-08-07T09:30:00-04:00</updated>
+    <media:thumbnail url="https://platform.offtackleempire.com/wp-content/uploads/thumb.jpg" />
+  </entry>
+
+  <entry>
+    <title type="html"><![CDATA[Entry with no resolvable link should be dropped]]></title>
+    <link rel="replies" type="text/html" />
+    <id>https://www.offtackleempire.com/?p=50081</id>
+    <updated>2026-08-06T09:00:00-04:00</updated>
+  </entry>
+</feed>

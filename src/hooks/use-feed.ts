@@ -11,7 +11,7 @@ import { fetchMultiTeamFeed, FeedArticle } from '@/lib/multi-team-feed';
  * those teams' news.
  */
 export function useFeed() {
-  const { favoriteIds, hydrated } = useFavorites();
+  const { hydrated, isFavorite } = useFavorites();
   const { teams, loading: teamsLoading } = useTeams();
 
   const [articles, setArticles] = useState<FeedArticle[]>([]);
@@ -19,13 +19,13 @@ export function useFeed() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Same out-of-order guard used in use-teams/use-articles: a slow first
+  // Same out-of-order guard used in use-teams: a slow first
   // response must not land after a faster second one and overwrite it.
   const requestId = useRef(0);
 
   const followedTeams = useMemo(
-    () => teams.filter((team) => favoriteIds.includes(team.id)),
-    [teams, favoriteIds],
+    () => teams.filter((team) => isFavorite(team)),
+    [teams, isFavorite],
   );
 
   // Depend on the ID string rather than the array so the effect below

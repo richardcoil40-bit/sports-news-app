@@ -1,0 +1,83 @@
+{
+  "children": [
+    {
+      "name": "Eastern Conference",
+      "standings": {
+        "entries": [
+          {
+            "team": {
+              "id": "8",
+              "displayName": "Detroit Pistons",
+              "shortDisplayName": "Pistons",
+              "abbreviation": "DET",
+              "logos": [
+                {
+                  "href": "https://a.espncdn.com/i/teamlogos/nba/500/det.png"
+                }
+              ],
+              "location": "Detroit"
+            }
+          },
+          {
+            "team": {
+              "id": "1",
+              "displayName": "Atlanta Hawks",
+              "shortDisplayName": "Hawks",
+              "abbreviation": "ATL",
+              "logos": [
+                {
+                  "href": "https://a.espncdn.com/i/teamlogos/nba/500/atl.png"
+                }
+              ],
+              "location": "Atlanta"
+            }
+          },
+          {
+            "team": {
+              "id": "2",
+              "displayName": "Boston Celtics",
+              "shortDisplayName": "Celtics",
+              "abbreviation": "BOS",
+              "location": "Boston"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Western Conference",
+      "standings": {
+        "entries": [
+          {
+            "team": {
+              "id": "13",
+              "displayName": "Los Angeles Lakers",
+              "shortDisplayName": "Lakers",
+              "abbreviation": "LAL",
+              "logos": [
+                {
+                  "href": "https://a.espncdn.com/i/teamlogos/nba/500/lal.png"
+                }
+              ],
+              "location": "Los Angeles"
+            }
+          },
+          {
+            "team": {
+              "id": "24",
+              "displayName": "San Antonio Spurs",
+              "shortDisplayName": "Spurs",
+              "abbreviation": "SA",
+              "logos": [
+                {
+                  "href": "https://a.espncdn.com/i/teamlogos/nba/500/sa.png"
+                }
+              ],
+              "location": "San Antonio"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

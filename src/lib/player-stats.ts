@@ -1,5 +1,7 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
+import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
+import { espnCacheKey, espnSitePath, League } from '@/lib/leagues';
 
 /**
  * Pinned to the 2025 season for this first pass rather than computed from
@@ -42,8 +44,8 @@ function hasSignal(values: string[]): boolean {
 
 const cache = createEntityCache<string, PlayerStatCategory[]>();
 
-async function fetchUncached(athleteId: string): Promise<PlayerStatCategory[]> {
-  const url = `https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/athletes/${athleteId}/stats`;
+async function fetchUncached(athleteId: string, league: League): Promise<PlayerStatCategory[]> {
+  const url = `https://site.web.api.espn.com/apis/common/v3/sports/${espnSitePath(league)}/athletes/${athleteId}/stats`;
   const response = await fetchWithTimeout(url);
   if (!response.ok) return [];
   const json = await response.json();
@@ -74,8 +76,13 @@ async function fetchUncached(athleteId: string): Promise<PlayerStatCategory[]> {
  * them). Cached per athlete since the player detail screen is the only
  * consumer and re-visiting it shouldn't re-fetch.
  */
-export async function fetchPlayerSeasonStats(athleteId: string): Promise<PlayerStatCategory[]> {
+export async function fetchPlayerSeasonStats(
+  athleteId: string,
+  league: League = DEFAULT_LEAGUE,
+): Promise<PlayerStatCategory[]> {
   // Failures degrade to (and are cached as) empty — a player screen without a
   // stats card is fine; one that fails to load isn't.
-  return cache.get(athleteId, () => fetchUncached(athleteId).catch(() => [] as PlayerStatCategory[]));
+  return cache.get(espnCacheKey(league, athleteId), () =>
+    fetchUncached(athleteId, league).catch(() => [] as PlayerStatCategory[]),
+  );
 }

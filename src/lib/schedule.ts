@@ -1,4 +1,7 @@
+import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
+import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
+import { espnCacheKey, espnCorePath, espnSitePath, League } from '@/lib/leagues';
 
 export interface Odds {
   provider: string;
@@ -62,8 +65,11 @@ interface RawEvent {
  * ESPN only publishes them once a sportsbook has posted a line (often not
  * until close to kickoff), so most future games come back with none.
  */
-export async function fetchTeamSchedule(teamId: string): Promise<ScheduledGame[]> {
-  const url = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${teamId}/schedule?seasontype=2`;
+async function fetchTeamScheduleUncached(
+  teamId: string,
+  league: League,
+): Promise<ScheduledGame[]> {
+  const url = `https://site.api.espn.com/apis/site/v2/sports/${espnSitePath(league)}/teams/${teamId}/schedule?seasontype=2`;
   const response = await fetchWithTimeout(url);
   if (!response.ok) throw new Error(`Schedule responded ${response.status}`);
   const json = await response.json();
@@ -118,13 +124,44 @@ interface RawOddsRoot {
 }
 
 /**
+ * Scores move while a game is in progress, so this is a TTL rather than a
+ * cache-for-the-process-lifetime like roster.ts. Three minutes matches the
+ * news pools, which is the cadence the rest of the app already refreshes at.
+ *
+ * Added because the home screen now reads a schedule per followed team on
+ * mount; without a cache that is one network round trip per team every time
+ * the tab is opened.
+ */
+const SCHEDULE_TTL_MS = 3 * 60 * 1000;
+const scheduleCache = createEntityCache<string, ScheduledGame[]>({ ttlMs: SCHEDULE_TTL_MS });
+
+/**
+ * Deliberately lets a failure escape rather than caching an empty schedule:
+ * per the error-policy note in AGENTS.md, a source that should retry on the
+ * next call must throw out of the loader. An empty schedule cached for three
+ * minutes would look like a team with no games.
+ */
+export async function fetchTeamSchedule(
+  teamId: string,
+  league: League = DEFAULT_LEAGUE,
+  options?: { force?: boolean },
+): Promise<ScheduledGame[]> {
+  return scheduleCache.get(espnCacheKey(league, teamId), () => fetchTeamScheduleUncached(teamId, league), {
+    force: options?.force,
+  });
+}
+
+/**
  * Best-effort free odds via ESPN's public core API (the same data ESPN's
  * own site pulls from DraftKings). Real sportsbook data, but not always
  * present: ESPN only returns a line once a book has posted one for that
  * game, so this can legitimately come back null for games further out.
  */
-export async function fetchGameOdds(eventId: string): Promise<Odds | null> {
-  const url = `https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/events/${eventId}/competitions/${eventId}/odds`;
+export async function fetchGameOdds(
+  eventId: string,
+  league: League = DEFAULT_LEAGUE,
+): Promise<Odds | null> {
+  const url = `https://sports.core.api.espn.com/v2/sports/${espnCorePath(league)}/events/${eventId}/competitions/${eventId}/odds`;
   const response = await fetchWithTimeout(url);
   if (!response.ok) return null;
   const json: RawOddsRoot = await response.json();

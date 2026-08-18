@@ -114,6 +114,7 @@ presents them, not whether they're allowed in.
 
 | Tier | Meaning | Criteria | Treatment in app |
 |---|---|---|---|
+| 0 | Not assessed | Nobody has applied the criteria below to this outlet | Show, labeled "Unrated" |
 | 1 | Professional newsroom | Accountability + attribution + track record all clear; independent or access-dependent | Show freely; eligible for "trusted only" filter |
 | 2 | Credible independent | Named staff, real original reporting, thinner formal standards (good team blogs, established newsletters) | Show freely |
 | 3 | Community / fan perspective | Real editorial presence but fan-voiced, mostly reaction and aggregation | Show, labeled as community |
@@ -122,6 +123,35 @@ presents them, not whether they're allowed in.
 
 Tier is a property of the *source*, stored alongside the feed definition, so
 it can be shown in the UI and used as a filter without re-deriving it.
+
+### Tier 0 is not a bad rating
+
+Tier 0 says *the app has not assessed this outlet*, which is a different
+statement from any of the ratings below it. In particular it is not a
+politer Tier 3: Tier 3 describes what a source is (fan-voiced, real
+editorial presence), while Tier 0 admits what the app doesn't know.
+Collapsing the two would put a description on an outlet nobody has looked
+at, which is the failure the whole tier exists to prevent.
+
+**Where it comes from today: syndication.** An RSS item can name the outlet
+it was republished from, via `<source url="…">Name</source>`. Surveyed
+across all 35 in-app feeds on 2026-08-18, exactly one uses it — Yahoo
+Sports, which is an aggregator: 50 items drawn from 27 different outlets
+(SB Nation, Trojans Wire, Detroit Free Press, HEAVY…), none written by
+Yahoo.
+
+Those articles used to be attributed to "Yahoo Sports" and to inherit
+Yahoo's Tier 1, so a HEAVY piece displayed as a professional newsroom. The
+app now credits the outlet that actually wrote it and drops the tier to 0.
+A rating is earned by the source that was assessed; passing it along to 27
+outlets that weren't is a false claim on the one axis this document exists
+to keep honest.
+
+Renaming without re-rating would have been worse than doing neither, which
+is why the rename waited for this tier rather than shipping on its own.
+
+Tier 0 is also the fallback for an unrecognised tier value, for the same
+reason: not knowing should never render as a claim.
 
 ## Candidate sources
 

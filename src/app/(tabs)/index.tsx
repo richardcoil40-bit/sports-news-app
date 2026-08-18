@@ -1,19 +1,35 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ArticleCard } from '@/components/article-card';
+import { CaughtUpMarker } from '@/components/caught-up-marker';
+import { CollapsibleSection } from '@/components/collapsible-section';
+import { ContextStrip } from '@/components/context-strip';
 import { Logo } from '@/components/logo';
-import { ReachFilterBar } from '@/components/reach-filter-bar';
+import { FilterBar } from '@/components/filter-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { BRIEF_MODE } from '@/constants/flags';
 import { Spacing } from '@/constants/theme';
+import { useBrief } from '@/hooks/use-brief';
+import { useContextStrip } from '@/hooks/use-context-strip';
 import { useFeed } from '@/hooks/use-feed';
+import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
-import { FeedArticle } from '@/lib/multi-team-feed';
-import { filterByReach, ReachFilter } from '@/lib/reach-filter';
+import {
+  ClaimFilter,
+  CLAIM_FILTER_TABS,
+  filterByClaimType,
+  withClaimTypes,
+} from '@/lib/claim-type';
+import { caughtUpMessage, splitBrief } from '@/lib/brief';
+import { detectMove } from '@/lib/program-moves';
+import { clusterArticles, leadsWithDuplicates } from '@/lib/cluster';
+import { Article } from '@/lib/feeds';
 import { balanceBySource } from '@/lib/source-balance';
+import { withTeamMentions } from '@/lib/team-mentions';
 
 /**
  * The home screen is a feed of the teams you follow, not a directory of
@@ -24,19 +40,81 @@ export default function FeedScreen() {
   const theme = useTheme();
   const { articles, loading, refreshing, error, refresh, followedTeams, hasFollowedTeams, ready } =
     useFeed();
-  const [reachFilter, setReachFilter] = useState<ReachFilter>('all');
+  // The whole league, not just followed teams: a Michigan follower's pool
+  // legitimately contains Michigan State stories, and tagging those
+  // MICHIGAN would be worse than not tagging them at all.
+  const { teams } = useTeams();
+  const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
+  const { ready: briefReady, cutoff, periodLabel, reachedEnd } = useBrief();
+  // "Did the reader actually get to the bottom?" — two ways for that to be
+  // true, and both are needed. Requiring a scroll alone means a brief that
+  // fits on one screen can never be marked read, so it would greet the
+  // reader with the same stories forever.
+  const hasScrolled = useRef(false);
+  const contentHeight = useRef(0);
+  const viewportHeight = useRef(0);
+  const briefWasSeen = () =>
+    hasScrolled.current ||
+    (viewportHeight.current > 0 && contentHeight.current <= viewportHeight.current);
+  const contexts = useContextStrip(followedTeams);
 
-  // Re-balanced after filtering, matching the team screen: the feed
-  // arrives already balanced across all sources, but once national
-  // coverage is filtered out that balance no longer describes what's
-  // left, so the remaining beat sources need re-spreading against each
-  // other. A no-op when the filter is 'all'.
-  const visibleArticles = useMemo(
-    () => balanceBySource(filterByReach(articles, reachFilter)),
-    [articles, reachFilter],
+  // Classified and tagged once, then filtered — every card needs both for
+  // its badges whether or not a filter is active, so this is one pass
+  // instead of one per consumer.
+  const classified = useMemo(
+    () => withTeamMentions(withClaimTypes(articles), teams),
+    [articles, teams],
   );
 
-  const openArticle = (article: FeedArticle) => {
+  // Re-balanced after filtering, matching the team screen: the feed
+  // arrives already balanced across all sources, but once a claim type is
+  // filtered out that balance no longer describes what's left, so the
+  // remaining sources need re-spreading against each other. A no-op when
+  // the filter is 'all'.
+  // Filter, then cluster, then balance — in that order.
+  //
+  // Filtering first means every member of every cluster is already
+  // eligible, so a cluster can't end up led by an article the active filter
+  // removed. Balancing last means it sees the post-cluster distribution:
+  // clustering is precisely what removes the duplicates that were inflating
+  // an outlet's share.
+  const visibleArticles = useMemo(
+    () =>
+      balanceBySource(
+        leadsWithDuplicates(clusterArticles(filterByClaimType(classified, claimFilter))),
+      ),
+    [classified, claimFilter],
+  );
+
+  // Widened to Article because it is also handed the duplicates a cluster
+  // absorbed, which carry no team attribution of their own.
+  // Only when nothing is filtered. Catching up and browsing are different
+  // intents: filtering to RUMOR and still seeing a "you're caught up" line
+  // above a collapsed section holding everything is nonsense, so an active
+  // filter renders one plain list instead.
+  const sectioned = BRIEF_MODE && claimFilter === 'all' && cutoff !== null;
+
+  const sections = useMemo(
+    () => (cutoff ? splitBrief(visibleArticles, cutoff) : null),
+    [visibleArticles, cutoff],
+  );
+
+  // Out of season the strip shows each team's latest roster or staff
+  // move, taken from news already loaded rather than fetched again. Keyed
+  // by team so a strip row can find its own.
+  const offseasonHeadlines = useMemo(() => {
+    const byTeam: Record<string, string | undefined> = {};
+    for (const article of classified) {
+      const team = article.mentionedTeam;
+      if (!team) continue;
+      const key = `${team.leagueId}:${team.id}`;
+      if (byTeam[key] || !detectMove(article)) continue;
+      byTeam[key] = article.title;
+    }
+    return byTeam;
+  }, [classified]);
+
+  const openArticle = (article: Article) => {
     router.push({
       pathname: '/article',
       params: {
@@ -49,6 +127,21 @@ export default function FeedScreen() {
       },
     });
   };
+
+  const renderCard = (item: (typeof visibleArticles)[number]) => (
+    <ArticleCard
+      article={item}
+      onPress={() => openArticle(item)}
+      // The team the headline actually names, which is not always the
+      // followed team whose pool surfaced it. Omitted when no team is
+      // named rather than guessed at.
+      tagLabel={item.mentionedTeam?.shortName}
+      claimType={item.claimType}
+      onPressClaim={setClaimFilter}
+      duplicates={item.duplicates}
+      onOpenDuplicate={openArticle}
+    />
+  );
 
   const subtitle = hasFollowedTeams
     ? followedTeams.map((team) => team.shortName).join(' · ')
@@ -69,7 +162,7 @@ export default function FeedScreen() {
           </ThemedText>
         </View>
 
-        {!ready || loading ? (
+        {!ready || loading || (BRIEF_MODE && !briefReady) ? (
           <View style={styles.centered}>
             <ActivityIndicator />
           </View>
@@ -94,32 +187,73 @@ export default function FeedScreen() {
           </View>
         ) : (
           <FlatList
-            data={visibleArticles}
+            data={sectioned && sections ? sections.brief : visibleArticles}
             keyExtractor={(item) => item.link}
-            renderItem={({ item }) => (
-              <ArticleCard
-                article={item}
-                onPress={() => openArticle(item)}
-                // Only worth showing when more than one team's news is
-                // mixed together — with a single followed team every tag
-                // would say the same thing.
-                tagLabel={followedTeams.length > 1 ? item.teamName : undefined}
-              />
-            )}
+            renderItem={({ item }) => renderCard(item)}
             ItemSeparatorComponent={() => (
               <View style={[styles.separator, { backgroundColor: theme.text }]} />
             )}
-            ListHeaderComponent={<ReachFilterBar active={reachFilter} onChange={setReachFilter} />}
+            ListHeaderComponent={
+              <View>
+                <ContextStrip contexts={contexts} offseasonHeadlines={offseasonHeadlines} />
+                <FilterBar
+                  tabs={CLAIM_FILTER_TABS}
+                  active={claimFilter}
+                  onChange={setClaimFilter}
+                />
+              </View>
+            }
+            ListFooterComponent={
+              sectioned && sections ? (
+                <View>
+                  <CaughtUpMarker message={caughtUpMessage(sections, periodLabel)} />
+                  <CollapsibleSection label="rumors & takes" count={sections.chatter.length}>
+                    {sections.chatter.map((item) => (
+                      <View key={item.link}>{renderCard(item)}</View>
+                    ))}
+                  </CollapsibleSection>
+                  <CollapsibleSection label="earlier" count={sections.earlier.length}>
+                    {sections.earlier.map((item) => (
+                      <View key={item.link}>{renderCard(item)}</View>
+                    ))}
+                  </CollapsibleSection>
+                </View>
+              ) : null
+            }
+            // A brief longer than the viewport reaches its "end" during
+            // initial layout, so onEndReached alone would retire stories
+            // nobody scrolled to. briefWasSeen() distinguishes that from a
+            // brief that simply fit on screen, which genuinely was read.
+            onLayout={(e) => {
+              viewportHeight.current = e.nativeEvent.layout.height;
+            }}
+            onContentSizeChange={(_w, h) => {
+              contentHeight.current = h;
+            }}
+            onScroll={(e) => {
+              if (e.nativeEvent.contentOffset.y > 8) hasScrolled.current = true;
+            }}
+            scrollEventThrottle={200}
+            onEndReached={sectioned ? () => reachedEnd(briefWasSeen()) : undefined}
+            onEndReachedThreshold={0.1}
+            // Suppressed in sectioned mode: the caught-up marker in the
+            // footer already says there's nothing new, and this copy is
+            // written for the whole feed — it would claim the feed is empty
+            // while Earlier sits one tap below holding two dozen stories.
             ListEmptyComponent={
+              sectioned ? null : (
               <View style={styles.centered}>
                 <ThemedText themeColor="textSecondary" style={styles.centeredText}>
-                  {reachFilter === 'beat'
-                    ? 'No beat coverage for your teams right now.'
-                    : reachFilter === 'national'
-                      ? 'No national coverage for your teams right now.'
-                      : 'Nothing new for your teams right now.'}
+                  {claimFilter === 'rumor'
+                    ? 'No rumors about your teams right now.'
+                    : claimFilter === 'take'
+                      ? 'No takes about your teams right now.'
+                      : claimFilter === 'reported'
+                        ? 'No reported news for your teams right now.'
+                        : 'Nothing new for your teams right now.'}
                 </ThemedText>
               </View>
+              )
             }
             contentContainerStyle={styles.listContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}

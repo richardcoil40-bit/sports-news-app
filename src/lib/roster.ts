@@ -1,5 +1,7 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
+import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
+import { espnCacheKey, espnSitePath, League } from '@/lib/leagues';
 
 export type PositionGroup = 'offense' | 'defense' | 'specialTeam';
 
@@ -33,8 +35,8 @@ const POSITION_GROUPS: PositionGroup[] = ['offense', 'defense', 'specialTeam'];
 // leaving and re-entering a team's Players tab doesn't re-fetch every time.
 const rosterCache = createEntityCache<string, Player[]>();
 
-async function fetchTeamRosterUncached(teamId: string): Promise<Player[]> {
-  const url = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${teamId}/roster`;
+async function fetchTeamRosterUncached(teamId: string, league: League): Promise<Player[]> {
+  const url = `https://site.api.espn.com/apis/site/v2/sports/${espnSitePath(league)}/teams/${teamId}/roster`;
   const response = await fetchWithTimeout(url);
   if (!response.ok) throw new Error(`Roster responded ${response.status}`);
   const json = await response.json();
@@ -66,6 +68,6 @@ async function fetchTeamRosterUncached(teamId: string): Promise<Player[]> {
   return players;
 }
 
-export async function fetchTeamRoster(teamId: string): Promise<Player[]> {
-  return rosterCache.get(teamId, () => fetchTeamRosterUncached(teamId));
+export async function fetchTeamRoster(teamId: string, league: League = DEFAULT_LEAGUE): Promise<Player[]> {
+  return rosterCache.get(espnCacheKey(league, teamId), () => fetchTeamRosterUncached(teamId, league));
 }

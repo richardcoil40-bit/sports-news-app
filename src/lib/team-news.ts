@@ -1,5 +1,7 @@
 import { Article } from '@/lib/feeds';
 import { fetchWithTimeout } from '@/lib/http';
+import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
+import { espnSitePath, League } from '@/lib/leagues';
 
 interface RawArticle {
   id: number;
@@ -22,8 +24,8 @@ function parsePublished(raw: string | undefined): string | null {
  * mixed with some general college football stories rather than being
  * exclusively about that team.
  */
-export async function fetchTeamArticles(teamId: string): Promise<Article[]> {
-  const url = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/news?team=${teamId}`;
+export async function fetchTeamArticles(teamId: string, league: League = DEFAULT_LEAGUE): Promise<Article[]> {
+  const url = `https://site.api.espn.com/apis/site/v2/sports/${espnSitePath(league)}/news?team=${teamId}`;
   const response = await fetchWithTimeout(url);
   if (!response.ok) throw new Error(`Team news responded ${response.status}`);
   const json = await response.json();

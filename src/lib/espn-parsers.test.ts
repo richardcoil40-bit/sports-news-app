@@ -7,7 +7,7 @@ import standingsFixture from '@/lib/__fixtures__/espn-standings.json';
 import teamFixture from '@/lib/__fixtures__/espn-team.json';
 import teamLeadersFixture from '@/lib/__fixtures__/espn-team-leaders.json';
 import teamNewsFixture from '@/lib/__fixtures__/espn-team-news.json';
-import { BIG_TEN } from '@/lib/leagues';
+import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import { fetchPlayerSeasonStats } from '@/lib/player-stats';
 import { fetchTeamRoster } from '@/lib/roster';
 import { fetchGameOdds, fetchTeamSchedule } from '@/lib/schedule';
@@ -104,7 +104,7 @@ describe('ESPN parsers degrade to empty on a malformed response', () => {
       it(`returns [] for ${label}`, async () => {
         respondWith(body);
         // force, because the team list caches per league rather than per id.
-        await expect(fetchTeams(BIG_TEN, { force: true })).resolves.toEqual([]);
+        await expect(fetchTeams(DEFAULT_LEAGUE, { force: true })).resolves.toEqual([]);
       });
     }
   });
@@ -114,15 +114,17 @@ describe('ESPN parsers on a well-formed response', () => {
   it('fetchTeams maps standings entries and sorts by short name', async () => {
     respondWith(standingsFixture);
 
-    const teams = await fetchTeams(BIG_TEN, { force: true });
+    const teams = await fetchTeams(DEFAULT_LEAGUE, { force: true });
 
     expect(teams.map((t) => t.shortName)).toEqual(['Michigan', 'Ohio State', 'Penn State']);
     expect(teams[1]).toEqual({
       id: '194',
       name: 'Ohio State Buckeyes',
       shortName: 'Ohio State',
+      location: 'Ohio State',
       abbreviation: 'OSU',
       logoUrl: 'https://a.espncdn.com/i/teamlogos/ncaa/500/194.png',
+      leagueId: 'big-ten',
     });
     // Penn State has no logos array in the fixture.
     expect(teams[2].logoUrl).toBeNull();
@@ -267,7 +269,7 @@ describe('ESPN parsers on a non-OK response', () => {
    */
   it('fetchTeams throws, by design', async () => {
     respondWith(null, { ok: false, status: 503 });
-    await expect(fetchTeams(BIG_TEN, { force: true })).rejects.toThrow(/Big Ten team list responded 503/);
+    await expect(fetchTeams(DEFAULT_LEAGUE, { force: true })).rejects.toThrow(/Big Ten team list responded 503/);
   });
 
   it.each([

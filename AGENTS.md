@@ -47,13 +47,22 @@ inventing a new one:
   `fetchTeamNewsPool`) use `Promise.allSettled`, not `Promise.all` — one
   dead feed should never take down the others. Failed sources get
   collected and surfaced, not silently dropped and not thrown.
-  - **Known gap:** "failed" currently means a rejected promise or a
-    non-OK status. A source that returns a *successful* response with
-    nothing usable in it — ESPN's feed answers 202 with an empty body —
-    parses to zero articles and is never added to `failedSources`. It
-    contributes nothing and reports nothing. See
-    `docs/evidence/README.md`; unresolved, and worth fixing if you're
-    touching this code.
+  - **A useless response counts as a failure — keep it that way.**
+    "Failed" used to mean only a rejected promise or a non-OK status, so
+    a source that answered politely with nothing usable reported nothing
+    and contributed nothing. That hid two real bugs for months (ESPN's
+    202-with-empty-body, and seventeen Atom feeds the parser couldn't
+    read at all — see `docs/evidence/README.md`). `fetchFeed` now throws
+    on a body that isn't well-formed XML, and on well-formed XML that
+    isn't a feed.
+  - **But a feed with zero items is still a success.** A publisher having
+    a quiet day is not a broken source. That distinction is the whole
+    point — conflating the two is what created the problem above — and
+    `feeds.test.ts` has a test on each side of it. Don't collapse them.
+  - **Validate before parsing.** `XMLValidator` runs first because the
+    parser is deliberately lenient: hand it a truncated document and it
+    nests the unclosed elements into a plausible-looking channel with no
+    items, which is indistinguishable from a healthy quiet feed.
 - **Defensive parsing.** External JSON is always read with optional
   chaining and a fallback (`json?.field ?? []`), never assumed to have
   the shape you expect. A malformed response should degrade to empty,
@@ -157,6 +166,21 @@ each with a reason: three are ordinary fetch-on-mount (`use-teams`,
 boilerplate. They're per-line rather than a rule-level "off" so the rule
 still fails the build on new code.
 
+## Feature flags
+
+`src/constants/flags.ts` holds compile-time booleans for changes big
+enough that you'd want to see the app both ways before committing.
+`BRIEF_MODE` is the current one: off, the home screen is the endless
+chronological feed it always was; on, it's the brief with a finish line
+and collapsed sections below.
+
+They're JS-only constants on purpose — flipping one is a Metro reload
+rather than a rebuild, so rejecting an idea costs a boolean instead of a
+revert.
+
+**Delete a flag once the question is settled, along with the branch it
+isn't taking.** A flag nobody flips is dead code with extra steps.
+
 ## Design system
 
 Established and intentional — don't drift from it without discussing:
@@ -189,11 +213,19 @@ code comments:
   else is in-memory and dies with the process. It carries the table of
   every cache and its TTL, so update it when you add or retime one, and
   it has the rule any future persistent store has to follow.
+- `docs/deferred-work.md` — what was deliberately left unbuilt and why.
+  Almost everything outstanding depends on one missing piece (a small
+  service holding an API key), and that file records what it unlocks,
+  why nothing built meanwhile becomes rework, and the one decision in it
+  that can't be reverted. Read it before concluding something is simply
+  missing.
 - `docs/evidence/` — dated output from `scripts/check-feeds.sh`, the
   record of when each source was last verified to be returning items.
-  Re-run it rather than assuming; feeds rot silently. Its README also
-  documents a standing failure worth knowing about (ESPN's feed returns
-  202 with an empty body and the app doesn't count that as a failure).
+  Re-run it rather than assuming; feeds rot silently. Reports print the
+  detected format (`rss` / `atom`) per source — that column is what made
+  the seventeen-dead-Atom-feeds problem visible, and its README writes up
+  that whole episode, which is worth reading before trusting any source
+  that merely *looks* healthy.
 
 ## Environment-specific constraints
 
@@ -214,6 +246,24 @@ running locally with full access:
   folders are generated once and reused. Regenerate with
   `npx expo prebuild --clean` before rebuilding, or the change silently
   won't show up and will look like a bug.
+- **CocoaPods needs a UTF-8 locale, and fails obscurely without one.**
+  If `pod install` dies with `Unicode Normalization not appropriate for
+  ASCII-8BIT (Encoding::CompatibilityError)`, Ruby's default external
+  encoding is US-ASCII (check with
+  `ruby -e 'puts Encoding.default_external'`). Prefix the build:
+
+  ```
+  LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 npx expo run:ios
+  ```
+
+  The traceback points into `Pod::Config#installation_root` and looks
+  like a corrupt Podfile, which it isn't.
+- **`expo run:ios` does not exit.** After building, installing and
+  launching, it stays in the foreground streaming device logs. Piping it
+  to `tail` therefore shows nothing and looks like a hang — the build
+  has usually finished long before. To check, look at what it's actually
+  doing: a child process of `simctl spawn … log stream` means the build
+  succeeded and it's only tailing logs.
 
 ## Scope
 
@@ -222,26 +272,51 @@ expand to other sports and leagues. Favor sport-agnostic naming and
 structure where it doesn't cost real effort now, so that expansion is
 additive later rather than a rewrite.
 
-A league's identity lives in `src/lib/leagues.ts` as a `League`
-descriptor (`id`, `displayName`, and the `espn*` fields its URLs are
-built from). `BIG_TEN` is the only one wired up today.
-`fetchTeams(league)` in `teams.ts` takes one and defaults to it, and
-each league's team list caches under its own `id`. When you add a
-league, add a constant — don't hardcode a group number or a conference
-name into a module.
+**Leagues are data, not code.** The catalog lives in
+`src/lib/__data__/leagues.json` and is read through
+`src/lib/league-catalog.ts`. Adding a league is a JSON entry — never a
+new constant, and never an edit to a module. The goal it serves is that
+adding the NFL should not require shipping a new build of the app, so
+resist anything that puts a league back into TypeScript.
 
-Two things are still conference-shaped and deliberately left alone:
+`League` itself (the type, plus the pure URL/season helpers) stays in
+`src/lib/leagues.ts`. That file holds no league data at all, and
+shouldn't gain any.
+
+- **Build ESPN URLs with the helpers**, never by interpolating the
+  descriptor fields directly. `espnSitePath` gives
+  `football/college-football`; `espnCorePath` gives
+  `football/leagues/college-football`. The extra `leagues` segment is
+  the single easiest thing here to get wrong — only two callers use it,
+  so grepping for the site path silently misses them.
+- **Key per-entity caches with `espnCacheKey`.** ESPN ids are unique
+  only within a sport: NBA team 13 is the Lakers, and college-football
+  team 13 is someone else entirely. Keyed on the raw id they would share
+  a roster cache entry. It intentionally keys on sport + league path
+  rather than league id, so two conferences of the same sport still
+  share one cached roster.
+- **Anything calendar-shaped belongs on the descriptor.**
+  `seasonStartMonth` exists because college football's August-to-January
+  season is wrong for nearly every other sport. Note it means "the month
+  from which the new season's year is worth querying", which for college
+  football is September, not the late-August opener — ESPN has no stats
+  until games are played, and setting it a month early silently returns
+  zero stat leaders all preseason.
+- **`parseLeagues` validates as if the data were hostile**, dropping bad
+  entries individually and falling back to the bundled catalog. That is
+  deliberate groundwork: the day the catalog is fetched instead of
+  bundled, no new trust code should be needed.
+
+One thing is still conference-shaped and deliberately left alone:
 
 - `community-sources.ts` is a Big Ten–only source table keyed by team
   slug. The *shape* is league-agnostic; only the contents are Big Ten.
   The real cost of a second conference is the research — every URL in
   there was verified live — not the code.
-- Six modules still hardcode the sport and league in their URLs:
-  `roster.ts`, `schedule.ts`, `team-color.ts`, `team-news.ts`,
-  `player-stats.ts` and `team-leaders.ts`. Note the last one is easy to
-  miss when grepping — it uses `football/leagues/college-football`
-  rather than the `football/college-football` the others use. So the
-  `League` descriptor closes the *conference* boundary but not yet the
-  *sport* one; those six each need it threaded through.
 
-Both are additive to fix later, not blockers.
+No second league is shipped, and basketball appears only as a test
+descriptor in `leagues.test.ts` plus a fixture trimmed from ESPN's live
+NBA standings. Those exercise the two paths one league cannot: a league
+with no conference filter, and the nested `children[]` standings shape
+that comes back when you omit the filter. Adding a real second league is
+a product decision, not a code one.

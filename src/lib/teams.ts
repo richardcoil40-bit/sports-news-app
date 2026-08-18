@@ -1,6 +1,7 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
-import { BIG_TEN, League } from '@/lib/leagues';
+import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
+import { espnSitePath, League } from '@/lib/leagues';
 
 /**
  * ESPN's public site API — the same JSON endpoints ESPN's own site and apps
@@ -15,34 +16,75 @@ import { BIG_TEN, League } from '@/lib/leagues';
  * conference is recorded on the League descriptor in leagues.ts.
  */
 function standingsUrl(league: League): string {
-  return `https://site.api.espn.com/apis/v2/sports/${league.espnSport}/${league.espnLeaguePath}/standings?group=${league.espnGroup}`;
+  const base = `https://site.api.espn.com/apis/v2/sports/${espnSitePath(league)}/standings`;
+  // A whole league (the NFL, the NBA) has no conference to filter by, and
+  // appending an empty group returns nothing useful. See the response-shape
+  // note on StandingsRoot — omitting it also changes what comes back.
+  return league.espnGroup === undefined ? base : `${base}?group=${league.espnGroup}`;
 }
 
 export interface Team {
   id: string;
   name: string; // "Georgia Bulldogs"
-  shortName: string; // "Georgia"
+  shortName: string; // "Georgia" — ESPN abbreviates some of these ("Michigan St")
+  /**
+   * The school or city as ESPN writes it out in full ("Michigan State").
+   *
+   * Kept separately from shortName because ESPN abbreviates the latter:
+   * Michigan State's shortDisplayName is "Michigan St", which never matches
+   * a headline saying "Michigan State" — and that silently tagged every
+   * Spartans story MICHIGAN. Anything matching team names against prose
+   * wants this field, not shortName.
+   */
+  location: string;
   abbreviation: string; // "UGA"
   logoUrl: string | null;
+  /**
+   * Which league this team came from. Carried on the team rather than
+   * inferred at the call site because ESPN ids are only unique within a
+   * sport — anything that stores or compares a team (favorites, caches)
+   * needs the league to disambiguate, and asking each screen to remember
+   * that is how the two drift apart.
+   */
+  leagueId: string;
 }
 
 interface RawTeam {
   id: string;
   displayName: string;
   shortDisplayName: string;
+  location?: string;
   abbreviation: string;
   logos?: { href: string }[];
 }
 
 /**
- * Scoping to a single conference changes the response shape: querying all
- * of FBS (group=80) nests each conference's standings under a top-level
- * `children` array, but querying one conference returns that conference
- * itself as the root object, with `standings.entries` sitting directly at
- * the top — no `children` wrapper.
+ * Scoping to a single conference changes the response shape: querying one
+ * conference returns that conference itself as the root object, with
+ * `standings.entries` sitting directly at the top. Querying a whole league
+ * instead nests each division's standings under a top-level `children`
+ * array and omits the root-level `standings` entirely.
+ *
+ * Both shapes have to be handled or a league with no `espnGroup` returns an
+ * empty team list — which, per the throw-on-non-OK note below, is precisely
+ * the "empty app that looks like it loaded fine" failure this module exists
+ * to avoid. Verified against ESPN's NBA standings on 2026-08-18: no root
+ * `standings`, two children (Eastern/Western), 15 teams each, `team` object
+ * identical in shape to the college-football one.
  */
-interface StandingsRoot {
+interface StandingsGroup {
   standings?: { entries?: { team: RawTeam }[] };
+}
+
+interface StandingsRoot extends StandingsGroup {
+  children?: StandingsGroup[];
+}
+
+/** Flattens whichever of the two shapes came back. */
+function standingsEntries(json: StandingsRoot): { team: RawTeam }[] {
+  const rootEntries = json?.standings?.entries;
+  if (rootEntries?.length) return rootEntries;
+  return (json?.children ?? []).flatMap((child) => child?.standings?.entries ?? []);
 }
 
 async function fetchTeamsUncached(league: League): Promise<Team[]> {
@@ -61,7 +103,7 @@ async function fetchTeamsUncached(league: League): Promise<Team[]> {
   const seen = new Set<string>();
   const teams: Team[] = [];
 
-  for (const entry of json?.standings?.entries ?? []) {
+  for (const entry of standingsEntries(json)) {
     const t = entry.team;
     if (!t || seen.has(t.id)) continue;
     seen.add(t.id);
@@ -69,8 +111,10 @@ async function fetchTeamsUncached(league: League): Promise<Team[]> {
       id: t.id,
       name: t.displayName,
       shortName: t.shortDisplayName,
+      location: t.location ?? t.shortDisplayName,
       abbreviation: t.abbreviation,
       logoUrl: t.logos?.[0]?.href ?? null,
+      leagueId: league.id,
     });
   }
 
@@ -89,7 +133,7 @@ const teamsCache = createEntityCache<string, Team[]>({ ttlMs: CACHE_TTL_MS });
 
 /** Defaults to the Big Ten — the only league wired up today. */
 export async function fetchTeams(
-  league: League = BIG_TEN,
+  league: League = DEFAULT_LEAGUE,
   options?: { force?: boolean },
 ): Promise<Team[]> {
   return teamsCache.get(league.id, () => fetchTeamsUncached(league), { force: options?.force });

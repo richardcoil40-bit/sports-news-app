@@ -9,7 +9,8 @@
 # stops contributing. Re-run this periodically and diff against the last
 # report in docs/evidence/.
 #
-# The in-app list is read out of src/lib/feeds.ts and src/lib/community-sources.ts
+# The in-app list is read out of src/lib/source-catalog.ts and
+# src/lib/community-sources.ts
 # rather than duplicated here, so it can't drift from what the app actually
 # fetches. Add a source there and it's covered here automatically.
 #
@@ -62,13 +63,24 @@ check() {
     return
   fi
 
+  # Print which shape the body actually is. This script counted <entry> as
+  # a fallback from the start, so Atom feeds always reported OK here —
+  # while the app read only the RSS path and silently got nothing from
+  # them. Being more tolerant than the app is precisely what let that hide
+  # for months, so the format now goes in the report and any future gap
+  # between "the script can read it" and "the app can read it" is visible.
+  fmt="rss"
   items=$(grep -o '<item[ >]' "$TMP" 2>/dev/null | wc -l | tr -d ' ')
-  if [ "$items" = "0" ]; then
-    items=$(grep -o '<entry[ >]' "$TMP" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${items:-0}" -eq 0 ]; then
+    entries=$(grep -o '<entry[ >]' "$TMP" 2>/dev/null | wc -l | tr -d ' ')
+    if [ "${entries:-0}" -gt 0 ]; then
+      fmt="atom"
+      items="$entries"
+    fi
   fi
 
   if [ "${items:-0}" -gt 0 ]; then
-    printf '  %-26s %-9s %s items\n' "$name" "OK" "$items"
+    printf '  %-26s %-9s %-5s %s items\n' "$name" "OK" "$fmt" "$items"
     pass=$((pass + 1))
   else
     printf '  %-26s %-9s %s\n' "$name" "EMPTY" "200 but no items — likely not a feed"
@@ -88,7 +100,7 @@ extract_in_app_sources() {
     const fs = require("fs");
     const out = [];
     const NAME_URL = /name:\s*(["\x27])(.+?)\1,\s*url:\s*(["\x27])(.+?)\3/g;
-    for (const file of ["src/lib/feeds.ts", "src/lib/community-sources.ts"]) {
+    for (const file of ["src/lib/source-catalog.ts", "src/lib/community-sources.ts"]) {
       const src = fs.readFileSync(file, "utf8");
       for (const m of src.matchAll(NAME_URL)) out.push([m[2], m[4]]);
     }
@@ -111,7 +123,7 @@ extract_in_app_sources() {
   printf '%s\n' "  commit     $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
   printf '%s\n' "  script     scripts/check-feeds.sh$([ "$CANDIDATES" = 1 ] && echo ' --candidates')"
 
-  section "In-app sources (read from src/lib/feeds.ts + src/lib/community-sources.ts)"
+  section "In-app sources (read from src/lib/source-catalog.ts + src/lib/community-sources.ts)"
   in_app_count=0
   while IFS=$'\t' read -r name url; do
     [ -z "${url:-}" ] && continue

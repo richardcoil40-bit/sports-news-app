@@ -14,8 +14,13 @@
           "shortDisplayName": "Ohio State",
           "abbreviation": "OSU",
           "logos": [
-            { "href": "https://a.espncdn.com/i/teamlogos/ncaa/500/194.png", "width": 500, "height": 500 }
-          ]
+            {
+              "href": "https://a.espncdn.com/i/teamlogos/ncaa/500/194.png",
+              "width": 500,
+              "height": 500
+            }
+          ],
+          "location": "Ohio State"
         }
       },
       {
@@ -25,8 +30,13 @@
           "shortDisplayName": "Michigan",
           "abbreviation": "MICH",
           "logos": [
-            { "href": "https://a.espncdn.com/i/teamlogos/ncaa/500/130.png", "width": 500, "height": 500 }
-          ]
+            {
+              "href": "https://a.espncdn.com/i/teamlogos/ncaa/500/130.png",
+              "width": 500,
+              "height": 500
+            }
+          ],
+          "location": "Michigan"
         }
       },
       {
@@ -34,7 +44,8 @@
           "id": "213",
           "displayName": "Penn State Nittany Lions",
           "shortDisplayName": "Penn State",
-          "abbreviation": "PSU"
+          "abbreviation": "PSU",
+          "location": "Penn State Nittany"
         }
       }
     ]

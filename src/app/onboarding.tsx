@@ -11,6 +11,7 @@ import { Spacing } from '@/constants/theme';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
 import { markOnboarded, setFavorites } from '@/lib/favorites';
+import { Team } from '@/lib/teams';
 
 /**
  * Shown once, on first launch. The app's premise is a feed of the teams
@@ -24,11 +25,13 @@ import { markOnboarded, setFavorites } from '@/lib/favorites';
 export default function OnboardingScreen() {
   const theme = useTheme();
   const { teams, loading, error } = useTeams();
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<Team[]>([]);
 
-  const toggle = (teamId: string) => {
+  const toggle = (team: Team) => {
     setSelected((current) =>
-      current.includes(teamId) ? current.filter((id) => id !== teamId) : [...current, teamId],
+      current.some((t) => t.id === team.id && t.leagueId === team.leagueId)
+        ? current.filter((t) => !(t.id === team.id && t.leagueId === team.leagueId))
+        : [...current, team],
     );
   };
 
@@ -72,9 +75,11 @@ export default function OnboardingScreen() {
             renderItem={({ item }) => (
               <TeamRow
                 team={item}
-                onPress={() => toggle(item.id)}
-                following={selected.includes(item.id)}
-                onToggleFollow={() => toggle(item.id)}
+                onPress={() => toggle(item)}
+                following={selected.some(
+                  (t) => t.id === item.id && t.leagueId === item.leagueId,
+                )}
+                onToggleFollow={() => toggle(item)}
               />
             )}
             ItemSeparatorComponent={() => (
