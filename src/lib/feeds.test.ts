@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import atomValid from '@/lib/__fixtures__/atom-valid.xml?raw';
 import rssMalformed from '@/lib/__fixtures__/rss-malformed.xml?raw';
 import rssValid from '@/lib/__fixtures__/rss-valid.xml?raw';
 import { FeedSource, fetchFeeds } from '@/lib/feeds';
@@ -59,26 +60,190 @@ describe('fetchFeeds', () => {
     expect(dates).toEqual([...dates].sort().reverse());
   });
 
-  describe('malformed bodies degrade to empty rather than throwing', () => {
-    const badBodies: [string, string][] = [
+  // The distinction this whole split exists to draw. A source that hands
+  // back something unusable has to be *reported*, not silently counted as
+  // a success with zero articles — that's what let seventeen Atom feeds
+  // look healthy while returning nothing. A source that is genuinely just
+  // quiet must NOT be reported, or every slow news day looks like an
+  // outage. Same empty article list, opposite meanings.
+  describe('unusable bodies degrade to empty AND are reported as failures', () => {
+    const unusableBodies: [string, string][] = [
       ['a truncated document', rssMalformed],
       ['an empty body', ''],
       ['an HTML error page', '<!DOCTYPE html><html><body><h1>502 Bad Gateway</h1></body></html>'],
       ['plain text', 'not xml at all'],
-      ['valid XML that is not RSS', '<?xml version="1.0"?><foo><bar>baz</bar></foo>'],
-      ['RSS with no items', '<?xml version="1.0"?><rss><channel><title>Empty</title></channel></rss>'],
+      ['valid XML that is neither RSS nor Atom', '<?xml version="1.0"?><foo><bar>baz</bar></foo>'],
       ['a JSON body', '{"items":[{"title":"nope"}]}'],
+      ['an RSS root with no channel', '<?xml version="1.0"?><rss version="2.0"></rss>'],
     ];
 
-    for (const [label, body] of badBodies) {
-      it(`handles ${label}`, async () => {
+    for (const [label, body] of unusableBodies) {
+      it(`reports ${label}`, async () => {
         respondPerUrl({ 'https://a.test/rss': { body } });
 
         const result = await fetchFeeds([source('a', 'https://a.test/rss')]);
 
         expect(result.articles).toEqual([]);
+        expect(result.failedSources).toEqual(['a']);
       });
     }
+  });
+
+  // The specific case docs/evidence/README.md filed as a standing known
+  // failure. ESPN answers 202 with an empty body, and 202 satisfies
+  // response.ok — so the old parser sailed past the status check, parsed
+  // nothing, and returned zero articles without ever naming ESPN as
+  // failed. Status code and body have to be checked independently.
+  it('reports a 2xx response with an empty body (the ESPN 202 case)', async () => {
+    respondPerUrl({ 'https://a.test/rss': { ok: true, status: 202, body: '' } });
+
+    const { articles, failedSources } = await fetchFeeds([source('espn', 'https://a.test/rss')]);
+
+    expect(articles).toEqual([]);
+    expect(failedSources).toEqual(['espn']);
+  });
+
+  describe('a well-formed feed with no items is a success, not a failure', () => {
+    const emptyButValid: [string, string][] = [
+      ['RSS', '<?xml version="1.0"?><rss><channel><title>Empty</title></channel></rss>'],
+      [
+        'Atom',
+        '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Empty</title></feed>',
+      ],
+    ];
+
+    for (const [label, body] of emptyButValid) {
+      it(`does not report an empty ${label} feed`, async () => {
+        respondPerUrl({ 'https://a.test/rss': { body } });
+
+        const result = await fetchFeeds([source('a', 'https://a.test/rss')]);
+
+        expect(result.articles).toEqual([]);
+        expect(result.failedSources).toEqual([]);
+      });
+    }
+  });
+
+  // Seventeen of the app's thirty-five sources are Atom, not RSS — every
+  // SB Nation team blog plus Off Tackle Empire. They parsed to zero
+  // articles and reported no failure, so they were invisible in both
+  // directions. Verified against the live Off Tackle Empire body on
+  // 2026-08-17; this fixture is trimmed from it.
+  describe('Atom feeds', () => {
+    it('parses an Atom feed into the same Article shape as RSS', async () => {
+      respondPerUrl({ 'https://a.test/atom': { body: atomValid } });
+
+      const { articles, failedSources } = await fetchFeeds([source('a', 'https://a.test/atom')]);
+
+      expect(failedSources).toEqual([]);
+      // Four entries, one of which has no resolvable href and is dropped.
+      expect(articles).toHaveLength(3);
+
+      const first = articles[0];
+      expect(first.title).toBe('A Blog, If We Could Keep It');
+      expect(first.link).toBe(
+        'https://www.offtackleempire.com/latest-news/50084/a-blog-if-we-could-keep-it',
+      );
+      expect(first.author).toBe('MN Wildcat');
+      expect(first.description).toBe(
+        'Off Tackle Empire makes no claim to be important; rather, it is a silly place on the internet.',
+      );
+      // <published>, not <updated>, when both are present.
+      expect(first.publishedAt).toBe('2026-08-10T11:00:00.000Z');
+      expect(first.imageUrl).toBe(
+        'https://platform.offtackleempire.com/wp-content/uploads/notre-dame.jpg',
+      );
+    });
+
+    it('uses the id-free link element, ignoring rel="replies"', async () => {
+      respondPerUrl({ 'https://a.test/atom': { body: atomValid } });
+
+      const { articles } = await fetchFeeds([source('a', 'https://a.test/atom')]);
+      const indiana = articles.find((a) => a.title.startsWith('Indiana'));
+
+      // The comments link comes first in the document; the article link is
+      // the one marked rel="alternate".
+      expect(indiana?.link).toBe('https://www.offtackleempire.com/latest-news/50083/indiana-defense');
+      // Atom's <id> is a permalink identifier ("?p=50083"), never the URL.
+      expect(indiana?.id).toBe(indiana?.link);
+    });
+
+    it('decodes entities in a CDATA-wrapped Atom title', async () => {
+      respondPerUrl({ 'https://a.test/atom': { body: atomValid } });
+
+      const { articles } = await fetchFeeds([source('a', 'https://a.test/atom')]);
+
+      expect(articles.some((a) => a.title === "Indiana's defense travels well")).toBe(true);
+    });
+
+    it('falls back to <updated> when an entry has no <published>', async () => {
+      respondPerUrl({ 'https://a.test/atom': { body: atomValid } });
+
+      const { articles } = await fetchFeeds([source('a', 'https://a.test/atom')]);
+      const indiana = articles.find((a) => a.title.startsWith('Indiana'));
+
+      expect(indiana?.publishedAt).toBe('2026-08-08T16:00:00.000Z');
+    });
+
+    it('falls back to <content> for the description when there is no <summary>', async () => {
+      respondPerUrl({ 'https://a.test/atom': { body: atomValid } });
+
+      const { articles } = await fetchFeeds([source('a', 'https://a.test/atom')]);
+      const indiana = articles.find((a) => a.title.startsWith('Indiana'));
+
+      expect(indiana?.description).toBe('The Hoosiers held Purdue to 61 rushing yards.');
+    });
+
+    it('handles a bare-string title, a rel-less link, and media:thumbnail', async () => {
+      respondPerUrl({ 'https://a.test/atom': { body: atomValid } });
+
+      const { articles } = await fetchFeeds([source('a', 'https://a.test/atom')]);
+      const bare = articles.find((a) => a.title === 'Bare text title with a thumbnail');
+
+      // rel is optional in Atom and defaults to "alternate".
+      expect(bare?.link).toBe('https://www.offtackleempire.com/latest-news/50082/bare-title');
+      expect(bare?.imageUrl).toBe(
+        'https://platform.offtackleempire.com/wp-content/uploads/thumb.jpg',
+      );
+    });
+
+    it('sorts and dedupes across mixed RSS and Atom sources', async () => {
+      respondPerUrl({
+        'https://a.test/rss': { body: rssValid },
+        'https://b.test/atom': { body: atomValid },
+      });
+
+      const { articles, failedSources } = await fetchFeeds([
+        source('a', 'https://a.test/rss'),
+        source('b', 'https://b.test/atom'),
+      ]);
+
+      expect(failedSources).toEqual([]);
+      expect(articles).toHaveLength(5);
+      const dates = articles.map((a) => a.publishedAt);
+      expect(dates).toEqual([...dates].sort().reverse());
+    });
+  });
+
+  // Guards the decision recorded in feeds.ts: an aggregating feed's
+  // item-level <source> is deliberately NOT read yet, because the tier
+  // would still come from the feed config and stamp an unassessed outlet
+  // with the aggregator's rating. Flip this test when the source registry
+  // lands and can rate those domains properly.
+  it('attributes articles to the feed, not an item-level <source>', async () => {
+    respondPerUrl({
+      'https://a.test/rss': {
+        body: `<?xml version="1.0"?><rss><channel><title>Aggregator</title><item>
+          <title>Smith enters the portal</title>
+          <link>https://example.com/a</link>
+          <source url="https://www.fansided.com">FanSided</source>
+        </item></channel></rss>`,
+      },
+    });
+
+    const { articles } = await fetchFeeds([source('aggregator', 'https://a.test/rss')]);
+
+    expect(articles[0].source).toBe('aggregator');
   });
 
   // The allSettled contract from AGENTS.md: one dead feed must not take the

@@ -47,13 +47,22 @@ inventing a new one:
   `fetchTeamNewsPool`) use `Promise.allSettled`, not `Promise.all` — one
   dead feed should never take down the others. Failed sources get
   collected and surfaced, not silently dropped and not thrown.
-  - **Known gap:** "failed" currently means a rejected promise or a
-    non-OK status. A source that returns a *successful* response with
-    nothing usable in it — ESPN's feed answers 202 with an empty body —
-    parses to zero articles and is never added to `failedSources`. It
-    contributes nothing and reports nothing. See
-    `docs/evidence/README.md`; unresolved, and worth fixing if you're
-    touching this code.
+  - **A useless response counts as a failure — keep it that way.**
+    "Failed" used to mean only a rejected promise or a non-OK status, so
+    a source that answered politely with nothing usable reported nothing
+    and contributed nothing. That hid two real bugs for months (ESPN's
+    202-with-empty-body, and seventeen Atom feeds the parser couldn't
+    read at all — see `docs/evidence/README.md`). `fetchFeed` now throws
+    on a body that isn't well-formed XML, and on well-formed XML that
+    isn't a feed.
+  - **But a feed with zero items is still a success.** A publisher having
+    a quiet day is not a broken source. That distinction is the whole
+    point — conflating the two is what created the problem above — and
+    `feeds.test.ts` has a test on each side of it. Don't collapse them.
+  - **Validate before parsing.** `XMLValidator` runs first because the
+    parser is deliberately lenient: hand it a truncated document and it
+    nests the unclosed elements into a plausible-looking channel with no
+    items, which is indistinguishable from a healthy quiet feed.
 - **Defensive parsing.** External JSON is always read with optional
   chaining and a fallback (`json?.field ?? []`), never assumed to have
   the shape you expect. A malformed response should degrade to empty,
@@ -191,9 +200,11 @@ code comments:
   it has the rule any future persistent store has to follow.
 - `docs/evidence/` — dated output from `scripts/check-feeds.sh`, the
   record of when each source was last verified to be returning items.
-  Re-run it rather than assuming; feeds rot silently. Its README also
-  documents a standing failure worth knowing about (ESPN's feed returns
-  202 with an empty body and the app doesn't count that as a failure).
+  Re-run it rather than assuming; feeds rot silently. Reports print the
+  detected format (`rss` / `atom`) per source — that column is what made
+  the seventeen-dead-Atom-feeds problem visible, and its README writes up
+  that whole episode, which is worth reading before trusting any source
+  that merely *looks* healthy.
 
 ## Environment-specific constraints
 

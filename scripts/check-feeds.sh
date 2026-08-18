@@ -62,13 +62,24 @@ check() {
     return
   fi
 
+  # Print which shape the body actually is. This script counted <entry> as
+  # a fallback from the start, so Atom feeds always reported OK here —
+  # while the app read only the RSS path and silently got nothing from
+  # them. Being more tolerant than the app is precisely what let that hide
+  # for months, so the format now goes in the report and any future gap
+  # between "the script can read it" and "the app can read it" is visible.
+  fmt="rss"
   items=$(grep -o '<item[ >]' "$TMP" 2>/dev/null | wc -l | tr -d ' ')
-  if [ "$items" = "0" ]; then
-    items=$(grep -o '<entry[ >]' "$TMP" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${items:-0}" -eq 0 ]; then
+    entries=$(grep -o '<entry[ >]' "$TMP" 2>/dev/null | wc -l | tr -d ' ')
+    if [ "${entries:-0}" -gt 0 ]; then
+      fmt="atom"
+      items="$entries"
+    fi
   fi
 
   if [ "${items:-0}" -gt 0 ]; then
-    printf '  %-26s %-9s %s items\n' "$name" "OK" "$items"
+    printf '  %-26s %-9s %-5s %s items\n' "$name" "OK" "$fmt" "$items"
     pass=$((pass + 1))
   else
     printf '  %-26s %-9s %s\n' "$name" "EMPTY" "200 but no items — likely not a feed"

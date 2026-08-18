@@ -19,6 +19,7 @@ deliberate edge case:
 | `espn-team.json` | `team-color.ts` | — (the white-color case is inline in the test) |
 | `rss-valid.xml` | `feeds.ts` | CDATA with pre-encoded entities, and an item with no link |
 | `rss-malformed.xml` | `feeds.ts` | Truncated mid-document, as a dying CDN returns |
+| `atom-valid.xml` | `feeds.ts` | A `link` array whose first entry is `rel="replies"`; an entry with a `rel`-less link; an entry with no resolvable `href` (dropped); a bare-string title alongside `type="html"` CDATA titles; an entry with `<updated>` but no `<published>`; `media:thumbnail` |
 
 Malformed *shapes* (null bodies, wrong types, missing keys) are generated in
 the tests rather than saved as files — they're one-liners and reading them
