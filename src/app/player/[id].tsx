@@ -1,20 +1,22 @@
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ArticleCard } from '@/components/article-card';
 import { Logo } from '@/components/logo';
+import { NewsTab } from '@/components/player-tabs/news-tab';
+import { StatsTab } from '@/components/player-tabs/stats-tab';
 import { TabBar } from '@/components/tab-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { useAsync } from '@/hooks/use-async';
 import { useTheme } from '@/hooks/use-theme';
-import { Classified, withClaimTypes } from '@/lib/claim-type';
+import { withClaimTypes } from '@/lib/claim-type';
 import { Article } from '@/lib/feeds';
 import { matchArticlesForPlayer } from '@/lib/player-match';
-import { fetchPlayerSeasonStats, PLAYER_STATS_SEASON, PlayerStatCategory } from '@/lib/player-stats';
+import { fetchPlayerSeasonStats, PlayerStatCategory } from '@/lib/player-stats';
 import { fetchTeamNewsPool } from '@/lib/team-news-pool';
 
 type TabKey = 'stats' | 'news';
@@ -40,64 +42,50 @@ export default function PlayerScreen() {
 
   const [tab, setTab] = useState<TabKey>('stats');
 
-  const [matches, setMatches] = useState<Article[]>([]);
-  const classifiedMatches = useMemo(() => withClaimTypes(matches), [matches]);
-  const [newsLoading, setNewsLoading] = useState(true);
-  const [newsError, setNewsError] = useState(false);
+  const news = useAsync<Article[]>(async () => {
+    // Same pool the team's News tab uses (ESPN + community sites + local
+    // newsroom + national feeds), and cached there, so this is usually
+    // instant rather than a fresh fetch of everything.
+    const pool = await fetchTeamNewsPool(params.teamId, params.teamShortName || params.teamName);
+    return matchArticlesForPlayer(pool.articles, params);
+  });
 
-  const [stats, setStats] = useState<PlayerStatCategory[] | null>(null);
-  const [statsError, setStatsError] = useState(false);
+  // Classified once here rather than inside NewsTab, so the tab stays a pure
+  // renderer and the work doesn't re-run on every tab switch. Same shape the
+  // team screen passes its own news tab.
+  const classifiedMatches = useMemo(() => withClaimTypes(news.data ?? []), [news.data]);
 
+  const stats = useAsync<PlayerStatCategory[]>(() => fetchPlayerSeasonStats(params.id));
+
+  // Both tabs load on mount rather than lazily when their tab is opened (the
+  // team screen's pattern): there are only two of them, the news pool is
+  // normally already cached by the team screen you arrived from, and stats is
+  // a single request.
+  //
+  // reload() rather than load(): load() is a no-op once data has landed, so it
+  // would skip exactly the re-fetch these effects exist to trigger when the
+  // params below change. On mount there's no data yet, so the two behave
+  // identically there.
   useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setNewsLoading(true);
-      setNewsError(false);
-      try {
-        // Same pool the team's News tab uses (ESPN + community sites + local
-        // newsroom + national feeds), and cached there, so this is usually
-        // instant rather than a fresh fetch of everything.
-        const pool = await fetchTeamNewsPool(params.teamId, params.teamShortName || params.teamName);
-        if (cancelled) return;
-        setMatches(matchArticlesForPlayer(pool.articles, params));
-      } catch {
-        if (!cancelled) setNewsError(true);
-      } finally {
-        if (!cancelled) setNewsLoading(false);
-      }
-    }
-
-    load();
-    return () => {
-      cancelled = true;
-    };
+    news.reload();
     // useLocalSearchParams() returns a new object every render, so depending
     // on `params` itself re-ran this effect (and re-fetched) on every
     // re-render forever — the screen never settled on "loaded" because it
     // kept resetting to loading before the previous fetch's result could
     // stick. Depending on the specific primitive values actually used here
     // fixes that.
+    //
+    // fullName and lastName look unused by the fetch, and are not — they're
+    // what matchArticlesForPlayer() matches on, via the whole params object.
+    // Narrow this list to just the three team fields and the screen silently
+    // stops re-matching when you navigate from one player to another on the
+    // same team: same pool, same cache hit, stale matches.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.teamId, params.teamShortName, params.teamName, params.fullName, params.lastName]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadStats() {
-      setStatsError(false);
-      try {
-        const categories = await fetchPlayerSeasonStats(params.id);
-        if (!cancelled) setStats(categories);
-      } catch {
-        if (!cancelled) setStatsError(true);
-      }
-    }
-
-    loadStats();
-    return () => {
-      cancelled = true;
-    };
+    stats.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
   const openArticle = (article: Article) => {
@@ -143,139 +131,29 @@ export default function PlayerScreen() {
         <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
         {tab === 'stats' ? (
-          <StatsTab categories={stats} error={statsError} />
+          // No `loading` prop: StatsTab derives its spinner from
+          // `categories === null && !error`, which is what this screen has
+          // always done. useAsync exposes a `loading` flag too, but rendering
+          // from it would add a state this tab never had — see the news tab
+          // below for the case where it's actually needed.
+          <StatsTab categories={stats.data} error={stats.error} />
         ) : (
           <NewsTab
             fullName={params.fullName}
             matches={classifiedMatches}
-            loading={newsLoading}
-            error={newsError}
+            // Both halves are load-bearing. `news.loading` is still false on
+            // the very first render (the mount effect hasn't run yet), so
+            // alone it would flash the empty state before the spinner; the
+            // null-data check alone would miss the *re*-load triggered by
+            // navigating to another player, where data is already non-null
+            // and the old matches would sit there looking current.
+            loading={news.loading || (news.data === null && !news.error)}
+            error={news.error}
             onOpenArticle={openArticle}
           />
         )}
       </SafeAreaView>
     </ThemedView>
-  );
-}
-
-function StatsTab({
-  categories,
-  error,
-}: {
-  categories: PlayerStatCategory[] | null;
-  error: boolean;
-}) {
-  if (categories === null && !error) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator />
-      </View>
-    );
-  }
-
-  if (error || !categories || categories.length === 0) {
-    return (
-      <View style={styles.centered}>
-        <ThemedText themeColor="textSecondary" style={styles.centeredText}>
-          {error
-            ? "Couldn't load stats right now. Try again later."
-            : `No ${PLAYER_STATS_SEASON} stats recorded for this player.`}
-        </ThemedText>
-      </View>
-    );
-  }
-
-  return (
-    <FlatList
-      data={categories}
-      keyExtractor={(item) => item.name}
-      renderItem={({ item }) => <StatCategoryCard category={item} />}
-      ItemSeparatorComponent={() => <View style={{ height: Spacing.two }} />}
-      ListHeaderComponent={
-        <ThemedText type="small" themeColor="textSecondary" style={styles.statsNote}>
-          {PLAYER_STATS_SEASON} season
-        </ThemedText>
-      }
-      contentContainerStyle={[styles.listContent, styles.statsContent]}
-    />
-  );
-}
-
-function StatCategoryCard({ category }: { category: PlayerStatCategory }) {
-  const theme = useTheme();
-
-  return (
-    <View style={[styles.statCard, { borderColor: theme.text }]}>
-      <ThemedText type="smallBold" style={styles.statCardTitle}>
-        {category.displayName.toUpperCase()}
-      </ThemedText>
-      <View style={styles.statTiles}>
-        {category.labels.map((label, index) => (
-          <View key={label + index} style={styles.statTile}>
-            <ThemedText type="title" style={styles.statValue}>
-              {category.values[index] ?? '—'}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.statLabel}>
-              {label}
-            </ThemedText>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function NewsTab({
-  fullName,
-  matches,
-  loading,
-  error,
-  onOpenArticle,
-}: {
-  fullName: string;
-  matches: Classified<Article>[];
-  loading: boolean;
-  error: boolean;
-  onOpenArticle: (a: Article) => void;
-}) {
-  const theme = useTheme();
-
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator />
-      </View>
-    );
-  }
-
-  return (
-    <FlatList
-      data={matches}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <ArticleCard
-          article={item}
-          onPress={() => onOpenArticle(item)}
-          claimType={item.claimType}
-        />
-      )}
-      ItemSeparatorComponent={() => (
-        <View style={[styles.separator, { backgroundColor: theme.text }]} />
-      )}
-      ListHeaderComponent={
-        <ThemedText type="smallBold" style={styles.sectionHeader}>
-          Articles mentioning {fullName}
-        </ThemedText>
-      }
-      ListEmptyComponent={
-        <View style={styles.centered}>
-          <ThemedText themeColor="textSecondary" style={styles.centeredText}>
-            {error ? "Couldn't load articles right now. Try again later." : 'No news is good news :)'}
-          </ThemedText>
-        </View>
-      }
-      contentContainerStyle={styles.listContent}
-    />
   );
 }
 
@@ -308,67 +186,5 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     fontSize: 11,
-  },
-  sectionHeader: {
-    fontSize: 13,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.two,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.five,
-    paddingVertical: Spacing.five,
-  },
-  centeredText: {
-    textAlign: 'center',
-  },
-  separator: {
-    height: 1.5,
-    marginLeft: Spacing.three,
-  },
-  listContent: {
-    flexGrow: 1,
-    paddingBottom: Spacing.five,
-  },
-  statsContent: {
-    paddingHorizontal: Spacing.three,
-  },
-  statsNote: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontSize: 11,
-    paddingBottom: Spacing.two,
-  },
-  statCard: {
-    borderWidth: 1.5,
-    padding: Spacing.three,
-  },
-  statCardTitle: {
-    fontSize: 13,
-    letterSpacing: 0.5,
-    paddingBottom: Spacing.three,
-  },
-  statTiles: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.three,
-  },
-  statTile: {
-    minWidth: 72,
-    alignItems: 'center',
-    gap: Spacing.half,
-  },
-  statValue: {
-    fontSize: 26,
-    lineHeight: 30,
-  },
-  statLabel: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontSize: 10,
   },
 });
