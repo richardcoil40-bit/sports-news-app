@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,6 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { Classified, withClaimTypes } from '@/lib/claim-type';
 import { Article } from '@/lib/feeds';
 import { matchArticlesForPlayer } from '@/lib/player-match';
 import { fetchPlayerSeasonStats, PLAYER_STATS_SEASON, PlayerStatCategory } from '@/lib/player-stats';
@@ -40,6 +41,7 @@ export default function PlayerScreen() {
   const [tab, setTab] = useState<TabKey>('stats');
 
   const [matches, setMatches] = useState<Article[]>([]);
+  const classifiedMatches = useMemo(() => withClaimTypes(matches), [matches]);
   const [newsLoading, setNewsLoading] = useState(true);
   const [newsError, setNewsError] = useState(false);
 
@@ -145,7 +147,7 @@ export default function PlayerScreen() {
         ) : (
           <NewsTab
             fullName={params.fullName}
-            matches={matches}
+            matches={classifiedMatches}
             loading={newsLoading}
             error={newsError}
             onOpenArticle={openArticle}
@@ -231,7 +233,7 @@ function NewsTab({
   onOpenArticle,
 }: {
   fullName: string;
-  matches: Article[];
+  matches: Classified<Article>[];
   loading: boolean;
   error: boolean;
   onOpenArticle: (a: Article) => void;
@@ -250,7 +252,13 @@ function NewsTab({
     <FlatList
       data={matches}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <ArticleCard article={item} onPress={() => onOpenArticle(item)} />}
+      renderItem={({ item }) => (
+        <ArticleCard
+          article={item}
+          onPress={() => onOpenArticle(item)}
+          claimType={item.claimType}
+        />
+      )}
       ItemSeparatorComponent={() => (
         <View style={[styles.separator, { backgroundColor: theme.text }]} />
       )}

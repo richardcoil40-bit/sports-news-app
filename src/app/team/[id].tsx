@@ -17,7 +17,11 @@ import { useAsync } from '@/hooks/use-async';
 import { useTheme } from '@/hooks/use-theme';
 import { Article } from '@/lib/feeds';
 import { rankNotablePlayers } from '@/lib/notable-players';
-import { filterByReach, ReachFilter } from '@/lib/reach-filter';
+import {
+  ClaimFilter,
+  filterByClaimType,
+  withClaimTypes,
+} from '@/lib/claim-type';
 import { filterRecruitingArticles } from '@/lib/recruiting';
 import { Player, fetchTeamRoster } from '@/lib/roster';
 import { fetchGameOdds, fetchTeamSchedule, ScheduledGame } from '@/lib/schedule';
@@ -51,7 +55,7 @@ export default function TeamScreen() {
   }>();
 
   const [tab, setTab] = useState<TabKey>('news');
-  const [reachFilter, setReachFilter] = useState<ReachFilter>('all');
+  const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
   const [teamColor, setTeamColor] = useState<string | null>(null);
 
   const news = useAsync<Article[]>(async () => {
@@ -110,16 +114,20 @@ export default function TeamScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, params.id, params.shortName, params.name]);
 
-  const visibleNews = useMemo(() => {
-    if (!news.data) return [];
+  // Classified once here, so the News and Recruiting tabs share one pass
+  // and every card has its badge whether or not a filter is active.
+  const classifiedNews = useMemo(() => withClaimTypes(news.data ?? []), [news.data]);
+
+  const visibleNews = useMemo(
     // Balanced after filtering, so it operates on whatever survived
     // rather than reserving slots for sources just filtered out.
-    return balanceBySource(filterByReach(news.data, reachFilter));
-  }, [news.data, reachFilter]);
+    () => balanceBySource(filterByClaimType(classifiedNews, claimFilter)),
+    [classifiedNews, claimFilter],
+  );
 
   const recruitingArticles = useMemo(
-    () => (news.data ? filterRecruitingArticles(news.data) : []),
-    [news.data],
+    () => filterRecruitingArticles(classifiedNews),
+    [classifiedNews],
   );
 
   const notablePlayers = useMemo(
@@ -191,8 +199,8 @@ export default function TeamScreen() {
             articles={visibleNews}
             loading={news.data === null && !news.error}
             error={news.error}
-            reachFilter={reachFilter}
-            onChangeReach={setReachFilter}
+            claimFilter={claimFilter}
+            onChangeClaim={setClaimFilter}
             onOpenArticle={openArticle}
             accentColor={teamColor}
           />

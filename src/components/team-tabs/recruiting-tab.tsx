@@ -4,6 +4,7 @@ import { AccentRow } from '@/components/accent-row';
 import { ArticleCard } from '@/components/article-card';
 import { Centered, Separator, tabStyles } from '@/components/team-tabs/shared';
 import { ThemedText } from '@/components/themed-text';
+import { Classified } from '@/lib/claim-type';
 import { Article } from '@/lib/feeds';
 
 export function RecruitingTab({
@@ -13,7 +14,7 @@ export function RecruitingTab({
   onOpenArticle,
   accentColor,
 }: {
-  articles: Article[];
+  articles: Classified<Article>[];
   loading: boolean;
   error: boolean;
   onOpenArticle: (a: Article) => void;
@@ -33,7 +34,11 @@ export function RecruitingTab({
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
         <AccentRow color={accentColor}>
-          <ArticleCard article={item} onPress={() => onOpenArticle(item)} />
+          <ArticleCard
+            article={item}
+            onPress={() => onOpenArticle(item)}
+            claimType={item.claimType}
+          />
         </AccentRow>
       )}
       ItemSeparatorComponent={Separator}

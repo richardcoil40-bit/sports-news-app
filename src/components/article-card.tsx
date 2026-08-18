@@ -4,8 +4,9 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatRelativeTime } from '@/lib/format';
+import { ClaimType, claimTypeLabel } from '@/lib/claim-type';
 import { Article } from '@/lib/feeds';
+import { formatRelativeTime } from '@/lib/format';
 import { tierLabel } from '@/lib/source-tier';
 
 export function ArticleCard({
@@ -18,10 +19,19 @@ export function ArticleCard({
    * where it would just repeat the header.
    */
   tagLabel,
+  /**
+   * What kind of claim the headline makes. Passed in rather than computed
+   * here because the screen already classified the list to filter it, and
+   * classifying is a few hundred regex tests per article.
+   */
+  claimType,
+  onPressClaim,
 }: {
   article: Article;
   onPress: () => void;
   tagLabel?: string;
+  claimType: ClaimType;
+  onPressClaim?: (type: ClaimType) => void;
 }) {
   const theme = useTheme();
 
@@ -42,13 +52,36 @@ export function ArticleCard({
 
       <View style={styles.textColumn}>
         <View style={styles.metaRow}>
+          {/*
+            Solid, and first. This is the app's primary signal, and it has
+            to read as a different *kind* of thing from the tier on the line
+            below — rendered as more grey text, "NEWSROOM · RUMOR" reads as
+            one label rather than two judgments about different things.
+          */}
+          <TouchableOpacity
+            onPress={() => onPressClaim?.(claimType)}
+            disabled={!onPressClaim}
+            activeOpacity={0.6}
+            accessibilityRole={onPressClaim ? 'button' : undefined}
+            accessibilityLabel={`${claimTypeLabel(claimType)} — filter by this`}
+            hitSlop={6}
+            style={[styles.claimChip, { backgroundColor: theme.text }]}>
+            <ThemedText style={[styles.chipText, { color: theme.background }]}>
+              {claimTypeLabel(claimType)}
+            </ThemedText>
+          </TouchableOpacity>
+
+          {/*
+            Outlined rather than solid, so the two chips don't compete. The
+            claim matters more than which of your teams it concerns, and two
+            filled blocks side by side read as noise.
+          */}
           {tagLabel ? (
-            <View style={[styles.tag, { backgroundColor: theme.text }]}>
-              <ThemedText style={[styles.tagText, { color: theme.background }]}>
-                {tagLabel}
-              </ThemedText>
+            <View style={[styles.teamTag, { borderColor: theme.text }]}>
+              <ThemedText style={[styles.chipText, { color: theme.text }]}>{tagLabel}</ThemedText>
             </View>
           ) : null}
+
           <ThemedText
             type="small"
             themeColor="textSecondary"
@@ -108,12 +141,20 @@ const styles = StyleSheet.create({
   metaFlex: {
     flex: 1,
   },
-  tag: {
+  claimChip: {
     paddingHorizontal: Spacing.one,
     paddingVertical: 1,
     borderRadius: 0,
   },
-  tagText: {
+  teamTag: {
+    paddingHorizontal: Spacing.one,
+    // 1px less vertical padding than the solid chip so the 1.5px border
+    // doesn't make the outlined one visibly taller than its neighbour.
+    paddingVertical: 0,
+    borderWidth: 1.5,
+    borderRadius: 0,
+  },
+  chipText: {
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',

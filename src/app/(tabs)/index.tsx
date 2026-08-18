@@ -5,14 +5,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ArticleCard } from '@/components/article-card';
 import { Logo } from '@/components/logo';
-import { ReachFilterBar } from '@/components/reach-filter-bar';
+import { FilterBar } from '@/components/filter-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useFeed } from '@/hooks/use-feed';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  ClaimFilter,
+  CLAIM_FILTER_TABS,
+  filterByClaimType,
+  withClaimTypes,
+} from '@/lib/claim-type';
 import { FeedArticle } from '@/lib/multi-team-feed';
-import { filterByReach, ReachFilter } from '@/lib/reach-filter';
 import { balanceBySource } from '@/lib/source-balance';
 
 /**
@@ -24,16 +29,21 @@ export default function FeedScreen() {
   const theme = useTheme();
   const { articles, loading, refreshing, error, refresh, followedTeams, hasFollowedTeams, ready } =
     useFeed();
-  const [reachFilter, setReachFilter] = useState<ReachFilter>('all');
+  const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
+
+  // Classified once, then filtered — every card needs its claim type for
+  // the badge whether or not a filter is active, so doing it here means
+  // one pass instead of one per consumer.
+  const classified = useMemo(() => withClaimTypes(articles), [articles]);
 
   // Re-balanced after filtering, matching the team screen: the feed
-  // arrives already balanced across all sources, but once national
-  // coverage is filtered out that balance no longer describes what's
-  // left, so the remaining beat sources need re-spreading against each
-  // other. A no-op when the filter is 'all'.
+  // arrives already balanced across all sources, but once a claim type is
+  // filtered out that balance no longer describes what's left, so the
+  // remaining sources need re-spreading against each other. A no-op when
+  // the filter is 'all'.
   const visibleArticles = useMemo(
-    () => balanceBySource(filterByReach(articles, reachFilter)),
-    [articles, reachFilter],
+    () => balanceBySource(filterByClaimType(classified, claimFilter)),
+    [classified, claimFilter],
   );
 
   const openArticle = (article: FeedArticle) => {
@@ -104,20 +114,26 @@ export default function FeedScreen() {
                 // mixed together — with a single followed team every tag
                 // would say the same thing.
                 tagLabel={followedTeams.length > 1 ? item.teamName : undefined}
+                claimType={item.claimType}
+                onPressClaim={setClaimFilter}
               />
             )}
             ItemSeparatorComponent={() => (
               <View style={[styles.separator, { backgroundColor: theme.text }]} />
             )}
-            ListHeaderComponent={<ReachFilterBar active={reachFilter} onChange={setReachFilter} />}
+            ListHeaderComponent={
+              <FilterBar tabs={CLAIM_FILTER_TABS} active={claimFilter} onChange={setClaimFilter} />
+            }
             ListEmptyComponent={
               <View style={styles.centered}>
                 <ThemedText themeColor="textSecondary" style={styles.centeredText}>
-                  {reachFilter === 'beat'
-                    ? 'No beat coverage for your teams right now.'
-                    : reachFilter === 'national'
-                      ? 'No national coverage for your teams right now.'
-                      : 'Nothing new for your teams right now.'}
+                  {claimFilter === 'rumor'
+                    ? 'No rumors about your teams right now.'
+                    : claimFilter === 'take'
+                      ? 'No takes about your teams right now.'
+                      : claimFilter === 'reported'
+                        ? 'No reported news for your teams right now.'
+                        : 'Nothing new for your teams right now.'}
                 </ThemedText>
               </View>
             }

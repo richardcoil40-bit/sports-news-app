@@ -37,6 +37,8 @@ function mentionsRecruiting(text: string): boolean {
   return RECRUITING_KEYWORDS.some((keyword) => lower.includes(keyword));
 }
 
-export function filterRecruitingArticles(articles: Article[]): Article[] {
+export function filterRecruitingArticles<T extends Pick<Article, 'title' | 'description'>>(
+  articles: T[],
+): T[] {
   return articles.filter((a) => mentionsRecruiting(`${a.title} ${a.description}`));
 }

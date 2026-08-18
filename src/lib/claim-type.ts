@@ -407,7 +407,7 @@ export function classifyClaim(article: Pick<Article, 'title' | 'description'>): 
   return 'reported';
 }
 
-/** `'all'` is the unfiltered case, matching REACH_FILTER_TABS' shape. */
+/** `'all'` is the unfiltered case — the bar always offers a way back. */
 export type ClaimFilter = 'all' | ClaimType;
 
 export const CLAIM_FILTER_TABS: { key: ClaimFilter; label: string }[] = [
@@ -417,10 +417,25 @@ export const CLAIM_FILTER_TABS: { key: ClaimFilter; label: string }[] = [
   { key: 'take', label: 'Take' },
 ];
 
-export function filterByClaimType<T extends Pick<Article, 'title' | 'description'>>(
+/** An article with its claim type attached, so it is computed once. */
+export type Classified<T> = T & { claimType: ClaimType };
+
+/**
+ * Classifies a list once. Every consumer — the badge, the filter, the
+ * brief — needs the same answer for the same article, and classifying is a
+ * few hundred regex tests each; doing it per consumer would repeat that
+ * work three times per render for no benefit.
+ */
+export function withClaimTypes<T extends Pick<Article, 'title' | 'description'>>(
+  articles: T[],
+): Classified<T>[] {
+  return articles.map((article) => ({ ...article, claimType: classifyClaim(article) }));
+}
+
+export function filterByClaimType<T extends { claimType: ClaimType }>(
   articles: T[],
   filter: ClaimFilter,
 ): T[] {
   if (filter === 'all') return articles;
-  return articles.filter((article) => classifyClaim(article) === filter);
+  return articles.filter((article) => article.claimType === filter);
 }

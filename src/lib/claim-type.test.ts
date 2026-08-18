@@ -5,6 +5,7 @@ import {
   claimTypeLabel,
   classifyClaim,
   filterByClaimType,
+  withClaimTypes,
 } from '@/lib/claim-type';
 
 const classify = (title: string, description = '') => classifyClaim({ title, description });
@@ -224,12 +225,16 @@ describe('claimTypeLabel', () => {
   });
 });
 
-describe('filterByClaimType', () => {
-  const articles = [
+describe('withClaimTypes / filterByClaimType', () => {
+  const articles = withClaimTypes([
     { title: 'Michigan hires Brian Hartline', description: '' },
     { title: 'Sources: Michigan closing in on a coordinator', description: '' },
     { title: 'Mailbag: your questions answered', description: '' },
-  ];
+  ]);
+
+  it('attaches a claim type to every article', () => {
+    expect(articles.map((a) => a.claimType)).toEqual(['reported', 'rumor', 'take']);
+  });
 
   it('returns everything for all', () => {
     expect(filterByClaimType(articles, 'all')).toHaveLength(3);
@@ -245,7 +250,9 @@ describe('filterByClaimType', () => {
   });
 
   it('preserves extra fields on the article', () => {
-    const withTeam = [{ title: 'Mailbag: questions', description: '', teamName: 'Michigan' }];
+    const withTeam = withClaimTypes([
+      { title: 'Mailbag: questions', description: '', teamName: 'Michigan' },
+    ]);
     expect(filterByClaimType(withTeam, 'take')[0].teamName).toBe('Michigan');
   });
 });

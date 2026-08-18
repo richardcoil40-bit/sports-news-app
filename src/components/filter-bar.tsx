@@ -3,10 +3,10 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ReachFilter, REACH_FILTER_TABS } from '@/lib/reach-filter';
+
 
 /**
- * All / National / Beat.
+ * A segmented control for narrowing the list below it.
  *
  * Deliberately lighter than TabBar even though both are segmented
  * controls: on the team screen this sits directly beneath the main
@@ -14,20 +14,26 @@ import { ReachFilter, REACH_FILTER_TABS } from '@/lib/reach-filter';
  * stacked on top of each other would read as one confusing block. This
  * one is smaller, outlined, and inset so it reads as a refinement of the
  * list below it rather than as navigation.
+ *
+ * Generic over the filter value so there is one of these rather than one
+ * per axis — the app deliberately shows a single filter row, and which
+ * axis it drives is the caller's business.
  */
-export function ReachFilterBar({
+export function FilterBar<T extends string>({
+  tabs,
   active,
   onChange,
 }: {
-  active: ReachFilter;
-  onChange: (next: ReachFilter) => void;
+  tabs: readonly { key: T; label: string }[];
+  active: T;
+  onChange: (next: T) => void;
 }) {
   const theme = useTheme();
 
   return (
     <View style={styles.wrap}>
       <View style={[styles.container, { borderColor: theme.text }]}>
-        {REACH_FILTER_TABS.map((tab, index) => {
+        {tabs.map((tab, index) => {
           const isActive = tab.key === active;
           return (
             <TouchableOpacity
@@ -39,7 +45,7 @@ export function ReachFilterBar({
               style={[
                 styles.segment,
                 { backgroundColor: isActive ? theme.text : 'transparent' },
-                index < REACH_FILTER_TABS.length - 1 && {
+                index < tabs.length - 1 && {
                   borderRightWidth: 1.5,
                   borderRightColor: theme.text,
                 },
