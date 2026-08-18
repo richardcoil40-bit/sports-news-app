@@ -9,7 +9,8 @@
 # stops contributing. Re-run this periodically and diff against the last
 # report in docs/evidence/.
 #
-# The in-app list is read out of src/lib/feeds.ts and src/lib/community-sources.ts
+# The in-app list is read out of src/lib/source-catalog.ts and
+# src/lib/community-sources.ts
 # rather than duplicated here, so it can't drift from what the app actually
 # fetches. Add a source there and it's covered here automatically.
 #
@@ -99,7 +100,7 @@ extract_in_app_sources() {
     const fs = require("fs");
     const out = [];
     const NAME_URL = /name:\s*(["\x27])(.+?)\1,\s*url:\s*(["\x27])(.+?)\3/g;
-    for (const file of ["src/lib/feeds.ts", "src/lib/community-sources.ts"]) {
+    for (const file of ["src/lib/source-catalog.ts", "src/lib/community-sources.ts"]) {
       const src = fs.readFileSync(file, "utf8");
       for (const m of src.matchAll(NAME_URL)) out.push([m[2], m[4]]);
     }
@@ -122,7 +123,7 @@ extract_in_app_sources() {
   printf '%s\n' "  commit     $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
   printf '%s\n' "  script     scripts/check-feeds.sh$([ "$CANDIDATES" = 1 ] && echo ' --candidates')"
 
-  section "In-app sources (read from src/lib/feeds.ts + src/lib/community-sources.ts)"
+  section "In-app sources (read from src/lib/source-catalog.ts + src/lib/community-sources.ts)"
   in_app_count=0
   while IFS=$'\t' read -r name url; do
     [ -z "${url:-}" ] && continue

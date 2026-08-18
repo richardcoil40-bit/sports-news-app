@@ -1,6 +1,5 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 
-import { createSingletonCache } from '@/lib/cache';
 import { FETCH_TIMEOUT_MS } from '@/lib/http';
 
 /**
@@ -44,21 +43,6 @@ export interface FeedSource {
   scope?: SourceScope;
   reach?: SourceReach;
 }
-
-/** College football RSS feeds only — no scraping. */
-/**
- * The national pool — sources that cover the whole sport rather than any
- * one team. Off Tackle Empire (conference-wide) and Extra Points (the
- * business of college sports) are both wider than a single program, so
- * they count as national here even though neither is a big TV network.
- */
-export const FEED_SOURCES: FeedSource[] = [
-  { id: 'espn-cfb', name: 'ESPN', url: 'https://www.espn.com/espn/rss/ncf/news', tier: 1, scope: 'broad', reach: 'national' },
-  { id: 'cbs-cfb', name: 'CBS Sports', url: 'https://www.cbssports.com/rss/headlines/college-football/', tier: 1, scope: 'broad', reach: 'national' },
-  { id: 'yahoo-cfb', name: 'Yahoo Sports', url: 'https://sports.yahoo.com/college-football/rss.xml', tier: 1, scope: 'broad', reach: 'national' },
-  { id: 'off-tackle-empire', name: 'Off Tackle Empire', url: 'https://www.offtackleempire.com/rss/index.xml', tier: 3, scope: 'broad', reach: 'national' },
-  { id: 'extra-points', name: 'Extra Points', url: 'https://extrapoints.substack.com/feed', tier: 2, scope: 'broad', reach: 'national' },
-];
 
 export interface Article {
   id: string;
@@ -484,17 +468,7 @@ export async function fetchFeeds(sources: FeedSource[]): Promise<FetchAllResult>
 }
 
 /**
- * The general pool (ESPN/CBS/Yahoo, ~3 feeds including one that runs
- * fairly large) gets re-requested by a lot of screens — team news,
- * recruiting, and every player detail page all pull from it. Without
- * caching, tapping from team → player was re-fetching and re-parsing all
- * three feeds from scratch every single time, which is most of what made
- * navigation feel slow. Cached for a few minutes; pull-to-refresh on the
- * News tab passes `force: true` to bypass it.
+ * Which feeds exist — and their caching — deliberately live in
+ * `source-catalog.ts`, not here. This module is *how* to fetch and parse a
+ * feed; it holds no source data and knows nothing about leagues.
  */
-const CACHE_TTL_MS = 3 * 60 * 1000;
-const allFeedsCache = createSingletonCache<FetchAllResult>({ ttlMs: CACHE_TTL_MS });
-
-export async function fetchAllFeeds(options?: { force?: boolean }): Promise<FetchAllResult> {
-  return allFeedsCache.get(() => fetchFeeds(FEED_SOURCES), { force: options?.force });
-}

@@ -17,7 +17,7 @@ bash scripts/check-feeds.sh --candidates # also re-probe the rejected candidates
 ```
 
 Each run writes `feed-status-<UTC timestamp>.txt` here and echoes to stdout.
-The in-app list is read out of `src/lib/feeds.ts` and
+The in-app list is read out of `src/lib/source-catalog.ts` and
 `src/lib/community-sources.ts` rather than duplicated in the script, so it
 can't drift from what the app actually fetches.
 

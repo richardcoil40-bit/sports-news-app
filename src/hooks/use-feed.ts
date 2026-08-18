@@ -19,7 +19,7 @@ export function useFeed() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Same out-of-order guard used in use-teams/use-articles: a slow first
+  // Same out-of-order guard used in use-teams: a slow first
   // response must not land after a faster second one and overwrite it.
   const requestId = useRef(0);
 

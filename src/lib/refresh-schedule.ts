@@ -1,4 +1,4 @@
-import { fetchAllFeeds } from '@/lib/feeds';
+import { fetchLeagueFeeds, leaguesWithNationalFeeds } from '@/lib/source-catalog';
 
 /**
  * "3x a day" is a content-freshness target, not a network scheduler — the
@@ -65,7 +65,13 @@ export async function refreshIfNewPeriod(): Promise<boolean> {
   lastRefreshedKey = key;
 
   try {
-    await fetchAllFeeds({ force: true });
+    // Every league that has one, not a named league: this runs before the
+    // user has looked at anything, so it has no team or league context to
+    // work from. Settled rather than awaited as a group, so one league's
+    // outage can't leave the others stale.
+    await Promise.allSettled(
+      leaguesWithNationalFeeds().map((league) => fetchLeagueFeeds(league, { force: true })),
+    );
   } finally {
     lastRefreshedAt = new Date();
   }
