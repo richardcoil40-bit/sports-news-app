@@ -4,11 +4,15 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, TouchableOpaci
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ArticleCard } from '@/components/article-card';
+import { CaughtUpMarker } from '@/components/caught-up-marker';
+import { CollapsibleSection } from '@/components/collapsible-section';
 import { Logo } from '@/components/logo';
 import { FilterBar } from '@/components/filter-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { BRIEF_MODE } from '@/constants/flags';
 import { Spacing } from '@/constants/theme';
+import { useBrief } from '@/hooks/use-brief';
 import { useFeed } from '@/hooks/use-feed';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
@@ -18,6 +22,7 @@ import {
   filterByClaimType,
   withClaimTypes,
 } from '@/lib/claim-type';
+import { caughtUpMessage, splitBrief } from '@/lib/brief';
 import { clusterArticles, leadsWithDuplicates } from '@/lib/cluster';
 import { Article } from '@/lib/feeds';
 import { balanceBySource } from '@/lib/source-balance';
@@ -37,6 +42,7 @@ export default function FeedScreen() {
   // MICHIGAN would be worse than not tagging them at all.
   const { teams } = useTeams();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
+  const { ready: briefReady, cutoff, periodLabel, reachedEnd } = useBrief();
 
   // Classified and tagged once, then filtered — every card needs both for
   // its badges whether or not a filter is active, so this is one pass
@@ -68,6 +74,17 @@ export default function FeedScreen() {
 
   // Widened to Article because it is also handed the duplicates a cluster
   // absorbed, which carry no team attribution of their own.
+  // Only when nothing is filtered. Catching up and browsing are different
+  // intents: filtering to RUMOR and still seeing a "you're caught up" line
+  // above a collapsed section holding everything is nonsense, so an active
+  // filter renders one plain list instead.
+  const sectioned = BRIEF_MODE && claimFilter === 'all' && cutoff !== null;
+
+  const sections = useMemo(
+    () => (cutoff ? splitBrief(visibleArticles, cutoff) : null),
+    [visibleArticles, cutoff],
+  );
+
   const openArticle = (article: Article) => {
     router.push({
       pathname: '/article',
@@ -81,6 +98,21 @@ export default function FeedScreen() {
       },
     });
   };
+
+  const renderCard = (item: (typeof visibleArticles)[number]) => (
+    <ArticleCard
+      article={item}
+      onPress={() => openArticle(item)}
+      // The team the headline actually names, which is not always the
+      // followed team whose pool surfaced it. Omitted when no team is
+      // named rather than guessed at.
+      tagLabel={item.mentionedTeam?.shortName}
+      claimType={item.claimType}
+      onPressClaim={setClaimFilter}
+      duplicates={item.duplicates}
+      onOpenDuplicate={openArticle}
+    />
+  );
 
   const subtitle = hasFollowedTeams
     ? followedTeams.map((team) => team.shortName).join(' · ')
@@ -101,7 +133,7 @@ export default function FeedScreen() {
           </ThemedText>
         </View>
 
-        {!ready || loading ? (
+        {!ready || loading || (BRIEF_MODE && !briefReady) ? (
           <View style={styles.centered}>
             <ActivityIndicator />
           </View>
@@ -126,28 +158,34 @@ export default function FeedScreen() {
           </View>
         ) : (
           <FlatList
-            data={visibleArticles}
+            data={sectioned && sections ? sections.brief : visibleArticles}
             keyExtractor={(item) => item.link}
-            renderItem={({ item }) => (
-              <ArticleCard
-                article={item}
-                onPress={() => openArticle(item)}
-                // The team the headline actually names, which is not
-                // always the followed team whose pool surfaced it.
-                // Omitted when no team is named rather than guessed at.
-                tagLabel={item.mentionedTeam?.shortName}
-                claimType={item.claimType}
-                onPressClaim={setClaimFilter}
-                duplicates={item.duplicates}
-                onOpenDuplicate={openArticle}
-              />
-            )}
+            renderItem={({ item }) => renderCard(item)}
             ItemSeparatorComponent={() => (
               <View style={[styles.separator, { backgroundColor: theme.text }]} />
             )}
             ListHeaderComponent={
               <FilterBar tabs={CLAIM_FILTER_TABS} active={claimFilter} onChange={setClaimFilter} />
             }
+            ListFooterComponent={
+              sectioned && sections ? (
+                <View>
+                  <CaughtUpMarker message={caughtUpMessage(sections, periodLabel)} />
+                  <CollapsibleSection label="rumors & takes" count={sections.chatter.length}>
+                    {sections.chatter.map((item) => (
+                      <View key={item.link}>{renderCard(item)}</View>
+                    ))}
+                  </CollapsibleSection>
+                  <CollapsibleSection label="earlier" count={sections.earlier.length}>
+                    {sections.earlier.map((item) => (
+                      <View key={item.link}>{renderCard(item)}</View>
+                    ))}
+                  </CollapsibleSection>
+                </View>
+              ) : null
+            }
+            onEndReached={sectioned ? reachedEnd : undefined}
+            onEndReachedThreshold={0.1}
             ListEmptyComponent={
               <View style={styles.centered}>
                 <ThemedText themeColor="textSecondary" style={styles.centeredText}>

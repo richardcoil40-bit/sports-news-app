@@ -48,6 +48,44 @@ function periodKey(now: Date): string {
 let lastRefreshedKey: string | null = null;
 let lastRefreshedAt: Date | null = null;
 
+/**
+ * When the current morning/noon/night window began.
+ *
+ * Exported because the brief is defined as "what arrived since this window
+ * opened". The refresh cadence and the reading session are deliberately the
+ * same boundary, so the app can only claim it has something new at a point
+ * where it actually went and looked.
+ *
+ * Hours before 5am belong to the previous day's night window, matching
+ * periodKey above: night runs 5pm to 5am, and treating midnight as a fresh
+ * window would wipe the evening's brief a few hours after it appeared.
+ */
+export function currentPeriodStart(now: Date = new Date()): Date {
+  const start = new Date(now);
+  start.setMinutes(0, 0, 0);
+
+  const hour = now.getHours();
+  if (hour >= NIGHT_STARTS_AT) {
+    start.setHours(NIGHT_STARTS_AT);
+  } else if (hour >= NOON_STARTS_AT) {
+    start.setHours(NOON_STARTS_AT);
+  } else if (hour >= MORNING_STARTS_AT) {
+    start.setHours(MORNING_STARTS_AT);
+  } else {
+    // Before 5am — still last night's window, which began yesterday.
+    start.setDate(start.getDate() - 1);
+    start.setHours(NIGHT_STARTS_AT);
+  }
+
+  return start;
+}
+
+/** Which window we're in, for labelling the brief. */
+export function currentPeriodLabel(now: Date = new Date()): string {
+  const period = periodFor(now.getHours());
+  return period === 'morning' ? 'this morning' : period === 'noon' ? 'midday' : 'this evening';
+}
+
 export function getLastRefreshedAt(): Date | null {
   return lastRefreshedAt;
 }
