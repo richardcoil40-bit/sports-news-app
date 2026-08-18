@@ -11,6 +11,7 @@ deliberate edge case:
 | File | Parser | Edge case it carries |
 | --- | --- | --- |
 | `espn-standings.json` | `teams.ts` | Third team has no `logos` array |
+| `espn-standings-nested.json` | `teams.ts` | The *other* standings shape — a whole-league query with no `group` filter, which nests entries under `children[]` instead of a root `standings`. Trimmed from ESPN's live NBA response so the alternate shape is real rather than imagined; one team has no `logos`. Not a sign the app supports basketball — it's the fixture that proves the league boundary is closed. |
 | `espn-roster.json` | `roster.ts` | A `coaches` group that must be filtered out |
 | `espn-team-leaders.json` | `team-leaders.ts` | A `$ref` with no extractable athlete id |
 | `espn-player-stats.json` | `player-stats.ts` | An all-zero category, and an off-season year |

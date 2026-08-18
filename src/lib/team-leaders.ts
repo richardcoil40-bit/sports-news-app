@@ -1,5 +1,6 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
+import { BIG_TEN, espnCacheKey, espnCorePath, lastCompletedSeason, League } from '@/lib/leagues';
 
 export interface StatLeader {
   athleteId: string;
@@ -22,15 +23,6 @@ interface RawCategory {
   leaders?: RawLeader[];
 }
 
-/**
- * College football seasons run from late August into January and are labelled
- * by their starting year, so for most of the calendar year the most recent
- * completed season is the previous year's.
- */
-function lastCompletedSeason(now: Date = new Date()): number {
-  return now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-}
-
 /** Athlete IDs are only present inside the $ref URL — there's no plain id field. */
 function athleteIdFromRef(ref: string | undefined): string | null {
   if (!ref) return null;
@@ -40,9 +32,9 @@ function athleteIdFromRef(ref: string | undefined): string | null {
 
 const cache = createEntityCache<string, StatLeader[]>();
 
-async function fetchUncached(teamId: string): Promise<StatLeader[]> {
-  const season = lastCompletedSeason();
-  const url = `https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/${season}/types/2/teams/${teamId}/leaders`;
+async function fetchUncached(teamId: string, league: League): Promise<StatLeader[]> {
+  const season = lastCompletedSeason(league);
+  const url = `https://sports.core.api.espn.com/v2/sports/${espnCorePath(league)}/seasons/${season}/types/2/teams/${teamId}/leaders`;
 
   const response = await fetchWithTimeout(url);
   if (!response.ok) return [];
@@ -73,8 +65,13 @@ async function fetchUncached(teamId: string): Promise<StatLeader[]> {
  * offseason. Players who have since left are filtered out naturally by
  * cross-referencing against the current roster.
  */
-export async function fetchTeamStatLeaders(teamId: string): Promise<StatLeader[]> {
+export async function fetchTeamStatLeaders(
+  teamId: string,
+  league: League = BIG_TEN,
+): Promise<StatLeader[]> {
   // Failures degrade to (and are cached as) empty — leaders are a nice-to-have
   // second opinion, not something worth failing a screen over.
-  return cache.get(teamId, () => fetchUncached(teamId).catch(() => [] as StatLeader[]));
+  return cache.get(espnCacheKey(league, teamId), () =>
+    fetchUncached(teamId, league).catch(() => [] as StatLeader[]),
+  );
 }
