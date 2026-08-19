@@ -15,6 +15,7 @@ function article(id: string, title: string, description = ''): Article {
     imageUrl: null,
     tier: 1,
     reach: 'national',
+    scope: 'broad',
   };
 }
 

@@ -1,0 +1,41 @@
+# The whole service. One Worker, one KV namespace, one secret.
+#
+# Deploy:
+#   cd worker
+#   npm install
+#   npx wrangler kv namespace create VERDICTS      # paste the id below
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put CLIENT_TOKEN           # optional, see README
+#   npx wrangler deploy
+
+name = "nofrills-verdicts"
+main = "src/index.ts"
+compatibility_date = "2026-08-18"
+# The Anthropic SDK is a normal npm package built on fetch; nodejs_compat is
+# what lets Wrangler bundle it for the Workers runtime.
+compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "VERDICTS"
+id = "5bba8039a42f49418095e9e2e8c4a676"
+
+[vars]
+# Cheapest capable model, per docs/deferred-work.md — this is a
+# single-enum-per-field classification, not a reasoning task. Override here
+# (not in code) if a verdict quality problem ever justifies the cost.
+MODEL = "claude-haiku-4-5"
+
+# Hard brake #1: the most model calls this Worker will make in a UTC day.
+# Each call classifies up to 100 headlines, so 40 ≈ 4,000 new headlines/day —
+# far more than 35 feeds actually produce. Past the cap the endpoint keeps
+# serving cached verdicts and tells the client it is degraded, which the app
+# reads as "use the local rules". A bug or an abused endpoint costs a capped
+# amount and a slightly worse feed, never a surprise bill.
+#
+# Hard brake #2 is not in this file and is the more important one: set a
+# spend limit on the Anthropic account itself.
+DAILY_CALL_CAP = "40"
+
+# Verdicts are about a fixed string of text, so they never go stale — this
+# TTL exists only to bound storage, not to refresh anything.
+VERDICT_TTL_DAYS = "90"

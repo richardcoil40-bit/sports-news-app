@@ -307,12 +307,25 @@ shouldn't gain any.
   deliberate groundwork: the day the catalog is fetched instead of
   bundled, no new trust code should be needed.
 
-One thing is still conference-shaped and deliberately left alone:
+Two tables are still conference-shaped and deliberately left alone. Both
+are keyed by team slug through `team-slug.ts`, which owns the one alias
+table reconciling ESPN's abbreviations ("Michigan St") with how a school
+is normally written — add a third table and key it the same way rather
+than re-deriving slugs:
 
-- `community-sources.ts` is a Big Ten–only source table keyed by team
-  slug. The *shape* is league-agnostic; only the contents are Big Ten.
-  The real cost of a second conference is the research — every URL in
-  there was verified live — not the code.
+- `community-sources.ts` is a Big Ten–only source table. The *shape* is
+  league-agnostic; only the contents are Big Ten. The real cost of a
+  second conference is the research — every URL in there was verified
+  live — not the code.
+- `team-nicknames.ts` is what each team's local paper calls it
+  ("Huskers", "Buckeye Talk"), used to filter that paper's broad sports
+  feed down to the program. Same story: research, not code.
+
+  **These are only safe against a source covering that team's own
+  region.** "Wildcats" is four schools and "Bruins" is also an NHL team,
+  so the national pool and ESPN's feed stay matched on the school name
+  alone. Don't widen the callers without doing the per-nickname
+  disambiguation research first.
 
 No second league is shipped, and basketball appears only as a test
 descriptor in `leagues.test.ts` plus a fixture trimmed from ESPN's live

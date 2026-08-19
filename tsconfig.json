@@ -16,5 +16,11 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-  ]
+  ],
+  // worker/ is a separate deployable (Cloudflare Worker) with its own
+  // tsconfig.json and its own ambient types (@cloudflare/workers-types).
+  // Under this tsconfig it fails on undeclared globals like KVNamespace and
+  // ExecutionContext that only exist in the Workers runtime — run
+  // `npm run typecheck` inside worker/ to check that project instead.
+  "exclude": ["worker/**"]
 }

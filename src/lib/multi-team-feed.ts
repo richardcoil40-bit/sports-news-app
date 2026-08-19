@@ -12,6 +12,12 @@ import { Team } from '@/lib/teams';
 export interface FeedArticle extends Article {
   teamId: string;
   teamName: string;
+  /**
+   * Alongside the id because an ESPN id is unique only within a sport, so
+   * the pair is what identifies a team once the feed spans two leagues.
+   * team-mentions.ts resolves the pair back to a Team.
+   */
+  leagueId: string;
 }
 
 export interface MultiTeamFeed {
@@ -42,7 +48,12 @@ export async function fetchMultiTeamFeed(
       const league = getLeague(team.leagueId) ?? DEFAULT_LEAGUE;
       const pool = await fetchTeamNewsPool(team.id, team.shortName || team.name, league, options);
       return pool.articles.map(
-        (article): FeedArticle => ({ ...article, teamId: team.id, teamName: team.shortName }),
+        (article): FeedArticle => ({
+          ...article,
+          teamId: team.id,
+          teamName: team.shortName,
+          leagueId: team.leagueId,
+        }),
       );
     }),
   );

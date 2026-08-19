@@ -22,3 +22,22 @@
  * this flag governs only the sectioning.
  */
 export const BRIEF_MODE = true;
+
+/**
+ * Whether a headline naming two or more sports ("Corn Flakes: Volleyball
+ * Red-White Game and Fall Football Camp") stays in a team's feed once the
+ * verdicts service (`worker/`, see `docs/deferred-work.md`) can actually
+ * tell that case apart from ordinary single-sport coverage.
+ *
+ * Off, `off-sport.ts`'s local fail-open rule is the last word: any mention
+ * of the league's own sport rescues the article, roundups included. On, a
+ * verdict of `sport: "multiple"` is dropped instead — see
+ * `isRelevantVerdict` in `src/lib/verdicts.ts`. Only takes effect where
+ * `EXPO_PUBLIC_VERDICT_URL` is configured; with the service unset this flag
+ * has nothing to act on.
+ *
+ * Not yet chosen — see the mixed-roundup note in the source-reliability
+ * work this shipped alongside. Flip it, look at a week of real mixed
+ * roundups both ways, then delete the flag once the question is settled.
+ */
+export const KEEP_MIXED_SPORT_ROUNDUPS = true;

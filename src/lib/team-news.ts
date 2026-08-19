@@ -47,6 +47,9 @@ export async function fetchTeamArticles(teamId: string, league: League = DEFAULT
         // ESPN's team-scoped endpoint is still ESPN — national coverage
         // pointed at a team, not a beat writer who follows it daily.
         reach: 'national',
+        // And 'broad' for the same reason the pool re-filters it by name:
+        // the endpoint re-ranks toward a team, it doesn't restrict to one.
+        scope: 'broad',
       }),
     );
 }

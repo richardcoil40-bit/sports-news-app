@@ -9,15 +9,49 @@ Last reviewed 2026-08-18.
 
 ---
 
+## Status: the service is built, not yet deployed or wired for everything it unlocks
+
+The backend service this file used to describe as the one missing piece now
+exists as code: `worker/` is a complete Cloudflare Worker exposing
+`POST /v1/classify` (see `worker/README.md` for the wire contract), and
+`src/lib/verdicts.ts` is the app-side client, wired into
+`team-news-pool.ts`'s enrichment step. **Nobody has deployed it** — no
+Cloudflare account, no KV namespace, no Anthropic API key, no
+`EXPO_PUBLIC_VERDICT_URL` set anywhere — so today this changes nothing
+about how the app behaves; `classifyHeadlines` sees the unset URL and never
+makes a network call. `docs/data-retention.md` was updated in the same
+change, per the one-way-door note at the bottom of this file.
+
+What this unlocks is narrower than what was originally scoped, though — see
+each numbered section below for which half of it actually landed:
+
+- **Better claim tagging (§3)** is the one item this genuinely delivers on,
+  once deployed: the verdict already carries a `claim` field.
+- **Sources that find themselves (§1)** only got the *filter* half — a
+  headline verdict's `sport` and `kind` fields can refine what local rules
+  already found. The *discovery* half (asking a news-search service what's
+  being published about a team) is still unbuilt; nothing here finds a new
+  outlet on its own.
+- **Adding a league without an app release (§2)** is entirely unbuilt —
+  the league catalog is still bundled JSON, untouched by this work.
+
+The rest of this file's original reasoning is left as written below, marked
+up with what's since landed.
+
+---
+
 ## The one deferred block
 
-Almost everything outstanding depends on a single missing piece: **a small
-backend service holding an Anthropic API key.**
+Almost everything outstanding depended on a single missing piece: **a small
+backend service holding an Anthropic API key.** That piece is now built —
+see the status note above — but three-quarters of what it was meant to
+unlock still isn't.
 
 An API key cannot ship inside the app. A React Native bundle is extractable
 from any installed device, so the key has to live server-side. That service
-— realistically one file on Cloudflare Workers or Vercel, free tier — is the
-only genuinely new infrastructure this project needs.
+— realistically one file on Cloudflare Workers or Vercel, free tier — was
+the only genuinely new infrastructure this project needed, and it now
+exists as `worker/`.
 
 It unlocks three separate things that have all been asked for:
 
@@ -44,6 +78,18 @@ cheaper filters were tested and both failed:
 
 So discovery and the AI check are one unit. Ship both or neither.
 
+**Half of that unit is now built, half isn't.** The classify endpoint's
+`sport` and `kind` fields are exactly the AI check this section describes —
+`isRelevantVerdict` in `src/lib/verdicts.ts` applies them to whatever a
+team's local rules already found (`off-topic.ts`, `off-sport.ts`,
+`community-sources.ts`, `team-nicknames.ts`). But nothing calls a news
+search service to find a URL that isn't already in
+`community-sources.ts`; discovery — the part that would make the Detroit
+Free Press and On3 show up without someone hand-adding them — is still
+unbuilt. So this item is still deferred as originally scoped: a filter with
+nothing new to filter *in* doesn't deliver "sources that find themselves,"
+it only sharpens the sources already hand-written.
+
 ### 2. Adding a league without an app release
 
 The *code* boundary is closed and proven: an NFL entry was added to
@@ -59,6 +105,11 @@ already validates the list as if it came from a stranger, drops bad entries
 individually, and falls back to the bundled copy. Switching the source from
 bundled to fetched is a change of one input, not a rewrite.
 
+**Untouched by the backend work.** Nothing about `worker/` or
+`src/lib/verdicts.ts` changes where the league catalog lives; this is still
+entirely deferred, and the remaining step above is still exactly what it
+takes.
+
 ### 3. Better claim tagging
 
 `claim-type.ts` sorts headlines into reported / rumor / take by pattern
@@ -70,6 +121,20 @@ and December's coaching carousel makes real news and rumor share every word.
 The upgrade is one extra question on a request the service is already making
 about the same headlines. **No screen changes** — same three labels, same
 filter, same chips. Only the answer gets better.
+
+**The question is already being asked — the answer isn't wired up yet.**
+Every verdict `worker/` returns already carries a `claim` field
+(`reported`/`rumor`/`take`, same three labels), for free, on the same
+request the sport/kind filtering above uses. What's still deferred is the
+migration this file's intro describes: `claim-type.ts` runs in a
+render-time `useMemo` in five call sites (`src/app/team/[id].tsx`,
+`src/app/(tabs)/index.tsx`, `src/app/player/[id].tsx`,
+`article-card.tsx`, and the tab components that read it), and none of them
+read a verdict's `claim` field yet. That migration is explicitly **later**
+even once the service is deployed — `claim-type.ts` stays permanently as
+the offline classifier and pre-filter (see "Why waiting costs nothing"
+below), so switching a screen over is a follow-up, not a blocker on
+anything in this file.
 
 ---
 
@@ -85,11 +150,14 @@ Nothing built so far becomes rework. Each piece was shaped for this:
 | **Local claim classifier** | Stays permanently as the offline path and pre-filter, so a service outage degrades to the previous version of the feature rather than to nothing. |
 | **Atom parsing** | Discovered feeds arrive in either format; both already work. |
 
-**The one real refactor** when this lands: classification becomes
-asynchronous. It currently runs in a render-time `useMemo`; with a service it
-moves into a pool-level enrichment step. That actually *simplifies* the
-screens — they stop classifying and just read the field — but it does touch
-`team-news-pool.ts` and the screens that call it.
+**The one real refactor, done for the sport/kind half:** classification
+becomes asynchronous. `team-news-pool.ts` now has a pool-level enrichment
+step (`withVerdictRefinement`) that races `classifyHeadlines` against a 3s
+budget and falls through to the unrefined list on a miss — see the comment
+there for why the race is shorter than `verdicts.ts`'s own 6s timeout. The
+*screens*, though, are the other half of this refactor and haven't moved:
+they still call `classifyClaim` in a render-time `useMemo`, per §3 above.
+That part "simplifies the screens" only once it's actually done.
 
 ---
 
@@ -108,10 +176,19 @@ as one.
   headline text on the worker and the first request pays while every other
   request forever is free.
 - **Cluster before classifying** — the same wire story from six outlets is one
-  question, not six.
-- **Skip what local rules already answer confidently.**
+  question, not six. **Not yet done.** `team-news-pool.ts`'s enrichment step
+  classifies every deduped article individually; clustering (`cluster.ts`)
+  runs downstream of this pool, in `brief.ts`, not before it. Six outlets on
+  one story means six titles sent, not one — mitigated by the worker's own
+  cross-user KV cache (a genuinely repeated headline is free after the
+  first request) but not eliminated, since six outlets rarely phrase a
+  story identically. Wiring clustering in ahead of classification is the
+  next real cost lever, not yet pulled.
+- **Skip what local rules already answer confidently.** Done as designed:
+  local rules run first (cheap), and only what survives them reaches
+  `withVerdictRefinement` — see `team-news-pool.ts`.
 - **Domain verdicts are permanent**; batch ~100 headlines per request; cheapest
-  capable model; single-enum output.
+  capable model; single-enum output. All done — see `worker/README.md`.
 
 Order of magnitude with those in place: **single-digit dollars per year, flat
 regardless of user count.** Cloudflare's free tier covers the infrastructure.
@@ -123,16 +200,26 @@ worse feed, never a surprise bill.
 
 ---
 
-## The one-way door
+## The one-way door — crossed
 
-`docs/data-retention.md` currently states that nothing the app handles is
-transmitted anywhere. The moment this ships, headlines and outlet names go to
-the service and to Anthropic.
+`docs/data-retention.md` used to state that nothing the app handles is
+transmitted anywhere. That stopped being true the moment `worker/` and
+`src/lib/verdicts.ts` were written, and the document was updated in the
+same change (see its new "What the verdicts service sees" section) rather
+than after, per this section's own rule when it was still a plan.
+
+What actually goes out, once `EXPO_PUBLIC_VERDICT_URL` is configured, is
+narrower than the original plan here assumed: **headline titles only** —
+not outlet names, not links, not team or league identifiers. That was a
+design choice made while building `worker/`, specifically to keep the
+one-way door as narrow as it could be once it had to be crossed at all.
 
 They are public news, not personal data, and no user identifier goes with
-them — but the *pattern* of requests would reveal which teams a user follows,
-and that document's claim stops being true. Update it in the same change, not
-after. Configure the service not to log request bodies.
+them — but the *pattern* of requests still reveals which teams a device
+follows, and that residual is exactly what `data-retention.md` now
+documents rather than glosses over. The service is configured not to log
+request bodies, per the plan.
 
-This is the only part of the block that can't be undone by reverting a branch,
-and it is worth thinking about before starting rather than during.
+Nothing about this changes until a build actually sets
+`EXPO_PUBLIC_VERDICT_URL` — the door was built, but it's still standing
+open onto an empty room until that happens.
