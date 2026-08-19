@@ -1,11 +1,14 @@
 import { createEntityCache } from '@/lib/cache';
 import { filterArticlesForTeams } from '@/lib/conference-filter';
 import { filterOffTopic } from '@/lib/off-topic';
+import { filterOtherSports } from '@/lib/off-sport';
 import { Article, fetchFeeds } from '@/lib/feeds';
 import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import { espnCacheKey, League } from '@/lib/leagues';
 import { fetchLeagueFeeds, teamSourcesFor } from '@/lib/source-catalog';
 import { fetchTeamArticles } from '@/lib/team-news';
+import { localNamesFor, schoolNamesFor } from '@/lib/team-nicknames';
+import { classifyHeadlines, isRelevantVerdict } from '@/lib/verdicts';
 
 export interface TeamNewsPool {
   articles: Article[];
@@ -28,6 +31,46 @@ const poolCache = createEntityCache<string, TeamNewsPool>({ ttlMs: CACHE_TTL_MS 
 // the per-source ones in feeds.ts) show whether one group is the long pole
 // or whether it's genuinely stuck (never resolves at all).
 const DEBUG_TIMING = false;
+
+// classifyHeadlines has its own internal timeout (see CLASSIFY_TIMEOUT_MS in
+// verdicts.ts), but this pool has a tighter budget of its own: it normally
+// resolves in ~10-11s against a 15s hard cap (HARD_CAP_MS below), and
+// blocking on the full classify timeout every time would risk tripping
+// that cap on an otherwise-healthy fetch. So this race is shorter than
+// verdicts.ts's own timeout — if the service hasn't answered by then, this
+// pool falls through to the unrefined article list rather than wait. The
+// classification call itself is not cancelled: it keeps running, and
+// whatever it resolves to still lands in verdicts.ts's in-process memo (and
+// the worker's own cross-user cache) for the *next* refresh to use.
+const VERDICT_RACE_MS = 3000;
+
+async function withVerdictRefinement(articles: Article[], league: League): Promise<Article[]> {
+  // Articles with no title can't be classified — the worker rejects a
+  // batch containing one rather than silently skipping it (see
+  // worker/src/index.ts's parseItems) — and shouldn't be able to invalidate
+  // classification for the rest of the batch just by being present.
+  const classifiable = articles.filter((a) => a.title?.trim());
+  if (classifiable.length === 0) return articles;
+
+  // `link` is already this pool's uniqueness key (see the dedupe step
+  // above), so it doubles as the opaque id the verdicts service echoes
+  // back — see worker/README.md's note that ids are never seen by the model.
+  const classification = classifyHeadlines(classifiable.map((a) => ({ id: a.link, title: a.title })));
+
+  const verdicts = await Promise.race([
+    classification,
+    new Promise<null>((resolve) => setTimeout(resolve, VERDICT_RACE_MS, null)),
+  ]);
+
+  // Timed out before the service (or its own internal timeout) answered —
+  // nothing to filter on yet. With EXPO_PUBLIC_VERDICT_URL unset,
+  // classifyHeadlines resolves well inside this race with every item
+  // mapped to `null`, and isRelevantVerdict(null, ...) keeps everything —
+  // so this filter is a no-op in that case, not this early return.
+  if (!verdicts) return articles;
+
+  return articles.filter((a) => isRelevantVerdict(verdicts.get(a.link) ?? null, league));
+}
 
 async function fetchTeamNewsPoolUncached(
   teamId: string,
@@ -77,7 +120,7 @@ async function fetchTeamNewsPoolUncached(
   // padded the pool enough to crowd out the smaller sources this app
   // exists to surface.
   if (espnResult.status === 'fulfilled') {
-    lists.push(filterArticlesForTeams(espnResult.value, [teamShortName]));
+    lists.push(filterArticlesForTeams(espnResult.value, schoolNamesFor(teamShortName)));
   } else {
     failedSources.push('ESPN team news');
   }
@@ -92,15 +135,20 @@ async function fetchTeamNewsPoolUncached(
 
   // Local sports sections and the national pool cover far more than this
   // team, so they only contribute articles that name it.
+  //
+  // The local paper gets nicknames as well as the school name, and only
+  // the local paper does: "Huskers" is unambiguous in the Lincoln Journal
+  // Star and "Wildcats" is four different schools in a national feed. See
+  // team-nicknames.ts, which is where that restriction is argued.
   if (localResult.status === 'fulfilled') {
-    lists.push(filterArticlesForTeams(localResult.value.articles, [teamShortName]));
+    lists.push(filterArticlesForTeams(localResult.value.articles, localNamesFor(teamShortName)));
     failedSources.push(...localResult.value.failedSources);
   } else {
     failedSources.push(...broadScoped.map((s) => s.name));
   }
 
   if (generalResult.status === 'fulfilled') {
-    lists.push(filterArticlesForTeams(generalResult.value.articles, [teamShortName]));
+    lists.push(filterArticlesForTeams(generalResult.value.articles, schoolNamesFor(teamShortName)));
     failedSources.push(...generalResult.value.failedSources);
   } else {
     failedSources.push('National college football feeds');
@@ -118,7 +166,20 @@ async function fetchTeamNewsPoolUncached(
   // all, so nothing downstream should count them either. notable-players.ts
   // ranks by how often a player is named, and a jersey ad naming a star
   // would inflate that.
-  const articles = filterOffTopic(deduped);
+  //
+  // Other sports go at the same point and for the same reason, but they
+  // answer a different question — see off-sport.ts. The team-name filter
+  // above can't catch them: Nebraska volleyball is unimpeachably about
+  // Nebraska, and the team sites this pool takes wholesale cover a whole
+  // athletic department, not one football team.
+  const localFiltered = filterOtherSports(filterOffTopic(deduped), league);
+
+  // Optional refinement pass — see docs/deferred-work.md and verdicts.ts.
+  // With EXPO_PUBLIC_VERDICT_URL unset (the default: no build ships this
+  // configured yet), classifyHeadlines resolves immediately with no
+  // network call and isRelevantVerdict keeps everything, so this is a
+  // no-op for every build that hasn't set up the service.
+  const articles = await withVerdictRefinement(localFiltered, league);
 
   articles.sort((a, b) => {
     if (!a.publishedAt) return 1;

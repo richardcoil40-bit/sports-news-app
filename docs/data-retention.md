@@ -25,6 +25,7 @@ hand-rolled per module:
 | Stat leaders | `lib/team-leaders.ts` | Keyed by team ID — max 18 entries | None (process lifetime) |
 | Team colors | `lib/team-color.ts` | Keyed by team ID — max 18 entries | None (process lifetime) |
 | Player season stats | `lib/player-stats.ts` | Keyed by athlete ID — one per player screen opened | None (process lifetime) |
+| Verdict classifications | `lib/verdicts.ts` | Keyed by headline title — one per unique headline seen; no-op (empty) unless `EXPO_PUBLIC_VERDICT_URL` is set | None (process lifetime) |
 
 Force-quitting the app clears all of it. None of these can grow without
 limit, but they aren't all bounded the same way. The team-keyed caches are
@@ -35,7 +36,11 @@ that does grow with use**: it gains an entry per player detail screen opened,
 so its ceiling is the number of athletes across all 18 rosters (order of
 1,800 entries of a few stat lines each) rather than 18. Still bounded, still
 cleared on quit, but worth stating precisely rather than filing it under
-"capped at 18" with the others.
+"capped at 18" with the others. **Verdict classifications are the other
+one**, for the same reason (an entry per unique headline the app has ever
+asked about, not per team) — but only where `EXPO_PUBLIC_VERDICT_URL` is
+configured; otherwise this cache never gains an entry, since `lib/
+verdicts.ts` never makes the network call that would populate it.
 
 The auto-refresh added for the morning/noon/night cycle (`lib/refresh-
 schedule.ts`) doesn't change this: it just forces one of these same bounded
@@ -51,12 +56,60 @@ model with publishers whose content is being aggregated.
 
 No personal data is collected in the sense that matters here: there's no
 login, no user profile, no tracking identifiers, no crash/analytics
-reporting, and nothing is transmitted anywhere. The one persisted value
-(followed team IDs) never leaves the device — it's read by the app to
-decide what to fetch, and that's all. The only
-network calls out are to ESPN's public endpoints and the RSS feeds listed
-in `lib/community-sources.ts` and `lib/feeds.ts`, made directly from the
-device the same way any RSS reader would.
+reporting. The one persisted value (followed team IDs) never leaves the
+device — it's read by the app to decide what to fetch, and that's all.
+Network calls out are to ESPN's public endpoints, the RSS feeds listed in
+`lib/community-sources.ts` and `lib/feeds.ts`, made directly from the
+device the same way any RSS reader would, and — only where
+`EXPO_PUBLIC_VERDICT_URL` is configured — the verdicts service described
+below.
+
+## What the verdicts service sees
+
+This section exists because a claim in the previous version of this
+document — "nothing is transmitted anywhere" — stopped being true the
+moment `lib/verdicts.ts` and `worker/` shipped, and that claim needs to be
+corrected in the same change that made it false, not after. See
+`docs/deferred-work.md` for why this service exists.
+
+**What actually crosses the wire:** headline titles, batched, sent to a
+Cloudflare Worker the project operates, which forwards uncached titles to
+Anthropic's API for classification. That's the complete list. No article
+link, no source name, no team, no league, and no device or user identifier
+of any kind goes with a title — `lib/verdicts.ts` builds the request body
+from title text alone, and the worker's own request handling never reads
+the parts of the app's request it isn't given (see `worker/README.md`'s
+"What this service never sees").
+
+**What that doesn't cover, and why it's still worth saying out loud:**
+headlines are public news, already published by outlets with no
+expectation of privacy in the text itself — this isn't personal data by
+any reasonable definition. But **the request pattern is data**: which
+headlines a device asks about, and when, is a reasonable proxy for which
+teams that device follows, and the worker's request logs (to whatever
+extent Cloudflare's platform logging captures them) carry that pattern
+even though no field in the request names a team or a user. The mitigating
+facts: the worker is configured not to log request bodies (see
+`worker/src/index.ts`), verdicts are cached by a hash of the title text so
+a repeat request for the same headline doesn't even reach the model, and
+there is no user identifier anywhere in the request to correlate a pattern
+back to a person. But "no identifier" is not the same claim as "no
+transmission," and this file exists to keep those two claims from getting
+conflated again.
+
+**Retention on the worker side:** verdicts are cached in Cloudflare KV,
+keyed by a SHA-256 hash of the normalized headline text, for
+`VERDICT_TTL_DAYS` (90, set in `worker/wrangler.toml`) — a storage bound,
+not a freshness one, since a verdict about a fixed piece of text never goes
+stale. Nothing else about a request is persisted on the worker: no logs of
+which title mapped to which app instance, no per-request history beyond
+KV's own bounded write pattern.
+
+**The default is still "nothing is transmitted."** `EXPO_PUBLIC_VERDICT_URL`
+is unset in every build that hasn't explicitly configured it, and
+`lib/verdicts.ts` never makes a network call when it's unset — this whole
+section describes what happens only once someone deliberately points the
+app at a running instance of `worker/`.
 
 ## Why this is worth stating explicitly
 

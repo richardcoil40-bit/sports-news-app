@@ -1,0 +1,142 @@
+# nofrills-verdicts
+
+The one backend service NoFrills needs — see `docs/deferred-work.md` in the
+main repo for why it exists and what it unlocks. This file is about running
+and deploying it; that one is about the decision.
+
+One route. It classifies a batch of headline titles and returns a
+league-agnostic verdict for each: what sport it's about, which teams are
+named, whether it's a report/rumor/take, and whether it's news, promo, or
+institutional filler. The client (`src/lib/verdicts.ts` in the main app)
+applies its own policy to the verdict fields — this service never sees a
+team, a league, or a user.
+
+## Deploy
+
+```bash
+cd worker
+npm install
+npx wrangler kv namespace create VERDICTS      # paste the returned id into wrangler.toml
+npx wrangler secret put ANTHROPIC_API_KEY
+npx wrangler secret put CLIENT_TOKEN           # optional — see Auth below
+npx wrangler deploy
+```
+
+Local dev: `npm run dev` (runs `wrangler dev`). `npm run typecheck` runs
+`tsc --noEmit`.
+
+## `POST /v1/classify`
+
+Request:
+
+```json
+{
+  "items": [
+    { "id": "https://example.com/article-1", "title": "Ohio State tops the AP Top 25" },
+    { "id": "https://example.com/article-2", "title": "Huskers volleyball sweeps road trip" }
+  ]
+}
+```
+
+- `items`: 1–100 entries. `id` is opaque — the client's own key (a URL works
+  well); it's only used to map results back to inputs and never reaches the
+  model. `title` is the headline text and **is** what reaches the model —
+  nothing else about the article does.
+
+Response:
+
+```json
+{
+  "results": [
+    {
+      "id": "https://example.com/article-1",
+      "verdict": { "sport": "football", "teams": ["Ohio State"], "claim": "reported", "kind": "news" }
+    },
+    {
+      "id": "https://example.com/article-2",
+      "verdict": { "sport": "volleyball", "teams": ["Nebraska"], "claim": "reported", "kind": "news" }
+    }
+  ],
+  "degraded": false
+}
+```
+
+- `verdict` is `null` when this request couldn't get a fresh classification
+  for that item (daily cap reached, or the model call failed) and nothing
+  cached was available either. Treat `null` the same way an unset
+  `EXPO_PUBLIC_VERDICT_URL` is treated client-side: fall back to local rules.
+- `degraded: true` means at least one item in this response has a `null`
+  verdict for that reason. It's a hint, not a per-item flag — check each
+  item's `verdict` if you need to know which ones.
+- `sport` is one of the values in `SPORTS` in `src/index.ts` — the same list
+  `off-sport.ts`'s lexicon covers in the main app, plus `"other"` (a real
+  sport with no local word list), `"multiple"` (a roundup naming two or
+  more sports), and `"none"` (no sport identifiable from the headline text
+  alone).
+- `claim` is `"reported"` / `"rumor"` / `"take"` — the same three labels
+  `claim-type.ts` already produces locally.
+- `kind` is `"news"` / `"promo"` / `"institutional"` — the off-topic axis;
+  this is the field that answers "is this actually sports coverage."
+
+`GET /health` returns `{"ok": true}` — nothing else to it, just a
+liveness check for `wrangler dev` / uptime monitoring.
+
+## Auth
+
+`CLIENT_TOKEN` is optional. If set, every request needs
+`Authorization: Bearer <token>` or gets a 401. Be honest with yourself about
+what this buys: a token baked into an app bundle is extractable by anyone
+who wants it, same as an API key would be. It's a speed bump against casual
+scraping of the endpoint, not access control. The actual brakes are:
+
+- **`DAILY_CALL_CAP`** (`wrangler.toml`) — the most Anthropic calls this
+  Worker will make in a UTC day, counted per model call, not per HTTP
+  request (see below). Past the cap the endpoint keeps serving cached
+  verdicts and returns `degraded: true` for the rest.
+- **A spend limit on the Anthropic account itself.** This is the one that
+  actually caps a worst-case bill, and it isn't in this repo — set it on
+  the account.
+
+## How it works
+
+- **Cache key is the title alone.** Normalized (trim, lowercase, collapse
+  whitespace) and SHA-256 hashed — `v1:<hex>` in KV. No link, source, team,
+  or user goes into the key. That's deliberate: the same wire headline
+  shows up in a dozen users' feeds across every team it's tagged for, and
+  hashing only the title is what lets one classification serve all of them.
+  KV's free tier caps writes at 1,000/day; cache writes are wrapped in
+  `try/catch` and pushed through `ctx.waitUntil` so a write failure costs a
+  future re-classification, never a broken response. If that cap is ever
+  hit in practice, D1 (100k writes/day free) is the documented upgrade —
+  swap the KV calls in `src/index.ts` for D1 queries, same key shape.
+- **The daily cap counts Anthropic calls, not headlines or requests.** One
+  HTTP request classifying 80 uncached headlines is one call to the model
+  (they're batched into a single `messages.create`); a request that's
+  entirely cache hits is zero calls. The counter lives at
+  `calls:YYYY-MM-DD` in KV with a 2-day TTL, so nothing has to prune it.
+- **Model is `claude-haiku-4-5`**, set in `wrangler.toml`'s `[vars]`, not
+  hardcoded — override there if a quality problem ever justifies the cost.
+  This is a deliberate downgrade from Opus-tier: the job is a single-enum
+  classification per headline, not open-ended reasoning, and
+  `docs/deferred-work.md` sizes the whole service at single-digit dollars a
+  year on the cheapest capable model. Haiku 4.5 doesn't support adaptive
+  thinking or the `effort` parameter — both are simply omitted from the
+  request, not set to "off".
+- **No prompt caching.** Haiku 4.5's minimum cacheable prefix is 4,096
+  tokens; the system prompt here is a few hundred. A `cache_control`
+  breakpoint would silently do nothing but complicate the code.
+- **Structured output**, not free-text parsing: `output_config.format` with
+  a `json_schema` constrains the response to exactly the verdict shape, and
+  results map back to input items by array index (titles go in as a plain
+  JSON array, verdicts come back the same length, same order) — never by
+  echoing the `id` back through the model, since ids here are URLs and
+  echoing them would cost output tokens for no reason.
+
+## What this service never sees
+
+Team names, league identity, user identity, and article links never reach
+this Worker — only the headline text and an opaque id the caller invented.
+The request pattern (which teams a user's client asks about, and when)
+still reveals something about who's using the app, which is why
+`docs/data-retention.md` was updated in the same change that shipped this
+service — read that file, not this one, for the retention story.

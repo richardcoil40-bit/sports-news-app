@@ -126,6 +126,73 @@ describe('withTeamMentions', () => {
     expect(tagged.map((a) => a.mentionedTeam?.shortName ?? null)).toEqual(['Michigan St', null]);
   });
 
+  /**
+   * A team site never says the school's name, because its readers already
+   * know whose site they're on — so headline matching alone left every
+   * Corn Nation story untagged while Land-Grant Holy Land's, which do say
+   * "Ohio State", got a tag. Provenance closes that, and only that.
+   */
+  describe('the team-site fallback', () => {
+    const NEBRASKA = team('158', 'Nebraska', 'Nebraska Cornhuskers');
+    const WITH_NEBRASKA = [...TEAMS, NEBRASKA];
+
+    it('tags a team-site story the headline does not name', () => {
+      const tagged = withTeamMentions(
+        [
+          {
+            title: 'Corn Flakes: Huskers vs. Texas in Primetime',
+            description: '',
+            scope: 'team' as const,
+            teamId: '158',
+            leagueId: 'big-ten',
+          },
+        ],
+        WITH_NEBRASKA,
+      );
+      expect(tagged[0].mentionedTeam?.shortName).toBe('Nebraska');
+    });
+
+    it('still lets the headline win, so a rival story is tagged with the rival', () => {
+      const tagged = withTeamMentions(
+        [
+          {
+            title: 'Why Ohio State is the team to beat',
+            description: '',
+            scope: 'team' as const,
+            teamId: '158',
+            leagueId: 'big-ten',
+          },
+        ],
+        WITH_NEBRASKA,
+      );
+      expect(tagged[0].mentionedTeam?.shortName).toBe('Ohio State');
+    });
+
+    // The whole point of the tag: a broad source's pool is full of stories
+    // about other teams, so which pool surfaced it proves nothing.
+    it('does not fire for a broad source', () => {
+      const tagged = withTeamMentions(
+        [{
+          title: 'Playoff expansion explained',
+          description: '',
+          scope: 'broad' as const,
+          teamId: '158',
+          leagueId: 'big-ten',
+        }],
+        WITH_NEBRASKA,
+      );
+      expect(tagged[0].mentionedTeam).toBeNull();
+    });
+
+    it('does not fire without a team id', () => {
+      const tagged = withTeamMentions(
+        [{ title: 'Playoff expansion explained', description: '', scope: 'team' as const }],
+        WITH_NEBRASKA,
+      );
+      expect(tagged[0].mentionedTeam).toBeNull();
+    });
+  });
+
   it('preserves extra fields', () => {
     const tagged = withTeamMentions(
       [{ title: 'Michigan wins', description: '', claimType: 'reported' as const }],

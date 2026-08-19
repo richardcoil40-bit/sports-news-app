@@ -1,4 +1,5 @@
 import { FeedSource } from '@/lib/feeds';
+import { teamSlug } from '@/lib/team-slug';
 
 /**
  * Per-team sources beyond the national pool. Every URL here was verified to
@@ -185,28 +186,9 @@ const SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   ],
 };
 
-/**
- * ESPN's short names don't always match how a school is normally written
- * ("Michigan St", not "Michigan State"), so lookups go through a slug plus
- * an alias table rather than depending on an exact string.
- */
-const SLUG_ALIASES: Record<string, string> = {
-  'michigan-st': 'michigan-state',
-  'ohio-st': 'ohio-state',
-  'penn-st': 'penn-state',
-  'washington-st': 'washington',
-};
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
 export function communitySourcesForTeam(teamShortName: string): FeedSource[] {
-  const slug = slugify(teamShortName);
-  const sources = SOURCES_BY_SLUG[slug] ?? SOURCES_BY_SLUG[SLUG_ALIASES[slug] ?? ''] ?? [];
+  // Slug and aliases live in team-slug.ts, shared with the nickname table.
+  const sources = SOURCES_BY_SLUG[teamSlug(teamShortName)] ?? [];
 
   // Everything in this file is beat coverage by definition — a team blog,
   // an independent that covers one program, or a metro paper's sports

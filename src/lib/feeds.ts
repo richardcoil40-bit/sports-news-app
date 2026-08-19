@@ -62,6 +62,15 @@ export interface Article {
   imageUrl: string | null;
   tier: SourceTier;
   reach: SourceReach;
+  /**
+   * The scope of the feed that served it. Carried onto the article because
+   * "this came from a site that only covers one team" is provenance the
+   * headline can't supply: Corn Nation's "Corn Flakes: Huskers vs. Texas"
+   * names no team a matcher would recognize, yet the outlet publishes
+   * nothing but Nebraska. See team-mentions.ts, which uses it as the
+   * fallback when the headline names nobody.
+   */
+  scope: SourceScope;
 }
 
 const xmlParser = new XMLParser({
@@ -357,6 +366,9 @@ function articleFromRssItem(item: Record<string, unknown>, source: FeedSource): 
     // community-sources.ts tags those explicitly rather than
     // relying on this fallback.
     reach: source.reach ?? (source.scope === 'team' ? 'beat' : 'national'),
+    // Not narrowed when syndicated: an aggregator's item is broad either
+    // way, and a team site republishing someone else is still a team site.
+    scope: source.scope ?? 'broad',
   };
 }
 
@@ -387,6 +399,7 @@ function articleFromAtomEntry(entry: Record<string, unknown>, source: FeedSource
     imageUrl: extractAtomImageUrl(entry),
     tier: source.tier ?? 0,
     reach: source.reach ?? (source.scope === 'team' ? 'beat' : 'national'),
+    scope: source.scope ?? 'broad',
   };
 }
 
