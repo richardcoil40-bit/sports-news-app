@@ -207,7 +207,7 @@ const weightOf = (weights: Map<string, number>, token: string) => weights.get(to
  * coefficient would go further but is too permissive — a 4-token title is
  * trivially "contained" in something unrelated.
  */
-export function titleSimilarity(
+function titleSimilarity(
   a: Set<string>,
   b: Set<string>,
   weights: Map<string, number>,

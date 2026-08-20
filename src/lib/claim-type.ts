@@ -27,8 +27,11 @@ import { Article } from '@/lib/feeds';
  * falling in December when the coaching carousel makes real news and rumor
  * share every word. The biggest blind spot has no lexical fix: a column
  * with a flat declarative headline ("Michigan's defense has a problem")
- * looks exactly like reporting. Fixing that needs a byline signal — see
- * journalists.ts, which is the right shape for it.
+ * looks exactly like reporting. Fixing that needs a byline signal — a
+ * match on the author against known columnists — which nothing here does
+ * today. `Article.author` is already parsed and available; what makes it
+ * harder than it looks is coverage and list rot, written up in
+ * `docs/deferred-work.md` §3a. Read that before rebuilding it.
  *
  * ## The asymmetry that governs every decision here
  *

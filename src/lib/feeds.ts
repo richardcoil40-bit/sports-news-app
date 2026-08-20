@@ -404,9 +404,11 @@ function articleFromAtomEntry(entry: Record<string, unknown>, source: FeedSource
 }
 
 /**
- * Set EXPO_PUBLIC_DEBUG_FEEDS=1 (or flip DEBUG_TIMING below) to log how long
- * each individual feed takes and whether it succeeded, failed, or hit the
- * 10s timeout. Added to debug reports of the news pool "loading forever" —
+ * Flip DEBUG_TIMING below to log how long each individual feed takes and
+ * whether it succeeded, failed, or hit the 10s timeout. Deliberately a
+ * hardcoded constant rather than an env var: this is a Metro reload away,
+ * and the data layer reads no configuration other than the verdicts URL.
+ * Added to debug reports of the news pool "loading forever" —
  * every fetch here has a timeout, so if the pool as a whole still hangs
  * well past ~10s, this pinpoints which source (or confirms it's none of
  * them, i.e. the hang is somewhere else, like parsing or a downstream
