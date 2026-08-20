@@ -10,21 +10,24 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
- * Where a tip goes, if you want to leave one. Empty until a real link
- * exists, and the button is hidden while it is — a dead donate button is
- * worse than none.
+ * Where a tip goes, if you want to leave one. Set it to '' and the whole
+ * section below hides itself — a dead donate button is worse than none.
  *
  * A plain external hand-off, the same shape as opening an article: no
  * payment SDK, no card details, nothing new collected. That keeps
  * `docs/data-retention.md` true as written.
  *
  * **Before any external TestFlight build or App Store submission, this
- * has to go or become an Apple in-app purchase** — see the donation note
- * in `docs/legal-notes.md`. Neither sideloading nor internal TestFlight
- * goes through App Review, which is why it's fine today and precisely
- * why the trigger point is worth writing down rather than remembering.
+ * has to go back to '' or become an Apple in-app purchase** — see the
+ * donation note in `docs/legal-notes.md`. Sideloading and *internal*
+ * TestFlight (App Store Connect team members only) don't go through
+ * review; anything else does, and "external" includes a build emailed to
+ * a dozen friends. That is the specific trap here: this constant and the
+ * tester invite are two harmless-looking changes that are only a problem
+ * together, and they'd be made weeks apart by someone not thinking about
+ * the other one.
  */
-const DONATION_URL = '';
+const DONATION_URL = 'https://venmo.com/code?user_id=2013094037422080726';
 
 const PARAGRAPHS = [
   "I'm a GRC consultant and former IT auditor. Building software isn't my day job — understanding how systems get built, secured, and governed is. NoFrills started as a way to close that gap: real hands-on depth to go alongside a career that's mostly been policy, compliance, and audit, rather than just reading about how software gets made.",
@@ -60,14 +63,25 @@ export default function DeveloperScreen() {
           ))}
 
           {DONATION_URL ? (
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: theme.accent }]}
-              onPress={openDonation}
-              accessibilityRole="button">
-              <ThemedText font="mono" style={[styles.buttonText, { color: theme.background }]}>
-                Buy me a coffee ↗
+            <View style={styles.tipSection}>
+              <View style={[styles.rule, { backgroundColor: theme.text }]} />
+              <ThemedText font="mono" style={styles.tipHeading}>
+                Tip the developer
               </ThemedText>
-            </TouchableOpacity>
+              <ThemedText themeColor="textSecondary" style={styles.tipNote}>
+                Entirely optional, and nothing in the app changes either way — there&apos;s no
+                paid tier and never will be.
+              </ThemedText>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: theme.accent }]}
+                onPress={openDonation}
+                accessibilityRole="button"
+                accessibilityLabel="Tip the developer on Venmo, opens in a browser">
+                <ThemedText font="mono" style={[styles.buttonText, { color: theme.background }]}>
+                  Venmo ↗
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
           ) : null}
         </ScrollView>
       </SafeAreaView>
@@ -103,6 +117,19 @@ const styles = StyleSheet.create({
   body: {
     fontSize: 17,
     lineHeight: 26,
+  },
+  tipSection: {
+    gap: Spacing.three,
+  },
+  tipHeading: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  tipNote: {
+    fontSize: 15,
+    lineHeight: 22,
   },
   button: {
     marginTop: Spacing.two,
