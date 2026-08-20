@@ -46,7 +46,6 @@ function periodKey(now: Date): string {
 }
 
 let lastRefreshedKey: string | null = null;
-let lastRefreshedAt: Date | null = null;
 
 /**
  * When the current morning/noon/night window began.
@@ -86,10 +85,6 @@ export function currentPeriodLabel(now: Date = new Date()): string {
   return period === 'morning' ? 'this morning' : period === 'noon' ? 'midday' : 'this evening';
 }
 
-export function getLastRefreshedAt(): Date | null {
-  return lastRefreshedAt;
-}
-
 /**
  * Call on app launch and whenever the app returns to the foreground. Cheap
  * to call often — it's a no-op unless the period actually changed.
@@ -102,16 +97,12 @@ export async function refreshIfNewPeriod(): Promise<boolean> {
   // in the same tick) don't both kick off a refresh.
   lastRefreshedKey = key;
 
-  try {
-    // Every league that has one, not a named league: this runs before the
-    // user has looked at anything, so it has no team or league context to
-    // work from. Settled rather than awaited as a group, so one league's
-    // outage can't leave the others stale.
-    await Promise.allSettled(
-      leaguesWithNationalFeeds().map((league) => fetchLeagueFeeds(league, { force: true })),
-    );
-  } finally {
-    lastRefreshedAt = new Date();
-  }
+  // Every league that has one, not a named league: this runs before the
+  // user has looked at anything, so it has no team or league context to
+  // work from. Settled rather than awaited as a group, so one league's
+  // outage can't leave the others stale.
+  await Promise.allSettled(
+    leaguesWithNationalFeeds().map((league) => fetchLeagueFeeds(league, { force: true })),
+  );
   return true;
 }

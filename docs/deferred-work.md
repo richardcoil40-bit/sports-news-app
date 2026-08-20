@@ -5,7 +5,7 @@ Kept here rather than in a chat log or an issue tracker so that the reasoning
 survives — the point of this file is that someone (or some future session)
 can resume this without re-deriving the decision.
 
-Last reviewed 2026-08-18.
+Last reviewed 2026-08-20.
 
 ---
 
@@ -135,6 +135,45 @@ even once the service is deployed — `claim-type.ts` stays permanently as
 the offline classifier and pre-filter (see "Why waiting costs nothing"
 below), so switching a screen over is a follow-up, not a blocker on
 anything in this file.
+
+#### 3a. The byline signal — same blind spot, different fix, no service needed
+
+The flat-declarative-column problem above has a second possible fix that is
+worth recording separately, because **it is the one item in this file that
+does not depend on the backend service at all.** A column and a report can
+be identical as sentences and still differ in who wrote them: if the byline
+is a known columnist, "Michigan's defense has a problem" is a take
+regardless of its grammar. That's metadata the headline text can't provide
+and the verdicts service is never given.
+
+The plumbing for it already exists. `feeds.ts` parses bylines from both
+formats — `dc:creator` with a plain `<author>` fallback for RSS,
+`<author><name>` for Atom — onto `Article.author`, and it survives all the
+way to a screen today (`src/app/team/[id].tsx` uses it to build the source
+label). Nothing reads it for classification.
+
+A first step at this once existed and was deleted on 2026-08-20:
+`src/lib/journalists.ts` held 24 hand-written reporter names and a
+substring match over them. It was removed as dead code — **nothing ever
+imported it**, so the matching half existed while the half that would have
+called it never got written. Recover it from git history if picking this
+up; it is not worth retyping, but it is also not the hard part.
+
+**The hard part, and why this stayed unbuilt:** coverage. The writers a
+list like that most needs to recognise — The Athletic's staff, Yahoo's
+Pete Thamel — publish behind paywalls with no public RSS, so their bylines
+never enter the app at all. Against the free ESPN/CBS/Yahoo feeds the
+signal is real but partial, and a hand-maintained name list rots silently:
+a writer changes outlet, and the list gets quietly worse with no failing
+test to say so. That decay is why the file was deleted rather than left
+sitting unused, and it's the thing to solve before rebuilding it — an
+`author`-derived signal that degrades honestly (unknown byline ⇒ no
+opinion, never a wrong one) is fine; a stale allow-list presented as
+authoritative is not.
+
+Cheap, local, and orthogonal to everything else here: it needs no API key,
+no network call, and no deploy, so it can be picked up whenever without
+waiting on §§1–3.
 
 ---
 

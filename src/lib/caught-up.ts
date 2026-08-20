@@ -9,29 +9,17 @@ import { readValue, writeValue } from '@/lib/storage';
  * a relaunch or the app would greet you with the same stories every time
  * you open it.
  *
- * Same module-level-store-with-subscribers shape as favorites.ts, for the
- * same reasons: it's read from more than one screen, and the persistence
- * layer underneath isn't React-aware.
+ * A module-level store like favorites.ts, but deliberately *without* that
+ * one's subscriber list. Nothing should re-render when this value moves:
+ * the only consumer freezes its window and re-derives it on focus or
+ * foreground (see use-brief.ts), and pushing a change live is precisely
+ * the bug markCaughtUp's comment below exists to prevent.
  */
 
 const CAUGHT_UP_KEY = 'nofrills.lastCaughtUpAt';
 
 let lastCaughtUpAt: Date | null = null;
 let hydrated = false;
-
-type Listener = () => void;
-const listeners = new Set<Listener>();
-
-function emit() {
-  for (const listener of listeners) listener();
-}
-
-export function subscribeToCaughtUp(listener: Listener): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
 
 export function getLastCaughtUpAt(): Date | null {
   return lastCaughtUpAt;
@@ -58,7 +46,6 @@ export async function hydrateCaughtUp(): Promise<void> {
   }
 
   hydrated = true;
-  emit();
 }
 
 /**

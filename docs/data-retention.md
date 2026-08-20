@@ -4,11 +4,13 @@ What this app keeps, where, and for how long. Written so the answer to "how
 long do you retain X" is something you can point to rather than reconstruct
 from the code each time someone asks.
 
-## Current state: one small persisted store, everything else in memory
+## Current state: three small persisted values, everything else in memory
 
-The app persists exactly one thing — which teams you follow — and nothing
-else. No analytics SDK, no user accounts, no article content, no
-behavioral or usage data. See "Persisted stores" below for the detail.
+The app persists three things: which teams you follow, whether you've
+completed onboarding, and when you last reached the end of a brief. Nothing
+else. No analytics SDK, no user accounts, no article content, no usage or
+behavioral history. See "Persisted stores" below for the detail, including
+why the third one is a single overwritten timestamp rather than a log.
 
 Every other cache in the codebase is in-memory only and exists for the
 lifetime of the running app process. They're all created through
@@ -56,8 +58,9 @@ model with publishers whose content is being aggregated.
 
 No personal data is collected in the sense that matters here: there's no
 login, no user profile, no tracking identifiers, no crash/analytics
-reporting. The one persisted value (followed team IDs) never leaves the
-device — it's read by the app to decide what to fetch, and that's all.
+reporting. None of the three persisted values ever leaves the device —
+they're read by the app to decide what to fetch and what to show, and
+that's all.
 Network calls out are to ESPN's public endpoints, the RSS feeds listed in
 `lib/community-sources.ts` and `lib/feeds.ts`, made directly from the
 device the same way any RSS reader would, and — only where
@@ -143,16 +146,25 @@ it, decided at the same time as the feature, not bolted on later:
 |---|---|---|---|
 | Followed teams (`nofrills.favoriteTeamIds`) | AsyncStorage, via `lib/storage.ts` | An array of short `"<leagueId>:<teamId>"` strings — bounded by the number of teams in the leagues the app ships, a few hundred bytes at most | No eviction policy needed: a user can only follow teams that exist, so this grows with the league catalog, never with use. Revisit if the catalog ever spans many sports |
 | Onboarding-complete flag (`nofrills.hasOnboarded`) | AsyncStorage, via `lib/storage.ts` | A single boolean | Nothing to cap |
+| Last caught-up mark (`nofrills.lastCaughtUpAt`) | AsyncStorage, via `lib/storage.ts` | A single ISO-8601 timestamp, overwritten in place | Deliberately **not** a history. Only the most recent mark is kept, so this can't accumulate into a log of when you read. It has to persist at all because a brief that means "since you last looked" would otherwise reset to a fixed window on every relaunch — see `lib/caught-up.ts` |
 
-Both are written and read only through `lib/storage.ts`, which is the
+All three are written and read only through `lib/storage.ts`, which is the
 single chokepoint for anything touching disk — deliberately, so this
 table can't silently drift from reality. If a future feature needs
 persistence, it goes through that module, and it gets a row here at the
 same time it gets written, per the rule above.
 
-Neither value is transmitted off the device, and neither contains
+None of the three is transmitted off the device, and none contains
 anything identifying — team IDs are ESPN's public identifiers, the same
 for every user who follows that team.
+
+The caught-up mark is the one persisted value that is *behavioral* rather
+than a preference: it records something about when the app was used, not
+just how it's configured. That's worth naming explicitly rather than
+filing it alongside the other two. What keeps it proportionate is that
+it's a single timestamp replaced on each write — the app can tell "was
+there anything new since your last read", and cannot reconstruct a reading
+history from it, because no prior value survives.
 
 ### Format change: followed teams became league-qualified
 
