@@ -30,7 +30,10 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# Local env overrides. Note that `.env` itself is deliberately NOT ignored:
+# it carries the public verdicts URL and is meant to be shared. Anything
+# that shouldn't be committed belongs in `.env.local`, which Expo loads
+# ahead of `.env` — see the header comment in `.env` for the full rule.
 .env*.local
 
 # typescript

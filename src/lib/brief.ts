@@ -19,7 +19,7 @@ import { Article } from '@/lib/feeds';
 export const MAX_BRIEF_AGE_MS = 48 * 60 * 60 * 1000;
 
 /** Enough to be worth reading, few enough to finish. */
-export const DEFAULT_BRIEF_CAP = 12;
+const DEFAULT_BRIEF_CAP = 12;
 
 export interface BriefWindow {
   now: Date;

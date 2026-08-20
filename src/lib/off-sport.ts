@@ -132,7 +132,7 @@ export function detectOtherSport(
   return null;
 }
 
-export function isOtherSport(article: Pick<Article, 'title' | 'link'>, league: League): boolean {
+function isOtherSport(article: Pick<Article, 'title' | 'link'>, league: League): boolean {
   return detectOtherSport(article, league) !== null;
 }
 
