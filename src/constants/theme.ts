@@ -44,6 +44,12 @@ export const Colors = {
      * isn't ink. Introduced with the dropdown filter controls.
      */
     accentControl: '#2D6B7A',
+    /**
+     * The REPORTED claim badge's fill. Ink here, so in light mode it is
+     * the solid near-black block it has always been — see the dark
+     * entry for why this is a token rather than just `text`.
+     */
+    claimReported: '#1B1410',
   },
   dark: {
     text: '#ffffff',
@@ -54,6 +60,15 @@ export const Colors = {
     accent: '#C8664E',
     /** Lightened so the teal still reads against black. */
     accentControl: '#6FB6C6',
+    /**
+     * Not `text`, which would make this a solid *white* block. Reported
+     * is the commonest claim by a wide margin, and inverted alongside
+     * the two fixed hues it drowned them out: white on black is ~19:1
+     * where rumor and take sit near 3:1 against the page. This grey is
+     * tuned to that same weight, so the three badges read as three
+     * variants of one thing rather than one shout and two murmurs.
+     */
+    claimReported: '#55585C',
   },
 } as const;
 
@@ -78,14 +93,17 @@ export function withAlpha(color: string, alpha: number): string {
   return `${color}${byte}`;
 }
 
+/** Every claim badge's text, in both themes — see below. */
+const BADGE_INK = Colors.light.background;
+
 /**
  * The claim badge's two colours, per claim type.
  *
- * Reported is the app's default and stays ink-on-paper, which also means
- * it inverts with the theme. Rumor and take carry their own fixed hues
- * — a story is no more a rumor at night — so both keep the cream text
- * that reads on them in either mode rather than following `background`
- * to black.
+ * All three are a solid block of colour with cream text; only the
+ * reported block's fill follows the theme, through `claimReported`.
+ * Rumor and take carry their own fixed hues — a story is no more a rumor
+ * at night — so neither may follow `background` to black, which is why
+ * the text is a constant rather than a theme lookup.
  *
  * These are the one place a colour means "what kind of thing this is".
  * The accents above mean "what state this control is in"; keep the two
@@ -93,11 +111,11 @@ export function withAlpha(color: string, alpha: number): string {
  */
 export function claimBadgeColors(
   type: ClaimType,
-  theme: { text: string; background: string },
+  theme: { claimReported: string },
 ): { background: string; text: string } {
-  if (type === 'rumor') return { background: '#B5482E', text: Colors.light.background };
-  if (type === 'take') return { background: '#3A5A78', text: Colors.light.background };
-  return { background: theme.text, text: theme.background };
+  if (type === 'rumor') return { background: '#B5482E', text: BADGE_INK };
+  if (type === 'take') return { background: '#3A5A78', text: BADGE_INK };
+  return { background: theme.claimReported, text: BADGE_INK };
 }
 
 /**
