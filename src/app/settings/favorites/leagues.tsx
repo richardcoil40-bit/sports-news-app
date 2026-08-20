@@ -18,7 +18,7 @@ export default function FavoritesLeaguesScreen() {
 
   return (
     <ThemedView style={styles.flex}>
-      <Stack.Screen options={{ title: level }} />
+      <Stack.Screen options={{ title: level , headerBackTitle: 'Back' }} />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <View style={[styles.rule, { backgroundColor: theme.text }]} />
         {leagues.map((league) => (

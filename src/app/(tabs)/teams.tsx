@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { Logo } from '@/components/logo';
+import { SettingsButton } from '@/components/settings-button';
 import { SquareFrame, TeamSquare } from '@/components/team-square';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -150,6 +151,8 @@ export default function TeamsScreen() {
           <ThemedText type="title" style={styles.headerTitle}>
             Teams
           </ThemedText>
+          <View style={styles.headerSpacer} />
+          <SettingsButton />
         </View>
 
         {settling ? (
@@ -233,6 +236,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.2,
+  },
+  headerSpacer: {
+    flex: 1,
   },
   column: {
     gap: Spacing.two,

@@ -52,7 +52,7 @@ export default function FavoritesTeamsScreen() {
 
   return (
     <ThemedView style={styles.flex}>
-      <Stack.Screen options={{ title: league.displayName }} />
+      <Stack.Screen options={{ title: league.displayName , headerBackTitle: 'Back' }} />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <View style={styles.searchWrap}>
           <TextInput

@@ -42,7 +42,7 @@ export default function DeveloperScreen() {
 
   return (
     <ThemedView style={styles.flex}>
-      <Stack.Screen options={{ title: 'Developer Info' }} />
+      <Stack.Screen options={{ title: 'Developer Info', headerBackTitle: 'Back' }} />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.masthead}>

@@ -18,7 +18,7 @@ export default function DefinitionsScreen() {
 
   return (
     <ThemedView style={styles.flex}>
-      <Stack.Screen options={{ title: 'Definitions' }} />
+      <Stack.Screen options={{ title: 'Definitions', headerBackTitle: 'Back' }} />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           <ThemedText themeColor="textSecondary" style={styles.lede}>

@@ -152,7 +152,6 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           {/* Draws its own header from settings/_layout.tsx. */}
-          <Stack.Screen name="settings" options={{ headerShown: false }} />
           <Stack.Screen name="article" />
           <Stack.Screen name="team/[id]" />
           <Stack.Screen name="player/[id]" />

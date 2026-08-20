@@ -20,7 +20,7 @@ export default function FavoritesLevelsScreen() {
 
   return (
     <ThemedView style={styles.flex}>
-      <Stack.Screen options={{ title: sport }} />
+      <Stack.Screen options={{ title: sport , headerBackTitle: 'Back' }} />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <View style={[styles.rule, { backgroundColor: theme.text }]} />
         {levels.map((level) => {

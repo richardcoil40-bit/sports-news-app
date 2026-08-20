@@ -36,7 +36,7 @@ export default function SettingsScreen() {
 
   return (
     <ThemedView style={styles.flex}>
-      <Stack.Screen options={{ title: 'Settings' }} />
+      <Stack.Screen options={{ title: 'Settings', headerBackTitle: 'Back' }} />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <View style={[styles.rule, { backgroundColor: theme.text }]} />
         {ITEMS.map((item) => (

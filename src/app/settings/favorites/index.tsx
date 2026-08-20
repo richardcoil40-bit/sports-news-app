@@ -29,7 +29,7 @@ export default function FavoritesSportsScreen() {
 
   return (
     <ThemedView style={styles.flex}>
-      <Stack.Screen options={{ title: 'Favorites' }} />
+      <Stack.Screen options={{ title: 'Favorites', headerBackTitle: 'Back' }} />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <View style={[styles.rule, { backgroundColor: theme.text }]} />
         {sports.map((sport) => {

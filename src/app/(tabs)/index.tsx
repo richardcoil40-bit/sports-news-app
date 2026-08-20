@@ -7,6 +7,7 @@ import { ArticleCard } from '@/components/article-card';
 import { CaughtUpMarker } from '@/components/caught-up-marker';
 import { ChipRow } from '@/components/chip-row';
 import { CollapsibleSection } from '@/components/collapsible-section';
+import { SettingsButton } from '@/components/settings-button';
 import { Logo } from '@/components/logo';
 import { FilterBar } from '@/components/filter-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -222,6 +223,8 @@ export default function FeedScreen() {
             <ThemedText type="title" style={styles.headerTitle}>
               NOFRILLS
             </ThemedText>
+            <View style={styles.headerSpacer} />
+            <SettingsButton />
           </View>
           <ThemedText
             font="mono"
@@ -353,6 +356,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
+  },
+  headerSpacer: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 23,
