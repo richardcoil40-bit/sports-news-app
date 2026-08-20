@@ -58,8 +58,14 @@ this one, for the retention and privacy story.
 What this unlocks is narrower than what was originally scoped, though — see
 each numbered section below for which half of it actually landed:
 
-- **Better claim tagging (§3)** is the one item this genuinely delivers on,
-  and now does: the verdict already carries a `claim` field.
+- **Better claim tagging (§3)** is *not* delivered, despite an earlier
+  version of this line claiming it was. The verdict carries a `claim`
+  field and the worker fills it in, but nothing in the app reads it —
+  `isRelevantVerdict` uses `sport` and `kind` only, and the
+  REPORTED/RUMOR/TAKE badges still come from `claim-type.ts`'s local
+  regex. Same for the `teams` field. Both are paid for on every request
+  and thrown away on arrival. Wiring `claim` up is a small change and
+  the obvious next one; until someone makes it, this item is unbuilt.
 - **Sources that find themselves (§1)** only got the *filter* half — a
   headline verdict's `sport` and `kind` fields can refine what local rules
   already found. The *discovery* half (asking a news-search service what's
