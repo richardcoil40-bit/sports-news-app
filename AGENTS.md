@@ -35,8 +35,9 @@ inventing a new one:
   bypasses the read and refetches — that's what pull-to-refresh uses.
   `peek(key)` is a TTL-ignoring stale read, for fallback paths that
   would rather serve something old than nothing (`team-news-pool.ts`'s
-  hard cap). Sources that cache one global result rather than one per
-  entity use `createSingletonCache` from the same file.
+  hard cap). There is no singleton variant: the national feed pool is the
+  one caller that ever looked like one, and it's keyed per league in
+  `source-catalog.ts`, so every cache here is an entity cache.
   - **Error policy stays at the call site.** The helper caches whatever
     the loader resolves to and caches nothing when it rejects. If a
     source should degrade to empty *and* remember that, catch inside

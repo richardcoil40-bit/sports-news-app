@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useFavorites } from '@/hooks/use-favorites';
 import { useTeams } from '@/hooks/use-teams';
+import { favoriteKey } from '@/lib/favorite-keys';
 import { fetchMultiTeamFeed, FeedArticle } from '@/lib/multi-team-feed';
 
 /**
@@ -31,7 +32,12 @@ export function useFeed() {
   // Depend on the ID string rather than the array so the effect below
   // doesn't re-run on every render just because filter() produced a new
   // array with identical contents.
-  const followedKey = followedTeams.map((t) => t.id).join(',');
+  //
+  // League-qualified, for the same reason favorites are stored that way and
+  // espnCacheKey exists: an ESPN id is unique only within a sport. Keyed on
+  // the bare id, swapping team 130 in one league for team 130 in another
+  // produces an identical key, and the feed silently never reloads.
+  const followedKey = followedTeams.map((t) => favoriteKey(t.leagueId, t.id)).join(',');
 
   const load = useCallback(
     async (isRefresh: boolean) => {

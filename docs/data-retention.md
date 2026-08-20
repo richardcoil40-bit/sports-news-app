@@ -14,7 +14,7 @@ why the third one is a single overwritten timestamp rather than a log.
 
 Every other cache in the codebase is in-memory only and exists for the
 lifetime of the running app process. They're all created through
-`createEntityCache` / `createSingletonCache` in `lib/cache.ts` — one helper,
+`createEntityCache` in `lib/cache.ts` — one helper,
 so what's cached and for how long is visible in one place rather than
 hand-rolled per module:
 

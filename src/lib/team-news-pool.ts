@@ -208,7 +208,10 @@ function withHardCap(teamId: string, teamShortName: string, work: Promise<TeamNe
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       const stale = poolCache.peek(teamId);
-      console.log(
+      // warn, not log: unlike the DEBUG_TIMING lines above, this one is
+      // always on, because reaching it means a fetch outlived its own
+      // timeout — a real anomaly worth seeing without flipping a flag.
+      console.warn(
         `[pool] ⚠ hard cap hit for ${teamShortName} after ${HARD_CAP_MS}ms — one of the fetches never resolved despite its own timeout. Falling back to ${stale ? 'stale cached' : 'empty'} data.`,
       );
       resolve(stale ?? { articles: [], failedSources: ['Timed out'] });

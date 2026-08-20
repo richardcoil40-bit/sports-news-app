@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createEntityCache, createSingletonCache } from '@/lib/cache';
+import { createEntityCache } from '@/lib/cache';
 
 const tick = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -177,30 +177,5 @@ describe('createEntityCache', () => {
       const cache = createEntityCache<string, string>();
       expect(cache.peek('never-fetched')).toBeUndefined();
     });
-  });
-});
-
-describe('createSingletonCache', () => {
-  it('dedupes concurrent callers and caches the result', async () => {
-    const load = vi.fn(async () => {
-      await tick(10);
-      return 'value';
-    });
-    const cache = createSingletonCache<string>({ ttlMs: 10_000 });
-
-    await Promise.all([cache.get(load), cache.get(load)]);
-    await cache.get(load);
-
-    expect(load).toHaveBeenCalledTimes(1);
-  });
-
-  it('refetches on force', async () => {
-    const load = vi.fn(async () => 'value');
-    const cache = createSingletonCache<string>({ ttlMs: 10_000 });
-
-    await cache.get(load);
-    await cache.get(load, { force: true });
-
-    expect(load).toHaveBeenCalledTimes(2);
   });
 });
