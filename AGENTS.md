@@ -282,6 +282,23 @@ running locally with full access:
   folders are generated once and reused. Regenerate with
   `npx expo prebuild --clean` before rebuilding, or the change silently
   won't show up and will look like a bug.
+- **`prebuild --clean` deletes your code signing setup.** `ios/` and
+  `android/` are gitignored, so the Apple Development Team that Xcode
+  writes into `ios/*.xcodeproj/project.pbxproj` as `DEVELOPMENT_TEAM`
+  exists in exactly one place — a folder `--clean` removes. Nothing in
+  any tracked config can restore it, and there is no `app.json` field
+  that survives the round trip. The next build then fails on signing,
+  pointing at a certificate problem rather than at the prebuild that
+  actually caused it. Read the value out before regenerating:
+
+  ```
+  grep -o 'DEVELOPMENT_TEAM = [^;]*' ios/*.xcodeproj/project.pbxproj | sort -u
+  ```
+
+  Then set it again afterwards in Xcode (project → Signing &
+  Capabilities → Team). The entitlements file and `PrivacyInfo.xcprivacy`
+  regenerate correctly on their own; signing is the only thing that
+  doesn't.
 - **CocoaPods needs a UTF-8 locale, and fails obscurely without one.**
   If `pod install` dies with `Unicode Normalization not appropriate for
   ASCII-8BIT (Encoding::CompatibilityError)`, Ruby's default external
