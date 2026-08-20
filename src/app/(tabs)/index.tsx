@@ -5,11 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ArticleCard } from '@/components/article-card';
 import { CaughtUpMarker } from '@/components/caught-up-marker';
-import { ChipRow } from '@/components/chip-row';
 import { CollapsibleSection } from '@/components/collapsible-section';
+import { DropdownPill, type DropdownOption } from '@/components/dropdown-pill';
 import { SettingsButton } from '@/components/settings-button';
 import { Logo } from '@/components/logo';
-import { FilterBar } from '@/components/filter-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BRIEF_MODE } from '@/constants/flags';
@@ -47,7 +46,12 @@ export default function FeedScreen() {
   // drop them, rather than tagging them MICHIGAN or showing them bare.
   const { teams } = useTeams();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
-  const [teamFilter, setTeamFilter] = useState<string | null>(null);
+  // `null` is "all teams" — the default, and deliberately a different
+  // value from an explicit empty selection. The two look identical as a
+  // list of keys the moment you follow or unfollow anyone, and they mean
+  // opposite things: one is "you haven't filtered", the other is "you
+  // filtered everything out".
+  const [teamSelection, setTeamSelection] = useState<string[] | null>(null);
   const { ready: briefReady, cutoff, periodLabel, reachedEnd } = useBrief();
   // "Did the reader actually get to the bottom?" — two ways for that to be
   // true, and both are needed. Requiring a scroll alone means a brief that
@@ -75,23 +79,48 @@ export default function FeedScreen() {
     [articles, teams, followedTeams],
   );
 
-  // One chip per followed team, keyed the same league-qualified way
+  // One row per followed team, keyed the same league-qualified way
   // favorites are stored — an ESPN id is unique only within a sport, so a
   // bare id would collide the moment a second league ships.
-  const teamChips = useMemo(
-    () =>
-      followedTeams.map((team) => ({
-        key: favoriteKey(team.leagueId, team.id),
-        label: team.shortName,
-      })),
+  const teamKeys = useMemo(
+    () => followedTeams.map((team) => favoriteKey(team.leagueId, team.id)),
     [followedTeams],
   );
 
   // Derived rather than reset in an effect: unfollowing the team you were
-  // filtered to would otherwise leave a chip selected that no longer
-  // exists, and the feed would sit permanently empty with nothing on
-  // screen explaining why. Falling back to "all" fixes itself in render.
-  const activeTeam = teamChips.some((chip) => chip.key === teamFilter) ? teamFilter : null;
+  // filtered to would otherwise leave a selection referring to someone who
+  // is no longer there, and the feed would sit permanently empty with
+  // nothing on screen explaining why. Falling back to every team fixes
+  // itself in render.
+  //
+  // The fallback is conditioned on the *stored* selection being non-empty,
+  // which is what keeps it from swallowing a deliberate "no teams" — that
+  // state is reachable in one tap and reversible in one more, so it is a
+  // choice to respect rather than a mistake to correct.
+  const selectedKeys = useMemo(() => {
+    if (teamSelection === null) return teamKeys;
+    const live = teamSelection.filter((key) => teamKeys.includes(key));
+    return live.length === 0 && teamSelection.length > 0 ? teamKeys : live;
+  }, [teamSelection, teamKeys]);
+
+  const allTeamsSelected = selectedKeys.length === teamKeys.length;
+
+  const selectedTeams = useMemo(
+    () => followedTeams.filter((team) => selectedKeys.includes(favoriteKey(team.leagueId, team.id))),
+    [followedTeams, selectedKeys],
+  );
+
+  // Toggling one team works off the *effective* set rather than the stored
+  // one, so the first tap out of the default "all" state removes a team
+  // instead of leaving one selected — unchecking a row should uncheck that
+  // row and nothing else. Landing back on the full set collapses to `null`,
+  // so "all" always has exactly one representation.
+  const toggleTeam = (key: string) => {
+    const next = selectedKeys.includes(key)
+      ? selectedKeys.filter((k) => k !== key)
+      : [...selectedKeys, key];
+    setTeamSelection(next.length === teamKeys.length ? null : next);
+  };
 
   // Scoped on which team's *pool* surfaced the story, not on the team its
   // headline names. filterToTeams deliberately keeps articles whose
@@ -101,10 +130,10 @@ export default function FeedScreen() {
   // exactly the coverage this app works hardest to keep.
   const teamScoped = useMemo(
     () =>
-      activeTeam === null
+      allTeamsSelected
         ? classified
-        : classified.filter((a) => favoriteKey(a.leagueId, a.teamId) === activeTeam),
-    [classified, activeTeam],
+        : classified.filter((a) => selectedKeys.includes(favoriteKey(a.leagueId, a.teamId))),
+    [classified, allTeamsSelected, selectedKeys],
   );
 
   // Re-balanced after filtering, matching the team screen: the feed
@@ -132,14 +161,14 @@ export default function FeedScreen() {
   // above a collapsed section holding everything is nonsense, so an active
   // filter renders one plain list instead.
   //
-  // The team chips have to be in this condition for a second and harder
+  // The team selection has to be in this condition for a second and harder
   // reason. Reaching the finish line calls markCaughtUp(), which writes
   // one timestamp for the whole feed, not one per team. Sectioning a
   // team-filtered list would let scrolling to the bottom of *one* team's
   // stories advance the cutoff for all of them — silently retiring the
-  // other teams' unread news. Whatever else this row does, it must not be
-  // able to mark stories read that were never on screen.
-  const sectioned = BRIEF_MODE && claimFilter === 'all' && activeTeam === null && cutoff !== null;
+  // other teams' unread news. Whatever else that control does, it must not
+  // be able to mark stories read that were never on screen.
+  const sectioned = BRIEF_MODE && claimFilter === 'all' && allTeamsSelected && cutoff !== null;
 
   const sections = useMemo(
     () => (cutoff ? splitBrief(visibleArticles, cutoff) : null),
@@ -193,17 +222,57 @@ export default function FeedScreen() {
     </View>
   );
 
-  // What the empty states and the header line call the current scope.
-  const scopeLabel = teamChips.find((chip) => chip.key === activeTeam)?.label ?? 'your teams';
+  // What the empty states call the current scope. Only names a team when
+  // exactly one is selected — "no reported news for Nebraska and two
+  // others" is worse than not naming them.
+  const scopeLabel = selectedTeams.length === 1 ? selectedTeams[0].shortName : 'your teams';
 
-  // The chip row scrolls away with the list header, so this line is the
-  // only always-visible statement of what you're looking at — which is
-  // why it narrows with the filter rather than always listing everyone.
+  // The teams the feed is actually showing, which is the whole followed
+  // set until you narrow it. Listing the *selection* rather than the
+  // follow list is what makes this line agree with the pill above it.
   const subtitle = !hasFollowedTeams
     ? 'No teams followed yet'
-    : activeTeam
-      ? `${scopeLabel} only`
-      : followedTeams.map((team) => team.shortName).join(' · ');
+    : selectedTeams.length === 0
+      ? 'No teams selected'
+      : selectedTeams.map((team) => team.shortName).join(' · ');
+
+  // 0 selected → NO TEAMS; all → ALL TEAMS; one or two → their names; more
+  // than that → the first plus a count, which is the only form that can't
+  // outgrow the pill. The pill shrinks before the claim filter does, so
+  // this degrades rather than pushing its neighbour off screen.
+  const teamsPillLabel =
+    selectedTeams.length === 0
+      ? 'No teams'
+      : allTeamsSelected
+        ? 'All teams'
+        : selectedTeams.length <= 2
+          ? selectedTeams.map((team) => team.shortName).join(', ')
+          : `${selectedTeams[0].shortName} +${selectedTeams.length - 1}`;
+
+  // "All teams" leads, as a select-all/clear-all shortcut rather than a
+  // team of its own — checked only when every team below it is.
+  const ALL_TEAMS_KEY = '__all__';
+  const teamOptions: DropdownOption[] = [
+    { key: ALL_TEAMS_KEY, label: 'All teams', selected: allTeamsSelected },
+    ...followedTeams.map((team) => {
+      const key = favoriteKey(team.leagueId, team.id);
+      return { key, label: team.shortName, selected: selectedKeys.includes(key) };
+    }),
+  ];
+
+  const claimOptions: DropdownOption[] = CLAIM_FILTER_TABS.map((tab) => ({
+    key: tab.key,
+    label: tab.label,
+    selected: tab.key === claimFilter,
+  }));
+
+  // "Filter" while the axis is off, the type's own name once it's on —
+  // the tab list's own "All" label would read as a claim type rather than
+  // as the absence of one.
+  const claimPillLabel =
+    claimFilter === 'all'
+      ? 'Filter'
+      : (CLAIM_FILTER_TABS.find((tab) => tab.key === claimFilter)?.label ?? 'Filter');
 
   return (
     <ThemedView style={styles.flex}>
@@ -233,7 +302,55 @@ export default function FeedScreen() {
             numberOfLines={1}>
             {subtitle}
           </ThemedText>
+
+          {/*
+            Which teams, then what kind of claim — scope above refinement,
+            left to right. Both pills sit in the header rather than in the
+            list, so the controls stay put while the feed scrolls under
+            them; that is the main thing this redesign changed.
+
+            The teams pill is the one that gives way when the two don't
+            fit: its label is user data of unbounded length and already
+            degrades to "+N", where the claim filter's four labels are
+            fixed and short.
+          */}
+          {hasFollowedTeams ? (
+            <View style={styles.controls}>
+              <DropdownPill
+                label={teamsPillLabel}
+                active={!allTeamsSelected}
+                options={teamOptions}
+                onSelect={(key) =>
+                  key === ALL_TEAMS_KEY
+                    ? setTeamSelection(allTeamsSelected ? [] : null)
+                    : toggleTeam(key)
+                }
+                accessibilityLabel="Filter by team"
+                style={styles.teamsPill}
+              />
+              <DropdownPill
+                label={claimPillLabel}
+                active={claimFilter !== 'all'}
+                options={claimOptions}
+                onSelect={(key) => setClaimFilter(key as ClaimFilter)}
+                align="right"
+                panelWidth={190}
+                closeOnSelect
+                accessibilityLabel="Filter by claim type"
+                style={styles.claimPill}
+              />
+            </View>
+          ) : null}
         </View>
+
+        {/*
+          The rule the design puts under the controls. The list draws one
+          between every pair of cards but none above the first, so without
+          this the header floats over the feed with no edge of its own.
+        */}
+        {hasFollowedTeams ? (
+          <View style={[styles.separator, { backgroundColor: theme.text }]} />
+        ) : null}
 
         {!ready || loading || (BRIEF_MODE && !briefReady) ? (
           <View style={styles.centered}>
@@ -266,25 +383,6 @@ export default function FeedScreen() {
             ItemSeparatorComponent={() => (
               <View style={[styles.separator, { backgroundColor: theme.text }]} />
             )}
-            ListHeaderComponent={
-              <View>
-                {/*
-                  Which teams, then what kind of claim — scope above
-                  refinement. Hidden below two followed teams, where the
-                  row would be an "All" chip beside the only team there
-                  is, and the header line already names them.
-                */}
-                {teamChips.length > 1 ? (
-                  <ChipRow
-                    items={teamChips}
-                    active={activeTeam}
-                    onChange={setTeamFilter}
-                    allLabel="All teams"
-                  />
-                ) : null}
-                <FilterBar tabs={CLAIM_FILTER_TABS} active={claimFilter} onChange={setClaimFilter} />
-              </View>
-            }
             ListFooterComponent={
               sectioned && sections ? (
                 <View>
@@ -322,7 +420,14 @@ export default function FeedScreen() {
               sectioned ? null : (
               <View style={styles.centered}>
                 <ThemedText themeColor="textSecondary" style={styles.centeredText}>
-                  {claimFilter === 'rumor'
+                  {/*
+                    Clearing the team selection is one tap, so it has to
+                    say so — "nothing new for your teams" would blame the
+                    news for an empty list the reader just caused.
+                  */}
+                  {selectedTeams.length === 0
+                    ? 'No teams selected. Pick one from the teams filter above.'
+                    : claimFilter === 'rumor'
                     ? `No rumors about ${scopeLabel} right now.`
                     : claimFilter === 'take'
                       ? `No takes about ${scopeLabel} right now.`
@@ -351,6 +456,20 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.two,
     paddingBottom: 14,
     gap: Spacing.one,
+  },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  // Shrinks and truncates before its neighbour does.
+  teamsPill: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  claimPill: {
+    flexShrink: 0,
   },
   headerRow: {
     flexDirection: 'row',

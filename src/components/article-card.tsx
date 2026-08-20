@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { claimBadgeColors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ClaimType, claimTypeLabel } from '@/lib/claim-type';
 import { Article } from '@/lib/feeds';
@@ -46,6 +46,7 @@ export function ArticleCard({
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
   const duplicateCount = duplicates?.length ?? 0;
+  const badge = claimBadgeColors(claimType, theme);
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
@@ -69,6 +70,11 @@ export function ArticleCard({
             to read as a different *kind* of thing from the tier on the line
             below — rendered as more grey text, "NEWSROOM · RUMOR" reads as
             one label rather than two judgments about different things.
+
+            Coloured per claim type, so the three are told apart at a
+            glance rather than only by reading the word. The hues live in
+            claimBadgeColors beside the palette, not here: the article
+            screen draws the same badge and the two must not drift.
           */}
           <TouchableOpacity
             onPress={() => onPressClaim?.(claimType)}
@@ -77,8 +83,8 @@ export function ArticleCard({
             accessibilityRole={onPressClaim ? 'button' : undefined}
             accessibilityLabel={`${claimTypeLabel(claimType)} — filter by this`}
             hitSlop={6}
-            style={[styles.claimChip, { backgroundColor: theme.text }]}>
-            <ThemedText font="mono" style={[styles.chipText, { color: theme.background }]}>
+            style={[styles.claimChip, { backgroundColor: badge.background }]}>
+            <ThemedText font="mono" style={[styles.chipText, { color: badge.text }]}>
               {claimTypeLabel(claimType)}
             </ThemedText>
           </TouchableOpacity>

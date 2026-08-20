@@ -208,12 +208,33 @@ Established and intentional — don't drift from it without discussing:
     known and accepted: the native header ignores `headerTitleStyle`'s
     family on iOS 26, so nav-bar text is the system sans. Anything the
     design must control belongs in-screen, not in header options.
-- **Newsprint palette, one accent.** Warm cream paper, near-black ink,
-  and brick red used *only* for links and the single outbound CTA — not
-  for emphasis, not for state. `Colors.light` carries the OKLCH original
-  beside each hex; retune there. `Colors.dark` was out of scope for the
-  redesign and is still the old neutral scale.
+- **Newsprint palette, two accents with separate jobs.** Warm cream
+  paper, near-black ink, and brick red used *only* for links and the
+  single outbound CTA — not for emphasis, not for state. State is the
+  second accent's job: `accentControl` (teal) marks a control that is
+  actively narrowing something — a filter pill, a checked row — and
+  nothing else. Keeping them apart is what lets the rule about red hold.
+  `Colors.light` carries the OKLCH original beside each hex; retune
+  there. `Colors.dark` was out of scope for the redesign and is still the
+  old neutral scale, plus lightened accents.
+  - Translucent control fills are derived with `withAlpha(theme.text, …)`
+    rather than written as the blended grey. Same call, both themes.
+- **Claim badges are the one colour that means "what kind of thing".**
+  `claimBadgeColors` in `theme.ts`: reported stays ink-on-paper and
+  inverts with the theme, rumor and take carry fixed hues with cream text
+  in both modes. Two screens draw that badge (`article-card.tsx` and
+  `article.tsx`) — neither should hard-code the hues.
 - Sharp corners. `borderRadius: 0` on every card, thumbnail, and logo.
+  - **Two exceptions, both from design handoffs, both scoped to a single
+    component.** `DropdownPill` — a 20pt pill and an 8pt panel: rounding
+    is what makes the pills read as controls floating over the page
+    rather than as more newsprint boxes, which is the entire point of
+    moving them into the header. `TeamBadgeRow` — a 12pt row and a
+    circular 38pt badge: the row is a container for a name, not a card of
+    content, and the badge is round because a team crest is.
+  - A rounded article card or thumbnail is still a drift. If a third
+    exception starts to look necessary, that's the point to reopen the
+    rule rather than to add to this list.
 - Metadata text (sources, dates, positions) is uppercase, ~10.5–11px,
   with slight letter-spacing. Keep tracking near 0.2 on *serif* caps:
   iOS measures the run without the trailing letter-space and clips the
@@ -221,7 +242,9 @@ Established and intentional — don't drift from it without discussing:
 - Separators are bold — 1.5px using `theme.text`, not a hairline, and
   full-bleed rather than inset. The team tabs share a `Separator`
   component (`src/components/team-tabs/shared.tsx`) rather than
-  re-declaring the style; use it where it fits.
+  re-declaring the style; use it where it fits. `DropdownPill`'s internal
+  row dividers are the exception: 1px at 14% ink, because inside a small
+  panel the bold rule reads as a border rather than a divider.
 - Each team's real color (from `fetchTeamColor`) is the only per-screen
   accent, applied as a left-edge bar via `AccentRow` rather than
   reskinning components.

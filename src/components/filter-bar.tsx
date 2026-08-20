@@ -18,10 +18,13 @@ import { useTheme } from '@/hooks/use-theme';
  * Generic over the filter value so there is one of these rather than one
  * per axis — which axis it drives is the caller's business.
  *
- * On the home feed it sits beneath a ChipRow narrowing the same list by
- * team. That row is a deliberately different-looking control for the
- * same reason given above: two filter axes drawn as matching bars would
- * read as one.
+ * The team screen is now the only caller. The home feed used to stack
+ * this under a ChipRow of teams, and the pair is what DropdownPill
+ * replaced: two filters collapsed into two pills that fit on one line,
+ * which also let them move up into the header instead of scrolling away
+ * with the list. Nothing here needs changing to match — this one still
+ * sits under the News/Schedule/Players bar, where the argument above for
+ * looking unlike it still holds.
  */
 export function FilterBar<T extends string>({
   tabs,

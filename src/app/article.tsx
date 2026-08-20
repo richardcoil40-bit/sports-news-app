@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Logo } from '@/components/logo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { claimBadgeColors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ClaimType, claimTypeLabel } from '@/lib/claim-type';
 import { formatRelativeTime } from '@/lib/format';
@@ -52,8 +52,17 @@ export default function ArticleScreen() {
             */}
             <View style={styles.metaRow}>
               {params.claimType ? (
-                <View style={[styles.claimChip, { backgroundColor: theme.text }]}>
-                  <ThemedText font="mono" style={[styles.chipText, { color: theme.background }]}>
+                <View
+                  style={[
+                    styles.claimChip,
+                    { backgroundColor: claimBadgeColors(params.claimType, theme).background },
+                  ]}>
+                  <ThemedText
+                    font="mono"
+                    style={[
+                      styles.chipText,
+                      { color: claimBadgeColors(params.claimType, theme).text },
+                    ]}>
                     {claimTypeLabel(params.claimType)}
                   </ThemedText>
                 </View>
