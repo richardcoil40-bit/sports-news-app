@@ -2,9 +2,21 @@
   {
     "id": "big-ten",
     "displayName": "Big Ten",
+    "sport": "Football",
+    "level": "College",
     "espnSport": "football",
     "espnLeaguePath": "college-football",
     "espnGroup": 5,
+    "seasonStartMonth": 8
+  },
+  {
+    "id": "nfl",
+    "displayName": "NFL",
+    "sport": "Football",
+    "level": "NFL",
+    "status": "planned",
+    "espnSport": "football",
+    "espnLeaguePath": "nfl",
     "seasonStartMonth": 8
   }
 ]

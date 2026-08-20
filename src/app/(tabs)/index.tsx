@@ -5,7 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ArticleCard } from '@/components/article-card';
 import { CaughtUpMarker } from '@/components/caught-up-marker';
+import { ChipRow } from '@/components/chip-row';
 import { CollapsibleSection } from '@/components/collapsible-section';
+import { SettingsButton } from '@/components/settings-button';
 import { Logo } from '@/components/logo';
 import { FilterBar } from '@/components/filter-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -25,6 +27,7 @@ import {
 } from '@/lib/claim-type';
 import { caughtUpMessage, splitBrief } from '@/lib/brief';
 import { clusterArticles, leadsWithDuplicates } from '@/lib/cluster';
+import { favoriteKey } from '@/lib/favorite-keys';
 import { Article } from '@/lib/feeds';
 import { balanceBySource } from '@/lib/source-balance';
 import { filterToTeams, withTeamMentions } from '@/lib/team-mentions';
@@ -44,6 +47,7 @@ export default function FeedScreen() {
   // drop them, rather than tagging them MICHIGAN or showing them bare.
   const { teams } = useTeams();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
+  const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const { ready: briefReady, cutoff, periodLabel, reachedEnd } = useBrief();
   // "Did the reader actually get to the bottom?" — two ways for that to be
   // true, and both are needed. Requiring a scroll alone means a brief that
@@ -71,6 +75,38 @@ export default function FeedScreen() {
     [articles, teams, followedTeams],
   );
 
+  // One chip per followed team, keyed the same league-qualified way
+  // favorites are stored — an ESPN id is unique only within a sport, so a
+  // bare id would collide the moment a second league ships.
+  const teamChips = useMemo(
+    () =>
+      followedTeams.map((team) => ({
+        key: favoriteKey(team.leagueId, team.id),
+        label: team.shortName,
+      })),
+    [followedTeams],
+  );
+
+  // Derived rather than reset in an effect: unfollowing the team you were
+  // filtered to would otherwise leave a chip selected that no longer
+  // exists, and the feed would sit permanently empty with nothing on
+  // screen explaining why. Falling back to "all" fixes itself in render.
+  const activeTeam = teamChips.some((chip) => chip.key === teamFilter) ? teamFilter : null;
+
+  // Scoped on which team's *pool* surfaced the story, not on the team its
+  // headline names. filterToTeams deliberately keeps articles whose
+  // mentionedTeam is null — those reach the pool by nickname ("Huskers")
+  // and name no team in the text, which is most of the local beat
+  // writer's output. Matching on mentionedTeam would silently drop
+  // exactly the coverage this app works hardest to keep.
+  const teamScoped = useMemo(
+    () =>
+      activeTeam === null
+        ? classified
+        : classified.filter((a) => favoriteKey(a.leagueId, a.teamId) === activeTeam),
+    [classified, activeTeam],
+  );
+
   // Re-balanced after filtering, matching the team screen: the feed
   // arrives already balanced across all sources, but once a claim type is
   // filtered out that balance no longer describes what's left, so the
@@ -86,16 +122,24 @@ export default function FeedScreen() {
   const visibleArticles = useMemo(
     () =>
       balanceBySource(
-        leadsWithDuplicates(clusterArticles(filterByClaimType(classified, claimFilter))),
+        leadsWithDuplicates(clusterArticles(filterByClaimType(teamScoped, claimFilter))),
       ),
-    [classified, claimFilter],
+    [teamScoped, claimFilter],
   );
 
   // Only when nothing is filtered. Catching up and browsing are different
   // intents: filtering to RUMOR and still seeing a "you're caught up" line
   // above a collapsed section holding everything is nonsense, so an active
   // filter renders one plain list instead.
-  const sectioned = BRIEF_MODE && claimFilter === 'all' && cutoff !== null;
+  //
+  // The team chips have to be in this condition for a second and harder
+  // reason. Reaching the finish line calls markCaughtUp(), which writes
+  // one timestamp for the whole feed, not one per team. Sectioning a
+  // team-filtered list would let scrolling to the bottom of *one* team's
+  // stories advance the cutoff for all of them — silently retiring the
+  // other teams' unread news. Whatever else this row does, it must not be
+  // able to mark stories read that were never on screen.
+  const sectioned = BRIEF_MODE && claimFilter === 'all' && activeTeam === null && cutoff !== null;
 
   const sections = useMemo(
     () => (cutoff ? splitBrief(visibleArticles, cutoff) : null),
@@ -149,9 +193,17 @@ export default function FeedScreen() {
     </View>
   );
 
-  const subtitle = hasFollowedTeams
-    ? followedTeams.map((team) => team.shortName).join(' · ')
-    : 'No teams followed yet';
+  // What the empty states and the header line call the current scope.
+  const scopeLabel = teamChips.find((chip) => chip.key === activeTeam)?.label ?? 'your teams';
+
+  // The chip row scrolls away with the list header, so this line is the
+  // only always-visible statement of what you're looking at — which is
+  // why it narrows with the filter rather than always listing everyone.
+  const subtitle = !hasFollowedTeams
+    ? 'No teams followed yet'
+    : activeTeam
+      ? `${scopeLabel} only`
+      : followedTeams.map((team) => team.shortName).join(' · ');
 
   return (
     <ThemedView style={styles.flex}>
@@ -163,10 +215,16 @@ export default function FeedScreen() {
             whose news it holds.
           */}
           <View style={styles.headerRow}>
-            <Logo size={16} />
+            <Logo
+              size={16}
+              onPress={() => router.push('/settings')}
+              accessibilityLabel="Settings"
+            />
             <ThemedText type="title" style={styles.headerTitle}>
               NOFRILLS
             </ThemedText>
+            <View style={styles.headerSpacer} />
+            <SettingsButton />
           </View>
           <ThemedText
             font="mono"
@@ -188,7 +246,7 @@ export default function FeedScreen() {
             </ThemedText>
             <TouchableOpacity
               style={[styles.button, { backgroundColor: theme.text }]}
-              onPress={() => router.push('/teams')}>
+              onPress={() => router.push('/settings/favorites')}>
               <ThemedText font="mono" style={[styles.buttonText, { color: theme.background }]}>
                 Pick your teams
               </ThemedText>
@@ -209,7 +267,23 @@ export default function FeedScreen() {
               <View style={[styles.separator, { backgroundColor: theme.text }]} />
             )}
             ListHeaderComponent={
-              <FilterBar tabs={CLAIM_FILTER_TABS} active={claimFilter} onChange={setClaimFilter} />
+              <View>
+                {/*
+                  Which teams, then what kind of claim — scope above
+                  refinement. Hidden below two followed teams, where the
+                  row would be an "All" chip beside the only team there
+                  is, and the header line already names them.
+                */}
+                {teamChips.length > 1 ? (
+                  <ChipRow
+                    items={teamChips}
+                    active={activeTeam}
+                    onChange={setTeamFilter}
+                    allLabel="All teams"
+                  />
+                ) : null}
+                <FilterBar tabs={CLAIM_FILTER_TABS} active={claimFilter} onChange={setClaimFilter} />
+              </View>
             }
             ListFooterComponent={
               sectioned && sections ? (
@@ -249,12 +323,12 @@ export default function FeedScreen() {
               <View style={styles.centered}>
                 <ThemedText themeColor="textSecondary" style={styles.centeredText}>
                   {claimFilter === 'rumor'
-                    ? 'No rumors about your teams right now.'
+                    ? `No rumors about ${scopeLabel} right now.`
                     : claimFilter === 'take'
-                      ? 'No takes about your teams right now.'
+                      ? `No takes about ${scopeLabel} right now.`
                       : claimFilter === 'reported'
-                        ? 'No reported news for your teams right now.'
-                        : 'Nothing new for your teams right now.'}
+                        ? `No reported news for ${scopeLabel} right now.`
+                        : `Nothing new for ${scopeLabel} right now.`}
                 </ThemedText>
               </View>
               )
@@ -282,6 +356,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
+  },
+  headerSpacer: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 23,

@@ -8,7 +8,6 @@ import { Logo } from '@/components/logo';
 import { TabBar } from '@/components/tab-bar';
 import { NewsTab } from '@/components/team-tabs/news-tab';
 import { PlayersTab } from '@/components/team-tabs/players-tab';
-import { RecruitingTab } from '@/components/team-tabs/recruiting-tab';
 import { ScheduleTab } from '@/components/team-tabs/schedule-tab';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -24,7 +23,6 @@ import {
   filterByClaimType,
   withClaimTypes,
 } from '@/lib/claim-type';
-import { filterRecruitingArticles } from '@/lib/recruiting';
 import { Player, fetchTeamRoster } from '@/lib/roster';
 import { fetchGameOdds, fetchTeamSchedule, ScheduledGame } from '@/lib/schedule';
 import { clusterArticles, leadsWithDuplicates } from '@/lib/cluster';
@@ -34,13 +32,12 @@ import { fetchTeamColor } from '@/lib/team-color';
 import { StatLeader, fetchTeamStatLeaders } from '@/lib/team-leaders';
 import { fetchTeamNewsPool } from '@/lib/team-news-pool';
 
-type TabKey = 'news' | 'schedule' | 'players' | 'recruiting';
+type TabKey = 'news' | 'schedule' | 'players';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'news', label: 'News' },
   { key: 'schedule', label: 'Schedule' },
   { key: 'players', label: 'Players' },
-  { key: 'recruiting', label: 'Recruiting' },
 ];
 
 /** The roster and its stat leaders load together, so they're one async unit. */
@@ -56,6 +53,8 @@ export default function TeamScreen() {
     name: string;
     shortName: string;
     logoUrl: string;
+    /** The color the Teams grid already resolved, when arriving from it. */
+    accent?: string;
   }>();
 
   const [tab, setTab] = useState<TabKey>('news');
@@ -63,7 +62,12 @@ export default function TeamScreen() {
   // opponents and neighbours, and those should be tagged as such.
   const { teams } = useTeams();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
-  const [teamColor, setTeamColor] = useState<string | null>(null);
+  // Seeded from the caller when it has already resolved this team's
+  // color. The fetch below still runs and returns the same cached value;
+  // what this avoids is the first frame painting the placeholder grey and
+  // then snapping to the team's color a tick later — visible on every
+  // entry, and directly against the point of the grid's expand animation.
+  const [teamColor, setTeamColor] = useState<string | null>(params.accent || null);
 
   const news = useAsync<Article[]>(async () => {
     const pool = await fetchTeamNewsPool(params.id, params.shortName || params.name);
@@ -105,13 +109,13 @@ export default function TeamScreen() {
   }, [params.id]);
 
   // Each tab's data loads only the first time that tab is opened, not all
-  // four up front — the schedule tab in particular fires one odds request
+  // three up front — the schedule tab in particular fires one odds request
   // per upcoming game, and doing that (plus news plus roster) all at once
   // on mount was slow and stole bandwidth from whatever screen you tapped
   // into next (e.g. a player's news). load() is a no-op once a tab's data
   // has arrived, so re-running this on every tab change is free.
   useEffect(() => {
-    if (tab === 'news' || tab === 'recruiting') news.load();
+    if (tab === 'news') news.load();
     if (tab === 'schedule') schedule.load();
     // The players tab ranks by article mentions, so it needs the news pool too.
     if (tab === 'players') {
@@ -121,10 +125,10 @@ export default function TeamScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, params.id, params.shortName, params.name]);
 
-  // Classified and tagged once here, so the News and Recruiting tabs
-  // share one pass and every card has its badges whether or not a filter
-  // is active. Tagged against the whole league because this team's pool
-  // carries stories about its opponents and neighbours too.
+  // Classified and tagged once here, so every card has its badges
+  // whether or not a filter is active. Tagged against the whole league
+  // because this team's pool carries stories about its opponents and
+  // neighbours too.
   const classifiedNews = useMemo(
     () => withTeamMentions(withClaimTypes(news.data ?? []), teams),
     [news.data, teams],
@@ -138,11 +142,6 @@ export default function TeamScreen() {
         leadsWithDuplicates(clusterArticles(filterByClaimType(classifiedNews, claimFilter))),
       ),
     [classifiedNews, claimFilter],
-  );
-
-  const recruitingArticles = useMemo(
-    () => filterRecruitingArticles(classifiedNews),
-    [classifiedNews],
   );
 
   const notablePlayers = useMemo(
@@ -246,16 +245,6 @@ export default function TeamScreen() {
             loading={(roster.data === null || news.data === null) && !roster.error && !news.error}
             error={roster.error}
             onOpenPlayer={openPlayer}
-            accentColor={teamColor}
-          />
-        ) : null}
-
-        {tab === 'recruiting' ? (
-          <RecruitingTab
-            articles={recruitingArticles}
-            loading={news.data === null && !news.error}
-            error={news.error}
-            onOpenArticle={openArticle}
             accentColor={teamColor}
           />
         ) : null}

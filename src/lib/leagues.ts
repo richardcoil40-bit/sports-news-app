@@ -13,6 +13,33 @@ export interface League {
   id: string;
   /** e.g. "Big Ten" — safe to show in UI. */
   displayName: string;
+  /**
+   * Where this league sits in the Sport → Level → League picker, as
+   * display strings: e.g. sport "Football", level "College".
+   *
+   * Optional, and deliberately so. A league that arrives without them is
+   * still a perfectly good league — it can be fetched, cached and read —
+   * it just can't be filed in the picker, which is a smaller loss than
+   * dropping it. The picker groups the unfiled under their own heading
+   * rather than hiding them.
+   *
+   * These are display strings rather than ids because they exist only to
+   * be grouped and shown. Nothing keys a cache or builds a URL off them,
+   * so there is nothing for a rename to break.
+   */
+  sport?: string;
+  level?: string;
+  /**
+   * `"planned"` means the app knows this league exists but cannot yet
+   * serve it — no sources, no verified team list. The picker shows it,
+   * greyed and unselectable, so the shape of what's coming is visible
+   * without pretending it works. Anything else, including absent, means
+   * available.
+   *
+   * This is what lets the NFL appear in the hierarchy as data rather
+   * than as a hardcoded placeholder row in the picker.
+   */
+  status?: 'planned';
   /** ESPN's sport segment, e.g. "football". */
   espnSport: string;
   /** ESPN's league segment, e.g. "college-football". */

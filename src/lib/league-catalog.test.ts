@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_LEAGUE, getLeague, getLeagues, parseLeagues } from '@/lib/league-catalog';
+import {
+  DEFAULT_LEAGUE,
+  getCatalogLeagues,
+  getLeague,
+  getLeagues,
+  parseLeagues,
+} from '@/lib/league-catalog';
 
 /**
  * `parseLeagues` is the gate a remote catalog will eventually come through,
@@ -18,6 +24,46 @@ const VALID = {
   espnGroup: 4,
   seasonStartMonth: 8,
 };
+
+describe('parseLeagues — picker taxonomy', () => {
+  it('keeps sport and level when present', () => {
+    const [league] = parseLeagues([{ ...VALID, sport: 'Football', level: 'College' }]);
+    expect(league.sport).toBe('Football');
+    expect(league.level).toBe('College');
+  });
+
+  it('keeps a league that declares neither, rather than dropping it', () => {
+    const [league] = parseLeagues([VALID]);
+    expect(league.id).toBe('big-12');
+    expect(league.sport).toBeUndefined();
+  });
+
+  it('marks a planned league and treats anything else as available', () => {
+    const [planned] = parseLeagues([{ ...VALID, status: 'planned' }]);
+    expect(planned.status).toBe('planned');
+
+    // A typo in a field unrelated to whether the league works must not
+    // be able to hide a working league.
+    const [junk] = parseLeagues([{ ...VALID, status: 'plnned' }]);
+    expect(junk.status).toBeUndefined();
+  });
+});
+
+describe('the bundled catalog', () => {
+  it('offers only leagues the app can actually serve', () => {
+    expect(getLeagues().every((league) => league.status !== 'planned')).toBe(true);
+  });
+
+  it('shows planned leagues to the picker', () => {
+    const planned = getCatalogLeagues().filter((league) => league.status === 'planned');
+    expect(planned.length).toBeGreaterThan(0);
+    expect(getLeagues()).not.toEqual(getCatalogLeagues());
+  });
+
+  it('never defaults to a planned league', () => {
+    expect(DEFAULT_LEAGUE.status).toBeUndefined();
+  });
+});
 
 describe('parseLeagues', () => {
   it('parses a well-formed catalog', () => {

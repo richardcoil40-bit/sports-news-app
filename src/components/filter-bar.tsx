@@ -10,14 +10,18 @@ import { useTheme } from '@/hooks/use-theme';
  *
  * Deliberately lighter than TabBar even though both are segmented
  * controls: on the team screen this sits directly beneath the main
- * News/Schedule/Players/Recruiting bar, and two identical-looking rows
+ * News/Schedule/Players bar, and two identical-looking rows
  * stacked on top of each other would read as one confusing block. This
  * one is smaller, outlined, and inset so it reads as a refinement of the
  * list below it rather than as navigation.
  *
  * Generic over the filter value so there is one of these rather than one
- * per axis — the app deliberately shows a single filter row, and which
- * axis it drives is the caller's business.
+ * per axis — which axis it drives is the caller's business.
+ *
+ * On the home feed it sits beneath a ChipRow narrowing the same list by
+ * team. That row is a deliberately different-looking control for the
+ * same reason given above: two filter axes drawn as matching bars would
+ * read as one.
  */
 export function FilterBar<T extends string>({
   tabs,

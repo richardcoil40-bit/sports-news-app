@@ -24,6 +24,10 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function optionalString(value: unknown): string | undefined {
+  return isNonEmptyString(value) ? value.trim() : undefined;
+}
+
 function optionalInteger(value: unknown, { min, max }: { min: number; max: number }): number | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'number' || !Number.isInteger(value)) return undefined;
@@ -56,6 +60,13 @@ function parseLeague(raw: unknown): League | null {
   return {
     id: record.id.trim(),
     displayName: record.displayName.trim(),
+    sport: optionalString(record.sport),
+    level: optionalString(record.level),
+    // Anything that isn't exactly "planned" — including junk — reads as
+    // available. The failure this way round is a league offered before
+    // it works; the other way round is a working league hidden by a typo
+    // in a field that has nothing to do with whether it works.
+    status: record.status === 'planned' ? 'planned' : undefined,
     espnSport: record.espnSport.trim(),
     espnLeaguePath: record.espnLeaguePath.trim(),
     espnGroup: optionalInteger(record.espnGroup, { min: 0, max: Number.MAX_SAFE_INTEGER }),
@@ -95,14 +106,31 @@ export function parseLeagues(raw: unknown): League[] {
  */
 const BUNDLED: League[] = parseLeagues(bundledLeagues);
 
-if (BUNDLED.length === 0) {
+if (BUNDLED.filter((league) => league.status !== 'planned').length === 0) {
   // Only reachable if the checked-in JSON is broken, which the tests cover.
   // Loud rather than silent: an empty catalog is an app with no teams, and
-  // that must never look like a network problem.
-  throw new Error('Bundled league catalog is empty or invalid — check src/lib/__data__/leagues.json');
+  // that must never look like a network problem. Counted over the
+  // *available* leagues, since a catalog of nothing but planned ones is
+  // just as empty from the app's point of view.
+  throw new Error('Bundled league catalog has no available leagues — check src/lib/__data__/leagues.json');
 }
 
+/**
+ * The leagues the app can actually serve. This is what every data path
+ * should use — a planned league has no sources and no verified team
+ * list, so handing one to a fetch produces an empty screen that looks
+ * like a bug.
+ */
 export function getLeagues(): League[] {
+  return BUNDLED.filter((league) => league.status !== 'planned');
+}
+
+/**
+ * Every league in the catalog, planned ones included. Only the Favorites
+ * picker wants this: it shows what's coming as well as what works, which
+ * is the one place a league you can't select is worth seeing.
+ */
+export function getCatalogLeagues(): League[] {
   return BUNDLED;
 }
 
@@ -116,4 +144,4 @@ export function getLeague(id: string): League | null {
  * the point of this file is that no module should have a conference baked
  * into it, and a default named BIG_TEN in eight call sites is exactly that.
  */
-export const DEFAULT_LEAGUE: League = BUNDLED[0];
+export const DEFAULT_LEAGUE: League = getLeagues()[0];
