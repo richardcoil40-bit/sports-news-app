@@ -16,8 +16,12 @@ import { useTheme } from '@/hooks/use-theme';
  * list below it rather than as navigation.
  *
  * Generic over the filter value so there is one of these rather than one
- * per axis — the app deliberately shows a single filter row, and which
- * axis it drives is the caller's business.
+ * per axis — which axis it drives is the caller's business.
+ *
+ * On the home feed it sits beneath a ChipRow narrowing the same list by
+ * team. That row is a deliberately different-looking control for the
+ * same reason given above: two filter axes drawn as matching bars would
+ * read as one.
  */
 export function FilterBar<T extends string>({
   tabs,
