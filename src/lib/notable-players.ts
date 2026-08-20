@@ -1,30 +1,33 @@
 import { Article } from '@/lib/feeds';
+import { compilePlayerMatcher } from '@/lib/player-match';
 import { Player } from '@/lib/roster';
 import { StatLeader } from '@/lib/team-leaders';
-import { compileWordBoundary } from '@/lib/text-match';
 
 export interface RankedPlayer {
   player: Player;
-  /** Number of articles in the pool that name this player. */
+  /**
+   * How many articles this player's own screen will list — i.e. the length
+   * of what matchArticlesForPlayer returns, not a separate tally. The card
+   * shows this number, and the two drifting apart is what made a card read
+   * "4 articles" over a screen listing 2.
+   */
   mentions: number;
   score: number;
   /** Short explanation of why they're on the list, shown in the UI. */
   detail: string;
+  /**
+   * Whether surname-only matching was allowed for this player, which the
+   * player's screen has to be told so it can reproduce the same list. False
+   * when a teammate shares the surname — see below.
+   */
+  matchesSurname: boolean;
 }
 
 const FULL_NAME_POINTS = 3;
 const LAST_NAME_POINTS = 1;
 
-/** Short surnames produce too many false hits to be worth matching alone. */
-const MIN_LAST_NAME_LENGTH = 5;
-
-/**
- * Suffixes and trailing periods break word-boundary matching ("Jr." ends in a
- * non-word character, so a trailing \b can never match), so names are trimmed
- * to a form that matches how articles actually write them.
- */
-function normalizeName(name: string): string {
-  return name.replace(/\.+$/, '').trim();
+function leaderPoints(leader: StatLeader | undefined): number {
+  return leader ? Math.max(5 - leader.rank, 1) : 0;
 }
 
 function countLastNames(roster: Player[]): Map<string, number> {
@@ -66,43 +69,37 @@ export function rankNotablePlayers(
   }
 
   const ranked: RankedPlayer[] = roster.map((player) => {
-    const fullName = normalizeName(player.fullName);
-    const firstLast = normalizeName(`${player.firstName} ${player.lastName}`);
-    const lastName = normalizeName(player.lastName);
+    // Two players named Smith and a "Smith" in a headline is not evidence
+    // about either of them. The length floor lives in the matcher; only
+    // this half depends on the roster.
+    const matchesSurname = (lastNameCounts.get(player.lastName.toLowerCase()) ?? 0) === 1;
+    const match = compilePlayerMatcher(player, { allowLastName: matchesSurname });
+    const leaderEntry = bestLeaderEntry.get(player.id);
 
-    const lastNameIsUsable =
-      lastName.length >= MIN_LAST_NAME_LENGTH &&
-      (lastNameCounts.get(player.lastName.toLowerCase()) ?? 0) === 1;
-
-    // Compiled once per player, not once per (player, article) pair — this
-    // loop runs roster.length × articles.length times, and rebuilding a
-    // RegExp on every single comparison (as wordBoundaryMatch does) adds up
-    // to tens of thousands of compiles for a full roster against a full
-    // pool. Reusing a compiled pattern here is the same match, much faster.
-    const fullNameRegex = compileWordBoundary(fullName);
-    const firstLastRegex = firstLast !== fullName ? compileWordBoundary(firstLast) : null;
-    const lastNameRegex = lastNameIsUsable ? compileWordBoundary(lastName) : null;
-
-    let mentions = 0;
-    let score = 0;
+    let named = 0;
+    let surnameOnly = 0;
 
     for (const haystack of haystacks) {
-      const namedInFull = fullNameRegex.test(haystack) || (firstLastRegex?.test(haystack) ?? false);
-
-      if (namedInFull) {
-        mentions += 1;
-        score += FULL_NAME_POINTS;
-      } else if (lastNameRegex?.test(haystack)) {
-        mentions += 1;
-        score += LAST_NAME_POINTS;
-      }
+      const kind = match(haystack);
+      if (kind === 'full') named += 1;
+      else if (kind === 'last') surnameOnly += 1;
     }
 
-    const leaderEntry = bestLeaderEntry.get(player.id);
-    if (leaderEntry) {
+    // Counted the way matchArticlesForPlayer builds its list — precise
+    // matches when there are any, surname-only matches otherwise — because
+    // that list is what the number is a summary *of*. Adding the two
+    // buckets together (which is what this used to do) counts articles the
+    // player's screen then declines to show.
+    const mentions = named > 0 ? named : surnameOnly;
+
+    // Scoring is a separate question and still weighs both buckets: a
+    // surname mention is weak evidence of notability, not no evidence, and
+    // this number decides ordering rather than being shown to anyone.
+    const score =
+      named * FULL_NAME_POINTS +
+      surnameOnly * LAST_NAME_POINTS +
       // Top of a category counts for more than third in it.
-      score += Math.max(5 - leaderEntry.rank, 1);
-    }
+      leaderPoints(leaderEntry);
 
     const detail = mentions > 0
       ? `${mentions} article${mentions === 1 ? '' : 's'}`
@@ -110,7 +107,7 @@ export function rankNotablePlayers(
         ? `${leaderEntry.category.replace(/ Leader$/, '')} · ${leaderEntry.displayValue}`
         : '';
 
-    return { player, mentions, score, detail };
+    return { player, mentions, score, detail, matchesSurname };
   });
 
   const sorted = ranked

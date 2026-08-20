@@ -61,13 +61,73 @@ export function compileTeamMatchers(teams: Team[]): CompiledTeam[] {
       const names = [team.name, team.location, team.shortName]
         .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
         .sort((a, b) => b.length - a.length);
-      return { team, patterns: names.map(compileWordBoundary) };
+      // Global, because detectTeams masks each name it finds rather than
+      // just testing for it — see the nesting note there.
+      return { team, patterns: names.map((n) => compileWordBoundary(n, 'gi')) };
     })
     .sort((a, b) => {
       const longest = (c: CompiledTeam) =>
         Math.max(...[c.team.name, c.team.location, c.team.shortName].map((n) => n?.length ?? 0));
       return longest(b) - longest(a);
     });
+}
+
+/**
+ * Every team named, split by where it was named: title first, then teaser,
+ * longest name first within each. Kept separate because the two carry
+ * different weight — see detectTeam — and flattened by detectTeams for
+ * callers that don't care.
+ *
+ * Each name found is masked out of the text before shorter ones are tried,
+ * which is what keeps nesting honest in both directions. Testing alone
+ * would tag "Michigan State beats Purdue" as naming Michigan too; masking
+ * only the first occurrence would miss the Michigan in "Michigan State
+ * beats Michigan". So every occurrence of a matched name is blanked, and
+ * whatever still matches afterwards was genuinely named on its own.
+ */
+function namedTeams(
+  article: Pick<Article, 'title' | 'description'>,
+  compiled: CompiledTeam[],
+): { inTitle: Team[]; inDescription: Team[] } {
+  const title = typeof article.title === 'string' ? article.title : '';
+  const description = typeof article.description === 'string' ? article.description : '';
+
+  const groups: Team[][] = [];
+  const seen = new Set<Team>();
+
+  for (const haystack of [title, description]) {
+    const found: Team[] = [];
+    groups.push(found);
+    if (!haystack) continue;
+
+    // Masked as this loop goes, so each team is matched against what the
+    // longer names before it didn't already claim.
+    let remaining = haystack;
+    for (const { team, patterns } of compiled) {
+      let named = false;
+      for (const pattern of patterns) {
+        const masked = remaining.replace(pattern, (match) => ' '.repeat(match.length));
+        if (masked === remaining) continue;
+        remaining = masked;
+        named = true;
+      }
+      if (named && !seen.has(team)) {
+        seen.add(team);
+        found.push(team);
+      }
+    }
+  }
+
+  return { inTitle: groups[0], inDescription: groups[1] };
+}
+
+/** Every team an article names, title matches first. */
+export function detectTeams(
+  article: Pick<Article, 'title' | 'description'>,
+  compiled: CompiledTeam[],
+): Team[] {
+  const { inTitle, inDescription } = namedTeams(article, compiled);
+  return [...inTitle, ...inDescription];
 }
 
 /**
@@ -83,17 +143,7 @@ export function detectTeam(
   article: Pick<Article, 'title' | 'description'>,
   compiled: CompiledTeam[],
 ): Team | null {
-  const title = typeof article.title === 'string' ? article.title : '';
-  const description = typeof article.description === 'string' ? article.description : '';
-
-  for (const haystack of [title, description]) {
-    if (!haystack) continue;
-    for (const { team, patterns } of compiled) {
-      if (patterns.some((pattern) => pattern.test(haystack))) return team;
-    }
-  }
-
-  return null;
+  return detectTeams(article, compiled)[0] ?? null;
 }
 
 /**
@@ -128,11 +178,72 @@ function sourceTeam(article: Taggable, byKey: Map<string, Team>): Team | null {
 /** An article with the team it names attached, computed once. */
 export type Tagged<T> = T & { mentionedTeam: Team | null };
 
-export function withTeamMentions<T extends Taggable>(articles: T[], teams: Team[]): Tagged<T>[] {
+/**
+ * Tags each article with the team it's about.
+ *
+ * `preferred` decides which one wins when a story names more than one, and
+ * exists for the home feed: a Nebraska follower's "Nebraska vs. Michigan
+ * State preview" names both, and longest-name-first would credit it to
+ * Michigan State — which then reads as someone else's story sitting in your
+ * feed, and gets dropped outright by filterToTeams below. Crediting it to
+ * the team you actually follow is both the truer tag and what keeps it in
+ * the feed. Screens with no such vantage point (the team screen, which
+ * tags a single team's pool against the whole league) pass nothing and get
+ * plain longest-first order.
+ */
+export function withTeamMentions<T extends Taggable>(
+  articles: T[],
+  teams: Team[],
+  preferred: Team[] = [],
+): Tagged<T>[] {
   const compiled = compileTeamMatchers(teams);
   const byKey = new Map(teams.map((team) => [teamKey(team.leagueId, team.id), team]));
-  return articles.map((article) => ({
-    ...article,
-    mentionedTeam: detectTeam(article, compiled) ?? sourceTeam(article, byKey),
-  }));
+  const preferredKeys = new Set(preferred.map((team) => teamKey(team.leagueId, team.id)));
+
+  // Preference applies *within* a haystack, never across one: a team named
+  // in the title outranks a followed team mentioned in the teaser, because
+  // that's the same reason detectTeam reads the title first at all. A
+  // ranking piece on Ohio State doesn't become a Michigan story by
+  // mentioning Michigan in its second sentence.
+  const pick = (named: Team[]): Team | undefined =>
+    named.find((team) => preferredKeys.has(teamKey(team.leagueId, team.id))) ?? named[0];
+
+  return articles.map((article) => {
+    const { inTitle, inDescription } = namedTeams(article, compiled);
+    return {
+      ...article,
+      mentionedTeam: pick(inTitle) ?? pick(inDescription) ?? sourceTeam(article, byKey),
+    };
+  });
+}
+
+/**
+ * Drops articles that are about a team outside `teams`.
+ *
+ * The home feed needs this because a team's news pool is assembled from
+ * that team's *sources*, and a team-scoped source is taken wholesale — so
+ * Corn Nation's "Michigan State Spartans 2026 Football Preview" arrives in
+ * a Nebraska follower's pool tagged MICHIGAN ST, correctly, and then sat
+ * there. "Came from a followed team's source" and "is about a followed
+ * team" are different questions, and only the second one is what the feed
+ * claims to answer.
+ *
+ * An untagged article is kept, not dropped. Null means no team name was
+ * found anywhere in it, which for everything but a team-scoped source
+ * means it got into the pool by matching something this module doesn't
+ * read — most often a nickname, since the local paper is filtered on
+ * "Huskers" as well as "Nebraska" (see team-nicknames.ts). Those are the
+ * followed team's own stories; dropping them would quietly delete the
+ * local beat writer from the feed.
+ */
+export function filterToTeams<T extends { mentionedTeam: Team | null }>(
+  articles: T[],
+  teams: Team[],
+): T[] {
+  const keys = new Set(teams.map((team) => teamKey(team.leagueId, team.id)));
+  return articles.filter(
+    (article) =>
+      !article.mentionedTeam ||
+      keys.has(teamKey(article.mentionedTeam.leagueId, article.mentionedTeam.id)),
+  );
 }

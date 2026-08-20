@@ -13,7 +13,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useAsync } from '@/hooks/use-async';
 import { useTheme } from '@/hooks/use-theme';
-import { withClaimTypes } from '@/lib/claim-type';
+import { ClaimType, withClaimTypes } from '@/lib/claim-type';
 import { Article } from '@/lib/feeds';
 import { matchArticlesForPlayer } from '@/lib/player-match';
 import { fetchPlayerSeasonStats, PlayerStatCategory } from '@/lib/player-stats';
@@ -31,7 +31,9 @@ export default function PlayerScreen() {
   const params = useLocalSearchParams<{
     id: string;
     fullName: string;
+    firstName: string;
     lastName: string;
+    surnameMatch: string;
     jersey: string;
     position: string;
     headshotUrl: string;
@@ -47,7 +49,14 @@ export default function PlayerScreen() {
     // newsroom + national feeds), and cached there, so this is usually
     // instant rather than a fresh fetch of everything.
     const pool = await fetchTeamNewsPool(params.teamId, params.teamShortName || params.teamName);
-    return matchArticlesForPlayer(pool.articles, params);
+    // The same matcher, with the same inputs, that produced the article
+    // count on the card you tapped — see notable-players.ts. Surname
+    // matching is opt-*out*: '0' is the Players tab saying a teammate
+    // shares this surname, and anything else (including arriving here by
+    // deep link, with no such judgement to pass on) leaves it enabled.
+    return matchArticlesForPlayer(pool.articles, params, {
+      allowLastName: params.surnameMatch !== '0',
+    });
   });
 
   // Classified once here rather than inside NewsTab, so the tab stays a pure
@@ -75,20 +84,28 @@ export default function PlayerScreen() {
     // stick. Depending on the specific primitive values actually used here
     // fixes that.
     //
-    // fullName and lastName look unused by the fetch, and are not — they're
-    // what matchArticlesForPlayer() matches on, via the whole params object.
+    // The name fields look unused by the fetch, and are not — they're what
+    // matchArticlesForPlayer() matches on, via the whole params object.
     // Narrow this list to just the three team fields and the screen silently
     // stops re-matching when you navigate from one player to another on the
     // same team: same pool, same cache hit, stale matches.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.teamId, params.teamShortName, params.teamName, params.fullName, params.lastName]);
+  }, [
+    params.teamId,
+    params.teamShortName,
+    params.teamName,
+    params.fullName,
+    params.firstName,
+    params.lastName,
+    params.surnameMatch,
+  ]);
 
   useEffect(() => {
     stats.reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
-  const openArticle = (article: Article) => {
+  const openArticle = (article: Article & { claimType?: ClaimType }) => {
     router.push({
       pathname: '/article',
       params: {
@@ -98,6 +115,7 @@ export default function PlayerScreen() {
         publishedAt: article.publishedAt ?? '',
         description: article.description,
         imageUrl: article.imageUrl ?? '',
+        claimType: article.claimType ?? '',
       },
     });
   };
@@ -117,13 +135,16 @@ export default function PlayerScreen() {
             <Image source={{ uri: params.headshotUrl }} style={styles.headshot} contentFit="cover" />
           ) : (
             <View style={[styles.headshot, styles.headshotPlaceholder, { backgroundColor: theme.backgroundElement }]}>
-              <ThemedText type="title">{params.jersey || '—'}</ThemedText>
+              {/* A number, not a name — mono, so it sits square in the tile. */}
+              <ThemedText type="title" font="mono">
+                {params.jersey || '—'}
+              </ThemedText>
             </View>
           )}
           <ThemedText type="title" style={styles.name}>
             {params.fullName}
           </ThemedText>
-          <ThemedText themeColor="textSecondary" style={styles.meta}>
+          <ThemedText font="mono" themeColor="textSecondary" style={styles.meta}>
             {[params.position, params.teamName].filter(Boolean).join(' · ')}
           </ThemedText>
         </View>

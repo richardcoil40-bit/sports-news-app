@@ -6,7 +6,6 @@ import { Centered, Separator, tabStyles } from '@/components/team-tabs/shared';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { RankedPlayer } from '@/lib/notable-players';
-import { Player } from '@/lib/roster';
 
 export function PlayersTab({
   players,
@@ -18,7 +17,12 @@ export function PlayersTab({
   players: RankedPlayer[];
   loading: boolean;
   error: boolean;
-  onOpenPlayer: (p: Player) => void;
+  /**
+   * The whole ranked entry, not just the player: the screen it opens has to
+   * be told how this row's article count was matched, or it lists a
+   * different set of articles than the count promises.
+   */
+  onOpenPlayer: (entry: RankedPlayer) => void;
   accentColor: string | null;
 }) {
   if (loading) {
@@ -38,7 +42,7 @@ export function PlayersTab({
           <PlayerRow
             player={item.player}
             detail={item.detail}
-            onPress={() => onOpenPlayer(item.player)}
+            onPress={() => onOpenPlayer(item)}
           />
         </AccentRow>
       )}

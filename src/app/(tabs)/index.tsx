@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArticleCard } from '@/components/article-card';
 import { CaughtUpMarker } from '@/components/caught-up-marker';
 import { CollapsibleSection } from '@/components/collapsible-section';
-import { ContextStrip } from '@/components/context-strip';
 import { Logo } from '@/components/logo';
 import { FilterBar } from '@/components/filter-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -14,22 +13,21 @@ import { ThemedView } from '@/components/themed-view';
 import { BRIEF_MODE } from '@/constants/flags';
 import { Spacing } from '@/constants/theme';
 import { useBrief } from '@/hooks/use-brief';
-import { useContextStrip } from '@/hooks/use-context-strip';
 import { useFeed } from '@/hooks/use-feed';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
 import {
   ClaimFilter,
+  ClaimType,
   CLAIM_FILTER_TABS,
   filterByClaimType,
   withClaimTypes,
 } from '@/lib/claim-type';
 import { caughtUpMessage, splitBrief } from '@/lib/brief';
-import { detectMove } from '@/lib/program-moves';
 import { clusterArticles, leadsWithDuplicates } from '@/lib/cluster';
 import { Article } from '@/lib/feeds';
 import { balanceBySource } from '@/lib/source-balance';
-import { withTeamMentions } from '@/lib/team-mentions';
+import { filterToTeams, withTeamMentions } from '@/lib/team-mentions';
 
 /**
  * The home screen is a feed of the teams you follow, not a directory of
@@ -40,9 +38,10 @@ export default function FeedScreen() {
   const theme = useTheme();
   const { articles, loading, refreshing, error, refresh, followedTeams, hasFollowedTeams, ready } =
     useFeed();
-  // The whole league, not just followed teams: a Michigan follower's pool
-  // legitimately contains Michigan State stories, and tagging those
-  // MICHIGAN would be worse than not tagging them at all.
+  // The whole league, not just followed teams. A Michigan follower's pool
+  // legitimately contains Michigan State stories, and recognising them as
+  // such is the point: it's what lets the feed tag them honestly and then
+  // drop them, rather than tagging them MICHIGAN or showing them bare.
   const { teams } = useTeams();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
   const { ready: briefReady, cutoff, periodLabel, reachedEnd } = useBrief();
@@ -56,14 +55,20 @@ export default function FeedScreen() {
   const briefWasSeen = () =>
     hasScrolled.current ||
     (viewportHeight.current > 0 && contentHeight.current <= viewportHeight.current);
-  const contexts = useContextStrip(followedTeams);
 
   // Classified and tagged once, then filtered — every card needs both for
   // its badges whether or not a filter is active, so this is one pass
   // instead of one per consumer.
+  //
+  // Followed teams are passed twice, for the two halves of one idea: as the
+  // tie-breaker for a story naming several teams, then as the set the feed
+  // is narrowed to. A pool is built from a followed team's *sources*, and a
+  // team site previewing next week's opponent is still that site's own
+  // post — so without this, someone else's team shows up in your feed.
   const classified = useMemo(
-    () => withTeamMentions(withClaimTypes(articles), teams),
-    [articles, teams],
+    () =>
+      filterToTeams(withTeamMentions(withClaimTypes(articles), teams, followedTeams), followedTeams),
+    [articles, teams, followedTeams],
   );
 
   // Re-balanced after filtering, matching the team screen: the feed
@@ -86,8 +91,6 @@ export default function FeedScreen() {
     [classified, claimFilter],
   );
 
-  // Widened to Article because it is also handed the duplicates a cluster
-  // absorbed, which carry no team attribution of their own.
   // Only when nothing is filtered. Catching up and browsing are different
   // intents: filtering to RUMOR and still seeing a "you're caught up" line
   // above a collapsed section holding everything is nonsense, so an active
@@ -99,22 +102,13 @@ export default function FeedScreen() {
     [visibleArticles, cutoff],
   );
 
-  // Out of season the strip shows each team's latest roster or staff
-  // move, taken from news already loaded rather than fetched again. Keyed
-  // by team so a strip row can find its own.
-  const offseasonHeadlines = useMemo(() => {
-    const byTeam: Record<string, string | undefined> = {};
-    for (const article of classified) {
-      const team = article.mentionedTeam;
-      if (!team) continue;
-      const key = `${team.leagueId}:${team.id}`;
-      if (byTeam[key] || !detectMove(article)) continue;
-      byTeam[key] = article.title;
-    }
-    return byTeam;
-  }, [classified]);
-
-  const openArticle = (article: Article) => {
+  // Widened past Article because the detail screen shows the same claim
+  // chip the row does, and re-classifying there would repeat a few hundred
+  // regex tests for a story that was already classified to get here. It is
+  // also handed the duplicates a cluster absorbed, which carry neither a
+  // classification nor a team attribution of their own — hence optional,
+  // and the chip is simply omitted for them.
+  const openArticle = (article: Article & { claimType?: ClaimType }) => {
     router.push({
       pathname: '/article',
       params: {
@@ -124,6 +118,7 @@ export default function FeedScreen() {
         publishedAt: article.publishedAt ?? '',
         description: article.description,
         imageUrl: article.imageUrl ?? '',
+        claimType: article.claimType ?? '',
       },
     });
   };
@@ -143,6 +138,17 @@ export default function FeedScreen() {
     />
   );
 
+  // The collapsed sections render their rows themselves rather than
+  // through a list, so they have to draw the rule the FlatList's
+  // separator draws for the brief above — without one under the section
+  // header, whose own bottom border already closes that edge.
+  const renderSectionCard = (item: (typeof visibleArticles)[number], index: number) => (
+    <View key={item.link}>
+      {index > 0 ? <View style={[styles.separator, { backgroundColor: theme.text }]} /> : null}
+      {renderCard(item)}
+    </View>
+  );
+
   const subtitle = hasFollowedTeams
     ? followedTeams.map((team) => team.shortName).join(' · ')
     : 'No teams followed yet';
@@ -151,13 +157,22 @@ export default function FeedScreen() {
     <ThemedView style={styles.flex}>
       <SafeAreaView style={styles.flex} edges={['top']}>
         <View style={styles.header}>
+          {/*
+            The wordmark rather than a screen title: the tab bar below
+            already says which screen this is, and the subtitle line says
+            whose news it holds.
+          */}
           <View style={styles.headerRow}>
-            <Logo size={22} />
+            <Logo size={16} />
             <ThemedText type="title" style={styles.headerTitle}>
-              Your Feed
+              NOFRILLS
             </ThemedText>
           </View>
-          <ThemedText themeColor="textSecondary" style={styles.subtitle} numberOfLines={1}>
+          <ThemedText
+            font="mono"
+            themeColor="textSecondary"
+            style={styles.subtitle}
+            numberOfLines={1}>
             {subtitle}
           </ThemedText>
         </View>
@@ -174,7 +189,7 @@ export default function FeedScreen() {
             <TouchableOpacity
               style={[styles.button, { backgroundColor: theme.text }]}
               onPress={() => router.push('/teams')}>
-              <ThemedText type="smallBold" style={[styles.buttonText, { color: theme.background }]}>
+              <ThemedText font="mono" style={[styles.buttonText, { color: theme.background }]}>
                 Pick your teams
               </ThemedText>
             </TouchableOpacity>
@@ -194,28 +209,17 @@ export default function FeedScreen() {
               <View style={[styles.separator, { backgroundColor: theme.text }]} />
             )}
             ListHeaderComponent={
-              <View>
-                <ContextStrip contexts={contexts} offseasonHeadlines={offseasonHeadlines} />
-                <FilterBar
-                  tabs={CLAIM_FILTER_TABS}
-                  active={claimFilter}
-                  onChange={setClaimFilter}
-                />
-              </View>
+              <FilterBar tabs={CLAIM_FILTER_TABS} active={claimFilter} onChange={setClaimFilter} />
             }
             ListFooterComponent={
               sectioned && sections ? (
                 <View>
                   <CaughtUpMarker message={caughtUpMessage(sections, periodLabel)} />
                   <CollapsibleSection label="rumors & takes" count={sections.chatter.length}>
-                    {sections.chatter.map((item) => (
-                      <View key={item.link}>{renderCard(item)}</View>
-                    ))}
+                    {sections.chatter.map(renderSectionCard)}
                   </CollapsibleSection>
                   <CollapsibleSection label="earlier" count={sections.earlier.length}>
-                    {sections.earlier.map((item) => (
-                      <View key={item.link}>{renderCard(item)}</View>
-                    ))}
+                    {sections.earlier.map(renderSectionCard)}
                   </CollapsibleSection>
                 </View>
               ) : null
@@ -269,10 +273,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: 20,
     paddingTop: Spacing.two,
-    paddingBottom: Spacing.two,
-    gap: Spacing.half,
+    paddingBottom: 14,
+    gap: Spacing.one,
   },
   headerRow: {
     flexDirection: 'row',
@@ -280,14 +284,14 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   headerTitle: {
-    fontSize: 24,
-    lineHeight: 30,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontSize: 23,
+    lineHeight: 28,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   subtitle: {
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     fontSize: 11,
   },
   centered: {
@@ -308,8 +312,9 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     fontSize: 12,
+    fontWeight: '700',
   },
   listContent: {
     flexGrow: 1,
@@ -317,6 +322,5 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 1.5,
-    marginLeft: Spacing.three,
   },
 });
