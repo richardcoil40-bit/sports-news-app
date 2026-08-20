@@ -47,6 +47,43 @@ licensing relationship. Purely informational use (news, scores,
 schedules) staying low-risk; commercial use of the marks themselves
 would not.
 
+## Donations
+
+There is a Developer Info screen in Settings with a donation link on
+it. As of 2026-08-20 the URL is deliberately unset and the button
+hides itself while it is, so nothing is solicited today — what exists
+is the surface, not a live ask.
+
+The mechanism, when it is switched on, is a plain external link handed
+to `WebBrowser.openBrowserAsync`, the same hand-off the Article screen
+already uses. No payment SDK, no card details, nothing new stored or
+collected — the zero-collection posture in `docs/data-retention.md`
+holds unchanged, which is why that document needs no edit for this.
+
+**The trigger point is Apple App Review, and nothing before it.** The
+app isn't on the App Store or public TestFlight, so Apple's guidelines
+don't apply — and that stays true for *internal* TestFlight testing
+(up to 100 named testers via App Store Connect), which isn't reviewed
+at all. What changes the picture is an external/public TestFlight beta
+or a full App Store submission. At that point Apple generally requires
+in-app purchase for tips and donations rather than an external link,
+with only a narrow and inconsistently-enforced exception for a
+personal, unconditional peer-to-peer gift not tied to any content or
+feature.
+
+So: **the link must be removed or converted to Apple in-app purchase
+before any external TestFlight beta or App Store submission.** Not
+before — and not after.
+
+Worth reading alongside the team-name/logo question above if this ever
+gets a real legal review before a public launch. A donation link is a
+small step away from framing this as a purely non-commercial passion
+project, though it doesn't monetize team content directly, which keeps
+it low risk. It also interacts with the next section: money entering
+the picture at all is the thing that moves this out of the lowest-risk
+category, so switching the URL on is a decision worth making
+deliberately rather than incidentally.
+
 ## The pattern underneath all of this
 
 Risk scales with distribution and money, not with what the code does.
