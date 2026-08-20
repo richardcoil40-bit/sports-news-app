@@ -5,7 +5,7 @@ import { playerTabStyles } from '@/components/player-tabs/shared';
 import { Centered, Separator, tabStyles } from '@/components/team-tabs/shared';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { Classified } from '@/lib/claim-type';
+import { ClaimType, Classified } from '@/lib/claim-type';
 import { Article } from '@/lib/feeds';
 
 export function NewsTab({
@@ -19,7 +19,7 @@ export function NewsTab({
   matches: Classified<Article>[];
   loading: boolean;
   error: boolean;
-  onOpenArticle: (a: Article) => void;
+  onOpenArticle: (a: Article & { claimType?: ClaimType }) => void;
 }) {
   if (loading) {
     return (

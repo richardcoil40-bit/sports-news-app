@@ -7,7 +7,7 @@ import { Logo } from '@/components/logo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TeamRow } from '@/components/team-row';
-import { Fonts, Spacing } from '@/constants/theme';
+import { Spacing, fontFamilyFor } from '@/constants/theme';
 import { useFavorites } from '@/hooks/use-favorites';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
@@ -120,10 +120,11 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.two,
   },
   headerTitle: {
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 23,
+    lineHeight: 28,
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.2,
   },
   searchWrap: {
     paddingHorizontal: Spacing.three,
@@ -135,7 +136,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     fontSize: 14,
-    fontFamily: Fonts.mono,
+    fontFamily: fontFamilyFor('mono'),
   },
   centered: {
     flex: 1,

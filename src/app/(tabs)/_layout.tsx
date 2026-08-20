@@ -11,6 +11,10 @@ export default function AppTabs() {
     <NativeTabs
       backgroundColor={colors.background}
       indicatorColor={colors.backgroundElement}
+      // Left alone the selected tab takes the OS tint, which is the one
+      // blue in an app that otherwise has exactly one accent colour.
+      tintColor={colors.text}
+      iconColor={{ default: colors.textSecondary, selected: colors.text }}
       labelStyle={{ selected: { color: colors.text } }}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>News</NativeTabs.Trigger.Label>

@@ -5,7 +5,7 @@ import { ArticleCard } from '@/components/article-card';
 import { FilterBar } from '@/components/filter-bar';
 import { Centered, Separator, tabStyles } from '@/components/team-tabs/shared';
 import { ThemedText } from '@/components/themed-text';
-import { ClaimFilter, CLAIM_FILTER_TABS, Classified } from '@/lib/claim-type';
+import { ClaimFilter, ClaimType, CLAIM_FILTER_TABS, Classified } from '@/lib/claim-type';
 import { WithDuplicates } from '@/lib/cluster';
 import { Article } from '@/lib/feeds';
 
@@ -23,7 +23,7 @@ export function NewsTab({
   error: boolean;
   claimFilter: ClaimFilter;
   onChangeClaim: (next: ClaimFilter) => void;
-  onOpenArticle: (a: Article) => void;
+  onOpenArticle: (a: Article & { claimType?: ClaimType }) => void;
   accentColor: string | null;
 }) {
   if (loading) {

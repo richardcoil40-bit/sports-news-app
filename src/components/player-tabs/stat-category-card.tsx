@@ -17,7 +17,9 @@ export function StatCategoryCard({ category }: { category: PlayerStatCategory })
       <View style={styles.statTiles}>
         {category.labels.map((label, index) => (
           <View key={label + index} style={styles.statTile}>
-            <ThemedText type="title" style={styles.statValue}>
+            {/* Mono for the figures: a row of stat tiles only reads as a
+                row if the digits are the same width in every one. */}
+            <ThemedText type="title" font="mono" style={styles.statValue}>
               {category.values[index] ?? '—'}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" style={styles.statLabel}>

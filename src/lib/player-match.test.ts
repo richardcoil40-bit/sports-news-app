@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { Article } from '@/lib/feeds';
-import { matchArticlesForPlayer } from '@/lib/player-match';
+import { compilePlayerMatcher, matchArticlesForPlayer } from '@/lib/player-match';
 
 function article(id: string, title: string, description = ''): Article {
   return {
@@ -105,5 +105,72 @@ describe('matchArticlesForPlayer', () => {
     expect(
       matchArticlesForPlayer(articles, { fullName: 'Bob Smith', lastName: 'Smith' }),
     ).toEqual([]);
+  });
+});
+
+describe('the middle-name / suffix case', () => {
+  // ESPN's fullName is not what a beat writer types. Matching it alone
+  // misses every article about the player, and — before the count and the
+  // list shared a matcher — did so on only one of the two screens.
+  it('matches first + last when fullName carries a middle name', () => {
+    const articles = [article('a', 'Dylan Raiola throws for 300')];
+
+    expect(
+      matchArticlesForPlayer(articles, {
+        fullName: 'Dylan James Raiola',
+        firstName: 'Dylan',
+        lastName: 'Raiola',
+      }).map((a) => a.id),
+    ).toEqual(['a']);
+  });
+
+  it('counts as a full-name match, not a surname one', () => {
+    const match = compilePlayerMatcher({
+      fullName: 'Dylan James Raiola',
+      firstName: 'Dylan',
+      lastName: 'Raiola',
+    });
+
+    expect(match('Dylan Raiola throws for 300')).toBe('full');
+    expect(match('Raiola throws for 300')).toBe('last');
+    expect(match('Nebraska opens camp')).toBeNull();
+  });
+});
+
+describe('allowLastName', () => {
+  // notable-players.ts says no when two players on the roster share the
+  // surname: "Smith had a big day" is then evidence about neither of them.
+  it('suppresses the surname fallback when the caller forbids it', () => {
+    const articles = [article('a', 'Smith records two sacks')];
+
+    expect(
+      matchArticlesForPlayer(
+        articles,
+        { fullName: 'Jack Smith', firstName: 'Jack', lastName: 'Smith' },
+        { allowLastName: false },
+      ),
+    ).toEqual([]);
+  });
+
+  it('still matches the full name when the surname is forbidden', () => {
+    const articles = [article('a', 'Jack Smith records two sacks')];
+
+    expect(
+      matchArticlesForPlayer(
+        articles,
+        { fullName: 'Jack Smith', firstName: 'Jack', lastName: 'Smith' },
+        { allowLastName: false },
+      ).map((a) => a.id),
+    ).toEqual(['a']);
+  });
+});
+
+// An empty needle compiles to a pattern that matches everything, so a
+// roster row missing a name would otherwise be "mentioned" by the whole pool.
+describe('degrades rather than matching everything', () => {
+  it('matches nothing for an empty name', () => {
+    const articles = [article('a', 'Some headline')];
+
+    expect(matchArticlesForPlayer(articles, { fullName: '', lastName: '' })).toEqual([]);
   });
 });

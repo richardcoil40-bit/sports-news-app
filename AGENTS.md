@@ -185,14 +185,42 @@ isn't taking.** A flag nobody flips is dead code with extra steps.
 
 Established and intentional — don't drift from it without discussing:
 
-- Monospace font everywhere, applied once at the base of `ThemedText`.
+- **Two typefaces, split by job.** Newsreader (serif) for anything you
+  *read* — headlines, body copy, team and player names. IBM Plex Mono for
+  anything you *scan* — chips, timestamps, sources, section labels, stat
+  figures. The app used to be monospace everywhere; that changed with the
+  newsprint redesign, and reverting a headline to mono is a drift, not a
+  fix.
+  - Both are chosen in exactly one place: `ThemedText` maps each `type`
+    to a family and calls `fontFamilyFor`. Don't set `fontFamily` at a
+    call site. When a `type`'s default is wrong for one instance —
+    a `title` that is a jersey number rather than a name, a `default`
+    that is an uppercase label — pass `font="mono"` rather than
+    introducing a new type.
+  - Each weight is a **separately bundled face with its own family
+    name**, so `fontWeight` alone cannot pick one. That's why
+    `ThemedText` flattens the caller's style before resolving the
+    family, and why the four weights per family in `_layout.tsx` are the
+    only ones that exist. Adding a fifth means loading it there too.
+  - Fonts load asynchronously and are deliberately *not* gated behind a
+    loading screen — see the comment on `FONTS`. One consequence is
+    known and accepted: the native header ignores `headerTitleStyle`'s
+    family on iOS 26, so nav-bar text is the system sans. Anything the
+    design must control belongs in-screen, not in header options.
+- **Newsprint palette, one accent.** Warm cream paper, near-black ink,
+  and brick red used *only* for links and the single outbound CTA — not
+  for emphasis, not for state. `Colors.light` carries the OKLCH original
+  beside each hex; retune there. `Colors.dark` was out of scope for the
+  redesign and is still the old neutral scale.
 - Sharp corners. `borderRadius: 0` on every card, thumbnail, and logo.
-- Metadata text (sources, dates, positions) is uppercase, 11px, with
-  slight letter-spacing.
-- Separators are bold — 1.5px using `theme.text`, not a hairline. The
-  team tabs share a `Separator` component
-  (`src/components/team-tabs/shared.tsx`) rather than re-declaring the
-  style; use it where it fits.
+- Metadata text (sources, dates, positions) is uppercase, ~10.5–11px,
+  with slight letter-spacing. Keep tracking near 0.2 on *serif* caps:
+  iOS measures the run without the trailing letter-space and clips the
+  last glyph, which is what a wide-tracked serif screen title did.
+- Separators are bold — 1.5px using `theme.text`, not a hairline, and
+  full-bleed rather than inset. The team tabs share a `Separator`
+  component (`src/components/team-tabs/shared.tsx`) rather than
+  re-declaring the style; use it where it fits.
 - Each team's real color (from `fetchTeamColor`) is the only per-screen
   accent, applied as a left-edge bar via `AccentRow` rather than
   reskinning components.

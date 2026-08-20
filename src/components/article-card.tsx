@@ -78,7 +78,7 @@ export function ArticleCard({
             accessibilityLabel={`${claimTypeLabel(claimType)} — filter by this`}
             hitSlop={6}
             style={[styles.claimChip, { backgroundColor: theme.text }]}>
-            <ThemedText style={[styles.chipText, { color: theme.background }]}>
+            <ThemedText font="mono" style={[styles.chipText, { color: theme.background }]}>
               {claimTypeLabel(claimType)}
             </ThemedText>
           </TouchableOpacity>
@@ -90,7 +90,9 @@ export function ArticleCard({
           */}
           {tagLabel ? (
             <View style={[styles.teamTag, { borderColor: theme.text }]}>
-              <ThemedText style={[styles.chipText, { color: theme.text }]}>{tagLabel}</ThemedText>
+              <ThemedText font="mono" style={[styles.chipText, { color: theme.text }]}>
+                {tagLabel}
+              </ThemedText>
             </View>
           ) : null}
 
@@ -102,7 +104,7 @@ export function ArticleCard({
             {article.source}
           </ThemedText>
         </View>
-        <ThemedText type="smallBold" numberOfLines={3} style={styles.title}>
+        <ThemedText numberOfLines={3} style={styles.title}>
           {article.title}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
@@ -111,7 +113,7 @@ export function ArticleCard({
 
         {/*
           On its own line rather than appended to the meta above: that line
-          is 11pt in a column already narrowed by a 96px thumbnail, and
+          is 10.5pt in a column already narrowed by an 88px thumbnail, and
           "2H AGO · NEWSROOM · +5 OTHER SOURCES" runs past the edge.
         */}
         {duplicateCount > 0 ? (
@@ -151,13 +153,13 @@ export function ArticleCard({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    gap: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
   thumbnail: {
-    width: 96,
-    height: 72,
+    width: 88,
+    height: 66,
     borderRadius: 0,
   },
   placeholder: {
@@ -169,16 +171,20 @@ const styles = StyleSheet.create({
   },
   textColumn: {
     flex: 1,
-    gap: Spacing.half,
+    gap: 3,
     justifyContent: 'center',
   },
+  // The one piece of prose in the row, so the one piece set in the serif.
   title: {
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '600',
   },
   meta: {
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontSize: 11,
+    letterSpacing: 0.4,
+    fontSize: 10.5,
+    lineHeight: 15,
   },
   duplicateRow: {
     paddingLeft: Spacing.two,
@@ -187,26 +193,27 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.one,
+    gap: 6,
   },
   metaFlex: {
     flex: 1,
   },
   claimChip: {
-    paddingHorizontal: Spacing.one,
+    paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 0,
   },
   teamTag: {
-    paddingHorizontal: Spacing.one,
-    // 1px less vertical padding than the solid chip so the 1.5px border
+    paddingHorizontal: 5,
+    // 1px less vertical padding than the solid chip so the 1.4px border
     // doesn't make the outlined one visibly taller than its neighbour.
     paddingVertical: 0,
-    borderWidth: 1.5,
+    borderWidth: 1.4,
     borderRadius: 0,
   },
   chipText: {
-    fontSize: 10,
+    fontSize: 9,
+    lineHeight: 13,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,

@@ -17,9 +17,10 @@ import { useAsync } from '@/hooks/use-async';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
 import { Article } from '@/lib/feeds';
-import { rankNotablePlayers } from '@/lib/notable-players';
+import { RankedPlayer, rankNotablePlayers } from '@/lib/notable-players';
 import {
   ClaimFilter,
+  ClaimType,
   filterByClaimType,
   withClaimTypes,
 } from '@/lib/claim-type';
@@ -152,7 +153,7 @@ export default function TeamScreen() {
     [roster.data, news.data],
   );
 
-  const openArticle = (article: Article) => {
+  const openArticle = (article: Article & { claimType?: ClaimType }) => {
     router.push({
       pathname: '/article',
       params: {
@@ -162,17 +163,27 @@ export default function TeamScreen() {
         publishedAt: article.publishedAt ?? '',
         description: article.description,
         imageUrl: article.imageUrl ?? '',
+        claimType: article.claimType ?? '',
       },
     });
   };
 
-  const openPlayer = (player: Player) => {
+  const openPlayer = ({ player, matchesSurname }: RankedPlayer) => {
     router.push({
       pathname: '/player/[id]',
       params: {
         id: player.id,
         fullName: player.fullName,
+        // firstName as well as fullName because ESPN's fullName can carry a
+        // middle name or suffix no article writes, and both screens have to
+        // match on the same forms to agree on the same articles.
+        firstName: player.firstName,
         lastName: player.lastName,
+        // The ranking decided whether this surname is specific enough to
+        // match on its own (it isn't, when a teammate shares it). Passing
+        // the decision along is what keeps the count on the card and the
+        // list on the screen describing the same articles.
+        surnameMatch: matchesSurname ? '1' : '0',
         jersey: player.jersey ?? '',
         position: player.position ?? '',
         headshotUrl: player.headshotUrl ?? '',
@@ -278,8 +289,9 @@ const styles = StyleSheet.create({
   teamName: {
     fontSize: 18,
     lineHeight: 24,
+    fontWeight: '700',
     textAlign: 'center',
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.2,
   },
 });

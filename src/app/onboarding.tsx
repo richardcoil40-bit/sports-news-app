@@ -130,10 +130,11 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   headerTitle: {
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 23,
+    lineHeight: 28,
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.2,
   },
   lede: {
     fontSize: 16,
