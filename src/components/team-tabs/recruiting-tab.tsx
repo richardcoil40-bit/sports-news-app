@@ -4,7 +4,7 @@ import { AccentRow } from '@/components/accent-row';
 import { ArticleCard } from '@/components/article-card';
 import { Centered, Separator, tabStyles } from '@/components/team-tabs/shared';
 import { ThemedText } from '@/components/themed-text';
-import { Classified } from '@/lib/claim-type';
+import { ClaimType, Classified } from '@/lib/claim-type';
 import { Article } from '@/lib/feeds';
 
 export function RecruitingTab({
@@ -17,7 +17,7 @@ export function RecruitingTab({
   articles: Classified<Article>[];
   loading: boolean;
   error: boolean;
-  onOpenArticle: (a: Article) => void;
+  onOpenArticle: (a: Article & { claimType?: ClaimType }) => void;
   accentColor: string | null;
 }) {
   if (loading) {

@@ -1,29 +1,64 @@
-import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
+import { StyleSheet, Text, type TextProps, type TextStyle } from 'react-native';
 
-import { Fonts, ThemeColor } from '@/constants/theme';
+import { FontFamily, fontFamilyFor, ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+export type ThemedTextType =
+  | 'default'
+  | 'title'
+  | 'small'
+  | 'smallBold'
+  | 'subtitle'
+  | 'link'
+  | 'linkPrimary'
+  | 'code';
+
 export type ThemedTextProps = TextProps & {
-  type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
+  type?: ThemedTextType;
   themeColor?: ThemeColor;
+  /**
+   * Overrides the family the type would otherwise pick. Needed in one
+   * direction far more than the other: a handful of `title`s are stat
+   * numbers and jersey digits rather than headlines, and those want the
+   * mono's fixed-width figures so a column of them lines up.
+   */
+  font?: FontFamily;
 };
 
-export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
+/**
+ * Serif for prose, mono for everything you scan. `default`, `title` and
+ * `subtitle` carry headlines, names and body copy, so they're serif; the
+ * `small` pair, links and `code` are the app's chips, timestamps, source
+ * lines and section labels, so they stay monospace.
+ */
+const FAMILY_BY_TYPE: Record<ThemedTextType, FontFamily> = {
+  default: 'serif',
+  title: 'serif',
+  subtitle: 'serif',
+  small: 'mono',
+  smallBold: 'mono',
+  link: 'mono',
+  linkPrimary: 'mono',
+  code: 'mono',
+};
+
+export function ThemedText({ style, type = 'default', themeColor, font, ...rest }: ThemedTextProps) {
   const theme = useTheme();
+
+  // Each weight is a separately bundled face with its own family name, so
+  // the family can only be resolved once the caller's own overrides have
+  // been folded in — a `style={{ fontWeight: '700' }}` on a `default`
+  // would otherwise silently render the regular face.
+  const flattened = StyleSheet.flatten<TextStyle>([styles[type], style]);
+  const fontFamily = fontFamilyFor(font ?? FAMILY_BY_TYPE[type], flattened.fontWeight);
 
   return (
     <Text
       style={[
-        { color: theme[themeColor ?? 'text'], fontFamily: Fonts.mono },
-        type === 'default' && styles.default,
-        type === 'title' && styles.title,
-        type === 'small' && styles.small,
-        type === 'smallBold' && styles.smallBold,
-        type === 'subtitle' && styles.subtitle,
-        type === 'link' && styles.link,
-        type === 'linkPrimary' && styles.linkPrimary,
-        type === 'code' && styles.code,
-        style,
+        { color: theme[themeColor ?? 'text'] },
+        type === 'linkPrimary' && { color: theme.accent },
+        flattened,
+        { fontFamily },
       ]}
       {...rest}
     />
@@ -44,17 +79,17 @@ const styles = StyleSheet.create({
   default: {
     fontSize: 16,
     lineHeight: 24,
-    fontWeight: 500,
+    fontWeight: 400,
   },
   title: {
     fontSize: 48,
-    fontWeight: 600,
+    fontWeight: 700,
     lineHeight: 52,
   },
   subtitle: {
-    fontSize: 32,
-    lineHeight: 44,
-    fontWeight: 600,
+    fontSize: 27,
+    lineHeight: 33,
+    fontWeight: 700,
   },
   link: {
     lineHeight: 30,
@@ -63,11 +98,9 @@ const styles = StyleSheet.create({
   linkPrimary: {
     lineHeight: 30,
     fontSize: 14,
-    color: '#3c87f7',
   },
   code: {
-    fontFamily: Fonts.mono,
-    fontWeight: Platform.select({ android: 700 }) ?? 500,
+    fontWeight: 500,
     fontSize: 12,
   },
 });

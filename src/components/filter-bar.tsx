@@ -51,6 +51,7 @@ export function FilterBar<T extends string>({
                 },
               ]}>
               <ThemedText
+                font="mono"
                 style={[
                   styles.label,
                   { color: isActive ? theme.background : theme.textSecondary },

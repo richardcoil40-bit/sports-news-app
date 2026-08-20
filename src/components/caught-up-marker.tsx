@@ -23,7 +23,7 @@ export function CaughtUpMarker({ message }: { message: string }) {
       <ThemedText type="smallBold" style={styles.title}>
         You&apos;re caught up
       </ThemedText>
-      <ThemedText themeColor="textSecondary" style={styles.detail}>
+      <ThemedText font="mono" themeColor="textSecondary" style={styles.detail}>
         {message}
       </ThemedText>
     </View>
