@@ -1,10 +1,19 @@
-import { router } from 'expo-router';
-import { useMemo } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { Logo } from '@/components/logo';
-import { TeamSquare } from '@/components/team-square';
+import { SquareFrame, TeamSquare } from '@/components/team-square';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -21,7 +30,15 @@ import { Team } from '@/lib/teams';
  * and a settings surface. Managing the set moved to Settings →
  * Favorites, leaving this as pure navigation — which is what lets it be
  * a grid of blocks rather than a list of rows.
+ *
+ * Tapping one grows that block out to fill the screen before the team
+ * screen is pushed, so the color you tapped is the color you land on.
+ * Hand-built rather than a shared-element transition: Reanimated's is
+ * experimental, explicitly doesn't support paths through a tab
+ * navigator (which this is), and can't animate backgroundColor — which
+ * is the only thing being animated here.
  */
+const EXPAND_MS = 260;
 export default function TeamsScreen() {
   const theme = useTheme();
   const { teams, loading, error } = useTeams();
@@ -38,7 +55,15 @@ export default function TeamsScreen() {
     [followed],
   );
 
-  const openTeam = (team: Team) => {
+  // The block currently growing, if any. Held rather than derived so the
+  // overlay keeps painting the team's color through the navigation.
+  const [expanding, setExpanding] = useState<{ frame: SquareFrame; color: string | null } | null>(
+    null,
+  );
+  const progress = useSharedValue(0);
+  const { width, height } = useWindowDimensions();
+
+  const openTeam = useCallback((team: Team, color: string | null) => {
     router.push({
       pathname: '/team/[id]',
       params: {
@@ -46,9 +71,68 @@ export default function TeamsScreen() {
         name: team.name,
         shortName: team.shortName,
         logoUrl: team.logoUrl ?? '',
+        // Handed over so the team screen's header is already the right
+        // color on its first frame. It would otherwise fetch the same
+        // (cached) value a tick later and visibly change under the
+        // arriving screen, undoing the continuity this whole animation
+        // exists to create.
+        accent: color ?? '',
       },
     });
+  }, []);
+
+  const pressTeam = (team: Team) => (frame: SquareFrame | null, color: string | null) => {
+    // No frame means no measurement, which means nothing to grow from —
+    // navigate plainly rather than inventing a starting rectangle.
+    if (!frame) {
+      openTeam(team, color);
+      return;
+    }
+
+    setExpanding({ frame, color });
+    progress.value = 0;
+    progress.value = withTiming(1, { duration: EXPAND_MS, easing: Easing.out(Easing.cubic) }, (finished) => {
+      'worklet';
+      if (finished) scheduleOnRN(openTeam, team, color);
+    });
   };
+
+  // Cleared when the grid is shown again, not when it is left: clearing on
+  // the way out would drop the color mid-push and flash the grid behind
+  // the arriving screen. The functional update makes the common case —
+  // focusing with nothing expanded — a no-op rather than a re-render.
+  useFocusEffect(
+    useCallback(() => {
+      setExpanding((current) => (current ? null : current));
+    }, []),
+  );
+
+  // Transforms rather than left/top/width/height: the latter re-run
+  // layout on every frame of the animation, where a translate and a
+  // scale are handled without one. The view is laid out at its *final*
+  // size and scaled down to the square's, so t=1 is the identity
+  // transform and the end state needs no correction.
+  const overlayStyle = useAnimatedStyle(() => {
+    const frame = expanding?.frame;
+    if (!frame) return { opacity: 0 };
+
+    const t = progress.value;
+    const fromScaleX = frame.width / width;
+    const fromScaleY = frame.height / height;
+    // Both boxes are centre-anchored, so the offset is between centres.
+    const fromX = frame.x + frame.width / 2 - width / 2;
+    const fromY = frame.y + frame.height / 2 - height / 2;
+
+    return {
+      opacity: 1,
+      transform: [
+        { translateX: fromX * (1 - t) },
+        { translateY: fromY * (1 - t) },
+        { scaleX: fromScaleX + (1 - fromScaleX) * t },
+        { scaleY: fromScaleY + (1 - fromScaleY) * t },
+      ],
+    };
+  });
 
   // Both, or the empty state flashes on every cold launch before the
   // persisted favorites have been read back off disk.
@@ -98,7 +182,7 @@ export default function TeamsScreen() {
             numColumns={2}
             renderItem={({ item }) =>
               item ? (
-                <TeamSquare team={item} onPress={() => openTeam(item)} />
+                <TeamSquare team={item} onPress={pressTeam(item)} />
               ) : (
                 <View style={styles.filler} />
               )
@@ -108,6 +192,25 @@ export default function TeamsScreen() {
           />
         )}
       </SafeAreaView>
+
+      {/*
+        Outside the SafeAreaView so it can cover the inset too, and
+        non-interactive throughout — it is scenery for a navigation
+        that has already been decided, and swallowing a second tap
+        during it would be the wrong kind of responsive.
+      */}
+      {expanding ? (
+        <Animated.View
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[
+            styles.overlay,
+            { width, height, backgroundColor: expanding.color ?? theme.backgroundElement },
+            overlayStyle,
+          ]}
+        />
+      ) : null}
     </ThemedView>
   );
 }
@@ -136,6 +239,12 @@ const styles = StyleSheet.create({
   },
   filler: {
     flex: 1,
+  },
+  overlay: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    borderRadius: 0,
   },
   listContent: {
     paddingHorizontal: Spacing.three,

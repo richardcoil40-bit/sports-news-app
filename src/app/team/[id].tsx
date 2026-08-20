@@ -53,6 +53,8 @@ export default function TeamScreen() {
     name: string;
     shortName: string;
     logoUrl: string;
+    /** The color the Teams grid already resolved, when arriving from it. */
+    accent?: string;
   }>();
 
   const [tab, setTab] = useState<TabKey>('news');
@@ -60,7 +62,12 @@ export default function TeamScreen() {
   // opponents and neighbours, and those should be tagged as such.
   const { teams } = useTeams();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
-  const [teamColor, setTeamColor] = useState<string | null>(null);
+  // Seeded from the caller when it has already resolved this team's
+  // color. The fetch below still runs and returns the same cached value;
+  // what this avoids is the first frame painting the placeholder grey and
+  // then snapping to the team's color a tick later — visible on every
+  // entry, and directly against the point of the grid's expand animation.
+  const [teamColor, setTeamColor] = useState<string | null>(params.accent || null);
 
   const news = useAsync<Article[]>(async () => {
     const pool = await fetchTeamNewsPool(params.id, params.shortName || params.name);

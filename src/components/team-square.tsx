@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -20,9 +20,28 @@ import { Team } from '@/lib/teams';
  * Until the color lands the square sits on the neutral element color.
  * That's a visible change on first paint, and preferable to holding the
  * whole grid behind a spinner for something purely decorative.
+ *
+ * A press hands back where the square is and what color it ended up, so
+ * the grid can grow that exact block out to fill the screen. The square
+ * owns both facts, so it is the only thing that can answer without the
+ * grid duplicating the lookup.
  */
-export function TeamSquare({ team, onPress }: { team: Team; onPress: () => void }) {
+export interface SquareFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export function TeamSquare({
+  team,
+  onPress,
+}: {
+  team: Team;
+  onPress: (frame: SquareFrame | null, color: string | null) => void;
+}) {
   const theme = useTheme();
+  const ref = useRef<View>(null);
   const [color, setColor] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,13 +61,26 @@ export function TeamSquare({ team, onPress }: { team: Team; onPress: () => void 
   // the team screen's header makes for the same reason.
   const ink = color ? '#FFFFFF' : theme.text;
 
+  // measureInWindow is asynchronous, and a press that somehow resolves
+  // without a mounted node still has to navigate — the frame is what the
+  // animation wants, not what the navigation needs.
+  const handlePress = () => {
+    const node = ref.current;
+    if (!node) {
+      onPress(null, color);
+      return;
+    }
+    node.measureInWindow((x, y, width, height) => onPress({ x, y, width, height }, color));
+  };
+
   return (
     <TouchableOpacity
+      ref={ref}
       style={[
         styles.square,
         { backgroundColor: color ?? theme.backgroundElement, borderColor: theme.text },
       ]}
-      onPress={onPress}
+      onPress={handlePress}
       activeOpacity={0.8}
       accessibilityRole="button"
       accessibilityLabel={team.name}>

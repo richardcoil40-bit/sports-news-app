@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,30 +10,30 @@ import { Spacing, fontFamilyFor } from '@/constants/theme';
 import { useFavorites } from '@/hooks/use-favorites';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
+import { DEFAULT_LEAGUE, getLeague } from '@/lib/league-catalog';
 
 /**
- * Where following and unfollowing happens. The Teams tab shows only the
- * teams you already follow, so this is the one screen in the app that
- * lists every team there is.
+ * The last step of Sport → Level → League → Team, and where following
+ * and unfollowing actually happens. The Teams tab shows only the teams
+ * you already follow, so this is the one screen that lists every team
+ * in a league.
  *
  * Changes commit immediately rather than behind a Done button — unlike
  * onboarding, which holds its selection locally so backing out of a
  * first run doesn't leave half a set of teams behind. Here there is
  * always an existing set to fall back to, so a star is just a star.
  *
- * A note on what this screen is *not* yet: the plan calls for a Sport →
- * Level → League → Team hierarchy, with any level holding one option
- * skipping itself. The catalog can't drive that today — a league
- * descriptor in `__data__/leagues.json` carries no "level", so "College"
- * cannot be derived, only hardcoded, and hardcoding it is exactly what
- * `AGENTS.md` says not to do with league data. With one league every
- * level would auto-skip to this list anyway, so the hierarchy is worth
- * building alongside the second league, when there is something real to
- * validate it against.
+ * Scoped to the league it was opened for. It falls back to the default
+ * league rather than erroring on a missing or unknown id: this screen is
+ * reachable directly by URL, and a bad one should land somewhere real.
  */
-export default function FavoritesScreen() {
+export default function FavoritesTeamsScreen() {
   const theme = useTheme();
-  const { teams, loading, error } = useTeams();
+  // The primitive, not the params object — that is a new reference every
+  // render, and depending on it re-runs forever.
+  const { league: leagueId } = useLocalSearchParams<{ league?: string }>();
+  const league = (leagueId ? getLeague(leagueId) : null) ?? DEFAULT_LEAGUE;
+  const { teams, loading, error } = useTeams(league);
   const { isFavorite, toggleFavorite } = useFavorites();
   const [query, setQuery] = useState('');
 
@@ -52,7 +52,7 @@ export default function FavoritesScreen() {
 
   return (
     <ThemedView style={styles.flex}>
-      <Stack.Screen options={{ title: 'Favorites' }} />
+      <Stack.Screen options={{ title: league.displayName }} />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <View style={styles.searchWrap}>
           <TextInput
