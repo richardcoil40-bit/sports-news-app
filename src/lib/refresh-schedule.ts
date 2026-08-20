@@ -8,8 +8,8 @@ import { fetchLeagueFeeds, leaguesWithNationalFeeds } from '@/lib/source-catalog
  * last time it refreshed, and if so, forces one fresh pull of the national
  * feed pool right away, before you tap into anything. Individual team news
  * pools already re-fetch on their own 3-minute cache, so this only needs to
- * handle the shared national pool that the News/Recruiting tabs and every
- * player screen build on.
+ * handle the shared national pool that the News tab and every player
+ * screen build on.
  *
  * Tracked in memory only (no persisted storage) — a cold relaunch always
  * counts as a new check, which in practice means "reopening the app after

@@ -18,8 +18,8 @@ export interface TeamNewsPool {
 // Fetching this pool touches every community/local source for a team, not
 // just the (already-cached) national feeds — so without its own cache, the
 // News tab, the Players tab (which ranks players by mentions in this same
-// pool), the Recruiting tab, and every player's detail screen were each
-// re-fetching and re-parsing all of it independently. Cached per team for a
+// pool), and every player's detail screen were each re-fetching and
+// re-parsing all of it independently. Cached per team for a
 // few minutes, with in-flight requests shared so rapid navigation (team →
 // player, tab → tab) doesn't fire duplicate fetches of the same sources.
 const CACHE_TTL_MS = 3 * 60 * 1000;
@@ -234,9 +234,9 @@ function withHardCap(teamId: string, teamShortName: string, work: Promise<TeamNe
  * narrowed to articles that actually name the team, since a metro sports
  * feed also carries pro teams and other sports.
  *
- * Deduped and sorted newest-first. Used as the base for the News, Players,
- * and Recruiting tabs, and for each player's detail screen — all pulling
- * from the same cached pool rather than fetching their own.
+ * Deduped and sorted newest-first. Used as the base for the News and
+ * Players tabs, and for each player's detail screen — all pulling from the
+ * same cached pool rather than fetching their own.
  */
 export async function fetchTeamNewsPool(
   teamId: string,

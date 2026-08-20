@@ -24,9 +24,8 @@ import { Article } from '@/lib/feeds';
  * left, at which point it relaxes rather than stalling (see below).
  *
  * Deliberately a presentation-layer concern, applied where a feed is
- * rendered rather than inside the news pool itself: player ranking and
- * recruiting filtering both need the complete, unbalanced set of
- * articles to work correctly.
+ * rendered rather than inside the news pool itself: player ranking needs
+ * the complete, unbalanced set of articles to work correctly.
  */
 
 const DEFAULT_WINDOW_SIZE = 5;

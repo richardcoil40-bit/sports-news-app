@@ -10,7 +10,7 @@ import { useTheme } from '@/hooks/use-theme';
  *
  * Deliberately lighter than TabBar even though both are segmented
  * controls: on the team screen this sits directly beneath the main
- * News/Schedule/Players/Recruiting bar, and two identical-looking rows
+ * News/Schedule/Players bar, and two identical-looking rows
  * stacked on top of each other would read as one confusing block. This
  * one is smaller, outlined, and inset so it reads as a refinement of the
  * list below it rather than as navigation.

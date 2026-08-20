@@ -62,7 +62,7 @@ export function teamSourcesFor(league: League, teamShortName: string): FeedSourc
 
 /**
  * A league's national pool gets re-requested by a lot of screens — team
- * news, recruiting, and every player detail page all pull from it. Without
+ * news and every player detail page both pull from it. Without
  * caching, tapping from team → player re-fetched and re-parsed every feed
  * from scratch, which was most of what made navigation feel slow.
  *
