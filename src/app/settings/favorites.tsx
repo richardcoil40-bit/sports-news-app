@@ -1,19 +1,37 @@
-import { router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Logo } from '@/components/logo';
+import { TeamRow } from '@/components/team-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { TeamRow } from '@/components/team-row';
 import { Spacing, fontFamilyFor } from '@/constants/theme';
 import { useFavorites } from '@/hooks/use-favorites';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
-import { Team } from '@/lib/teams';
 
-export default function TeamsScreen() {
+/**
+ * Where following and unfollowing happens. The Teams tab shows only the
+ * teams you already follow, so this is the one screen in the app that
+ * lists every team there is.
+ *
+ * Changes commit immediately rather than behind a Done button — unlike
+ * onboarding, which holds its selection locally so backing out of a
+ * first run doesn't leave half a set of teams behind. Here there is
+ * always an existing set to fall back to, so a star is just a star.
+ *
+ * A note on what this screen is *not* yet: the plan calls for a Sport →
+ * Level → League → Team hierarchy, with any level holding one option
+ * skipping itself. The catalog can't drive that today — a league
+ * descriptor in `__data__/leagues.json` carries no "level", so "College"
+ * cannot be derived, only hardcoded, and hardcoding it is exactly what
+ * `AGENTS.md` says not to do with league data. With one league every
+ * level would auto-skip to this list anyway, so the hierarchy is worth
+ * building alongside the second league, when there is something real to
+ * validate it against.
+ */
+export default function FavoritesScreen() {
   const theme = useTheme();
   const { teams, loading, error } = useTeams();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -29,39 +47,13 @@ export default function TeamsScreen() {
 
     // Followed teams float to the top, so the list doubles as a view of
     // who you follow rather than needing a separate screen for it.
-    // Alphabetical within each group, preserving the order from lib/teams.
-    return [
-      ...matching.filter((t) => isFavorite(t)),
-      ...matching.filter((t) => !isFavorite(t)),
-    ];
+    return [...matching.filter((t) => isFavorite(t)), ...matching.filter((t) => !isFavorite(t))];
   }, [teams, query, isFavorite]);
-
-  const openTeam = (team: Team) => {
-    router.push({
-      pathname: '/team/[id]',
-      params: {
-        id: team.id,
-        name: team.name,
-        shortName: team.shortName,
-        logoUrl: team.logoUrl ?? '',
-      },
-    });
-  };
 
   return (
     <ThemedView style={styles.flex}>
-      <SafeAreaView style={styles.flex} edges={['top']}>
-        <View style={styles.header}>
-          <Logo
-            size={22}
-            onPress={() => router.push('/settings')}
-            accessibilityLabel="Settings"
-          />
-          <ThemedText type="title" style={styles.headerTitle}>
-            Teams
-          </ThemedText>
-        </View>
-
+      <Stack.Screen options={{ title: 'Favorites' }} />
+      <SafeAreaView style={styles.flex} edges={['bottom']}>
         <View style={styles.searchWrap}>
           <TextInput
             value={query}
@@ -71,10 +63,7 @@ export default function TeamsScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             clearButtonMode="while-editing"
-            style={[
-              styles.searchInput,
-              { borderColor: theme.text, color: theme.text },
-            ]}
+            style={[styles.searchInput, { borderColor: theme.text, color: theme.text }]}
           />
         </View>
 
@@ -95,7 +84,7 @@ export default function TeamsScreen() {
             renderItem={({ item }) => (
               <TeamRow
                 team={item}
-                onPress={() => openTeam(item)}
+                onPress={() => toggleFavorite(item)}
                 following={isFavorite(item)}
                 onToggleFollow={() => toggleFavorite(item)}
               />
@@ -103,6 +92,13 @@ export default function TeamsScreen() {
             ItemSeparatorComponent={() => (
               <View style={[styles.separator, { backgroundColor: theme.text }]} />
             )}
+            ListEmptyComponent={
+              <View style={styles.centered}>
+                <ThemedText themeColor="textSecondary" style={styles.centeredText}>
+                  No teams match “{query.trim()}”.
+                </ThemedText>
+              </View>
+            }
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.listContent}
           />
@@ -115,20 +111,6 @@ export default function TeamsScreen() {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-  },
-  headerTitle: {
-    fontSize: 23,
-    lineHeight: 28,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.2,
   },
   searchWrap: {
     paddingHorizontal: Spacing.three,
@@ -147,11 +129,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.five,
+    paddingVertical: Spacing.five,
   },
   centeredText: {
     textAlign: 'center',
   },
   listContent: {
+    flexGrow: 1,
     paddingBottom: Spacing.five,
   },
   separator: {

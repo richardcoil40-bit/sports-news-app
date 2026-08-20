@@ -214,7 +214,11 @@ export default function FeedScreen() {
             whose news it holds.
           */}
           <View style={styles.headerRow}>
-            <Logo size={16} />
+            <Logo
+              size={16}
+              onPress={() => router.push('/settings')}
+              accessibilityLabel="Settings"
+            />
             <ThemedText type="title" style={styles.headerTitle}>
               NOFRILLS
             </ThemedText>
@@ -239,7 +243,7 @@ export default function FeedScreen() {
             </ThemedText>
             <TouchableOpacity
               style={[styles.button, { backgroundColor: theme.text }]}
-              onPress={() => router.push('/teams')}>
+              onPress={() => router.push('/settings/favorites')}>
               <ThemedText font="mono" style={[styles.buttonText, { color: theme.background }]}>
                 Pick your teams
               </ThemedText>
