@@ -254,6 +254,13 @@ code comments:
   the seventeen-dead-Atom-feeds problem visible, and its README writes up
   that whole episode, which is worth reading before trusting any source
   that merely *looks* healthy.
+- `docs/dependency-risk.md` — the advisories in the dependency tree that
+  are knowingly accepted rather than fixed, and the scope of that
+  acceptance. Read it before acting on an `npm audit` result: the current
+  16 are build-time only, and npm's proposed "fix" is a major *downgrade*
+  to Expo 53. Anything critical, or anything reaching a runtime dependency
+  (`fast-xml-parser` especially — it parses hostile input by design), is
+  explicitly outside that acceptance and needs its own assessment.
 
 ## Environment-specific constraints
 
