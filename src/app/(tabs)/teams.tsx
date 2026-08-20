@@ -1,40 +1,42 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, TextInput, View } from 'react-native';
+import { useMemo } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Logo } from '@/components/logo';
+import { TeamSquare } from '@/components/team-square';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { TeamRow } from '@/components/team-row';
-import { Spacing, fontFamilyFor } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useFavorites } from '@/hooks/use-favorites';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
 import { Team } from '@/lib/teams';
 
+/**
+ * A way in to each team you follow, and nothing else.
+ *
+ * This tab used to be the whole conference with a search box and a star
+ * on every row, which made it two screens wearing one coat: a directory
+ * and a settings surface. Managing the set moved to Settings →
+ * Favorites, leaving this as pure navigation — which is what lets it be
+ * a grid of blocks rather than a list of rows.
+ */
 export default function TeamsScreen() {
   const theme = useTheme();
   const { teams, loading, error } = useTeams();
-  const { isFavorite, toggleFavorite } = useFavorites();
-  const [query, setQuery] = useState('');
+  const { hydrated, isFavorite } = useFavorites();
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const matching = q
-      ? teams.filter(
-          (t) => t.name.toLowerCase().includes(q) || t.abbreviation.toLowerCase().includes(q),
-        )
-      : teams;
+  const followed = useMemo(() => teams.filter((team) => isFavorite(team)), [teams, isFavorite]);
 
-    // Followed teams float to the top, so the list doubles as a view of
-    // who you follow rather than needing a separate screen for it.
-    // Alphabetical within each group, preserving the order from lib/teams.
-    return [
-      ...matching.filter((t) => isFavorite(t)),
-      ...matching.filter((t) => !isFavorite(t)),
-    ];
-  }, [teams, query, isFavorite]);
+  // Padded to an even count so an odd last team doesn't stretch across
+  // both columns: the squares are flex:1, so a row holding one of them
+  // gives it the whole width, and aspectRatio then makes it double
+  // height. The filler is an empty cell, not a rendered square.
+  const cells = useMemo<(Team | null)[]>(
+    () => (followed.length % 2 === 1 ? [...followed, null] : followed),
+    [followed],
+  );
 
   const openTeam = (team: Team) => {
     router.push({
@@ -47,6 +49,10 @@ export default function TeamsScreen() {
       },
     });
   };
+
+  // Both, or the empty state flashes on every cold launch before the
+  // persisted favorites have been read back off disk.
+  const settling = loading || !hydrated;
 
   return (
     <ThemedView style={styles.flex}>
@@ -62,48 +68,42 @@ export default function TeamsScreen() {
           </ThemedText>
         </View>
 
-        <View style={styles.searchWrap}>
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search teams"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            style={[
-              styles.searchInput,
-              { borderColor: theme.text, color: theme.text },
-            ]}
-          />
-        </View>
-
-        {loading ? (
+        {settling ? (
           <View style={styles.centered}>
             <ActivityIndicator />
           </View>
-        ) : error && filtered.length === 0 ? (
+        ) : error && followed.length === 0 ? (
           <View style={styles.centered}>
             <ThemedText themeColor="textSecondary" style={styles.centeredText}>
               {error}
             </ThemedText>
           </View>
+        ) : followed.length === 0 ? (
+          <View style={styles.centered}>
+            <ThemedText themeColor="textSecondary" style={styles.centeredText}>
+              You&apos;re not following any teams yet.
+            </ThemedText>
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: theme.text }]}
+              onPress={() => router.push('/settings/favorites')}>
+              <ThemedText font="mono" style={[styles.buttonText, { color: theme.background }]}>
+                Pick your teams
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
         ) : (
           <FlatList
-            data={filtered}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TeamRow
-                team={item}
-                onPress={() => openTeam(item)}
-                following={isFavorite(item)}
-                onToggleFollow={() => toggleFavorite(item)}
-              />
-            )}
-            ItemSeparatorComponent={() => (
-              <View style={[styles.separator, { backgroundColor: theme.text }]} />
-            )}
-            keyboardShouldPersistTaps="handled"
+            data={cells}
+            keyExtractor={(item, index) => (item ? `${item.leagueId}:${item.id}` : `filler-${index}`)}
+            numColumns={2}
+            renderItem={({ item }) =>
+              item ? (
+                <TeamSquare team={item} onPress={() => openTeam(item)} />
+              ) : (
+                <View style={styles.filler} />
+              )
+            }
+            columnWrapperStyle={styles.column}
             contentContainerStyle={styles.listContent}
           />
         )}
@@ -122,6 +122,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
+    paddingBottom: Spacing.three,
   },
   headerTitle: {
     fontSize: 23,
@@ -130,32 +131,36 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.2,
   },
-  searchWrap: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+  column: {
+    gap: Spacing.two,
   },
-  searchInput: {
-    borderRadius: 0,
-    borderWidth: 1.5,
+  filler: {
+    flex: 1,
+  },
+  listContent: {
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    fontSize: 14,
-    fontFamily: fontFamilyFor('mono'),
+    paddingBottom: Spacing.five,
+    gap: Spacing.two,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.five,
+    gap: Spacing.three,
   },
   centeredText: {
     textAlign: 'center',
   },
-  listContent: {
-    paddingBottom: Spacing.five,
+  button: {
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.four,
+    borderRadius: 0,
   },
-  separator: {
-    height: 1.5,
-    marginLeft: Spacing.three,
+  buttonText: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
