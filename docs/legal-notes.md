@@ -49,10 +49,15 @@ would not.
 
 ## Donations
 
-There is a Developer Info screen in Settings with a donation link on
-it. As of 2026-08-20 the URL is deliberately unset and the button
-hides itself while it is, so nothing is solicited today — what exists
-is the surface, not a live ask.
+There is a "Tip the developer" section on the Developer Info screen in
+Settings, with a Venmo link. **As of 2026-08-20 it is live** — the URL
+is set in `src/app/settings/developer.tsx` and the section renders.
+
+An earlier version of this paragraph said the URL was deliberately unset
+and that what existed was "the surface, not a live ask." That was true
+when written and stopped being true the same day. Anyone reading this
+file to decide whether the app solicits money needs the current answer,
+so: it does, via an external link, today.
 
 The mechanism, when it is switched on, is a plain external link handed
 to `WebBrowser.openBrowserAsync`, the same hand-off the Article screen
@@ -74,6 +79,43 @@ feature.
 So: **the link must be removed or converted to Apple in-app purchase
 before any external TestFlight beta or App Store submission.** Not
 before — and not after.
+
+### "Internal" is narrower than it sounds — check which one you're doing
+
+The word doing the work above is *internal*, and it does not mean "a
+private group of people I chose." Apple's two TestFlight modes split on
+who the testers are, not on whether the build is publicly advertised:
+
+- **Internal** — testers must be members of your App Store Connect team,
+  each added individually with a role (Admin, App Manager, Developer,
+  Marketing). Up to 100 people, 30 devices each. **No Beta App Review.**
+- **External** — anyone else: friends, family, testers invited by email
+  or public link. Up to 10,000 people. **Requires Beta App Review**, a
+  lighter pass than full App Store review but a review by Apple all the
+  same.
+
+A build handed to a dozen friends who are not on the App Store Connect
+team is **external testing**, however unadvertised it is. That crosses
+the trigger point named above, even though nothing about it feels
+public. If the testers are going to be added as team members, it's
+internal and the trigger hasn't fired; if they're going to be invited by
+email, it has.
+
+**This is now the live configuration, so the sequencing matters.**
+`DONATION_URL` is set, the tip section renders, and the next planned
+step is TestFlight. Switching the URL on and inviting external testers
+are two changes that are individually harmless and jointly the thing
+this section exists to prevent — and they are now half done.
+
+Concretely, before a build goes to anyone who is not an App Store
+Connect team member, one of these has to happen:
+
+- set `DONATION_URL` back to `''` for that build, or
+- replace the link with an Apple in-app purchase.
+
+Sideloading to your own devices and internal TestFlight are unaffected;
+the link can stay for both. The checkpoint is the first external
+invite, not the first upload.
 
 Worth reading alongside the team-name/logo question above if this ever
 gets a real legal review before a public launch. A donation link is a

@@ -99,5 +99,20 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;
+/**
+ * Bottom padding a scrolling tab screen needs so its last row clears the
+ * tab bar.
+ *
+ * iOS 26 draws `NativeTabs` as a pill floating *over* the content instead
+ * of docking it, and nothing in `expo-router/unstable-native-tabs` reports
+ * its height. Left at the ordinary page padding, the final row renders
+ * behind it — which put the home feed's "N earlier" header half under the
+ * pill, where it was still a tap target and no longer readable. Measured
+ * off the pill's top edge on a 402x874pt device, plus room to breathe.
+ *
+ * Android docks its tab bar, so content is already inset there and the
+ * ordinary padding is right. That half is unverified on a device; if a
+ * list turns out to be clipped on Android too, this is the knob.
+ */
+export const BottomTabInset = Platform.select({ ios: 96, android: Spacing.five }) ?? Spacing.five;
+

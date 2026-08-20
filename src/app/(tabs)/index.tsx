@@ -13,7 +13,7 @@ import { FilterBar } from '@/components/filter-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BRIEF_MODE } from '@/constants/flags';
-import { Spacing } from '@/constants/theme';
+import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useBrief } from '@/hooks/use-brief';
 import { useFeed } from '@/hooks/use-feed';
 import { useTeams } from '@/hooks/use-teams';
@@ -365,6 +365,16 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     fontWeight: '700',
     letterSpacing: 0.2,
+    // iOS measures a tracked run without its trailing letter-space and
+    // clips whatever overhangs, which sliced the final S off NOFRILLS.
+    // Tracking is already at the 0.2 the design system allows, so the
+    // remaining fix is to give the glyph somewhere to overhang into.
+    //
+    // Sized against Newsreader Bold, not the fallback: 4pt was enough
+    // while the system sans was still showing and clipped again the
+    // moment the real face loaded. A flex spacer follows this text, so
+    // over-reserving here costs no layout.
+    paddingRight: Spacing.three,
   },
   subtitle: {
     textTransform: 'uppercase',
@@ -395,7 +405,10 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: Spacing.five,
+    // Clears the floating tab bar rather than sitting under it — see
+    // BottomTabInset. The collapsed section headers are the last thing in
+    // this list, so without it the bottom one is permanently half-covered.
+    paddingBottom: BottomTabInset,
   },
   separator: {
     height: 1.5,

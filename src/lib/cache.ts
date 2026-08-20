@@ -65,21 +65,3 @@ export function createEntityCache<K, V>(options?: { ttlMs?: number }): EntityCac
     },
   };
 }
-
-/**
- * Same contract for sources that cache one global result rather than one
- * per entity (feeds.ts's national pool). A thin wrapper over a single-key
- * EntityCache so both share one implementation.
- */
-export interface SingletonCache<V> {
-  get(load: () => Promise<V>, options?: { force?: boolean }): Promise<V>;
-  peek(): V | undefined;
-}
-
-export function createSingletonCache<V>(options?: { ttlMs?: number }): SingletonCache<V> {
-  const cache = createEntityCache<'singleton', V>(options);
-  return {
-    get: (load, callOptions) => cache.get('singleton', load, callOptions),
-    peek: () => cache.peek('singleton'),
-  };
-}

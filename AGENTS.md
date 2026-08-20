@@ -35,8 +35,9 @@ inventing a new one:
   bypasses the read and refetches — that's what pull-to-refresh uses.
   `peek(key)` is a TTL-ignoring stale read, for fallback paths that
   would rather serve something old than nothing (`team-news-pool.ts`'s
-  hard cap). Sources that cache one global result rather than one per
-  entity use `createSingletonCache` from the same file.
+  hard cap). There is no singleton variant: the national feed pool is the
+  one caller that ever looked like one, and it's keyed per league in
+  `source-catalog.ts`, so every cache here is an entity cache.
   - **Error policy stays at the call site.** The helper caches whatever
     the loader resolves to and caches nothing when it rejects. If a
     source should degrade to empty *and* remember that, catch inside
@@ -254,6 +255,13 @@ code comments:
   the seventeen-dead-Atom-feeds problem visible, and its README writes up
   that whole episode, which is worth reading before trusting any source
   that merely *looks* healthy.
+- `docs/dependency-risk.md` — the advisories in the dependency tree that
+  are knowingly accepted rather than fixed, and the scope of that
+  acceptance. Read it before acting on an `npm audit` result: the current
+  16 are build-time only, and npm's proposed "fix" is a major *downgrade*
+  to Expo 53. Anything critical, or anything reaching a runtime dependency
+  (`fast-xml-parser` especially — it parses hostile input by design), is
+  explicitly outside that acceptance and needs its own assessment.
 
 ## Environment-specific constraints
 
@@ -274,6 +282,23 @@ running locally with full access:
   folders are generated once and reused. Regenerate with
   `npx expo prebuild --clean` before rebuilding, or the change silently
   won't show up and will look like a bug.
+- **`prebuild --clean` deletes your code signing setup.** `ios/` and
+  `android/` are gitignored, so the Apple Development Team that Xcode
+  writes into `ios/*.xcodeproj/project.pbxproj` as `DEVELOPMENT_TEAM`
+  exists in exactly one place — a folder `--clean` removes. Nothing in
+  any tracked config can restore it, and there is no `app.json` field
+  that survives the round trip. The next build then fails on signing,
+  pointing at a certificate problem rather than at the prebuild that
+  actually caused it. Read the value out before regenerating:
+
+  ```
+  grep -o 'DEVELOPMENT_TEAM = [^;]*' ios/*.xcodeproj/project.pbxproj | sort -u
+  ```
+
+  Then set it again afterwards in Xcode (project → Signing &
+  Capabilities → Team). The entitlements file and `PrivacyInfo.xcprivacy`
+  regenerate correctly on their own; signing is the only thing that
+  doesn't.
 - **CocoaPods needs a UTF-8 locale, and fails obscurely without one.**
   If `pod install` dies with `Unicode Normalization not appropriate for
   ASCII-8BIT (Encoding::CompatibilityError)`, Ruby's default external
