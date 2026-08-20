@@ -14,7 +14,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { Logo } from '@/components/logo';
 import { SettingsButton } from '@/components/settings-button';
-import { SquareFrame, TeamSquare } from '@/components/team-square';
+import { BadgeFrame, TeamBadgeRow } from '@/components/team-badge-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Spacing } from '@/constants/theme';
@@ -29,10 +29,12 @@ import { Team } from '@/lib/teams';
  * This tab used to be the whole conference with a search box and a star
  * on every row, which made it two screens wearing one coat: a directory
  * and a settings surface. Managing the set moved to Settings →
- * Favorites, leaving this as pure navigation — which is what lets it be
- * a grid of blocks rather than a list of rows.
+ * Favorites, leaving this as pure navigation.
  *
- * Tapping one grows that block out to fill the screen before the team
+ * The rows themselves used to be a two-column grid of full-bleed color
+ * squares; see TeamBadgeRow for why the color moved into a badge.
+ *
+ * Tapping one grows that badge out to fill the screen before the team
  * screen is pushed, so the color you tapped is the color you land on.
  * Hand-built rather than a shared-element transition: Reanimated's is
  * experimental, explicitly doesn't support paths through a tab
@@ -47,18 +49,9 @@ export default function TeamsScreen() {
 
   const followed = useMemo(() => teams.filter((team) => isFavorite(team)), [teams, isFavorite]);
 
-  // Padded to an even count so an odd last team doesn't stretch across
-  // both columns: the squares are flex:1, so a row holding one of them
-  // gives it the whole width, and aspectRatio then makes it double
-  // height. The filler is an empty cell, not a rendered square.
-  const cells = useMemo<(Team | null)[]>(
-    () => (followed.length % 2 === 1 ? [...followed, null] : followed),
-    [followed],
-  );
-
-  // The block currently growing, if any. Held rather than derived so the
+  // The badge currently growing, if any. Held rather than derived so the
   // overlay keeps painting the team's color through the navigation.
-  const [expanding, setExpanding] = useState<{ frame: SquareFrame; color: string | null } | null>(
+  const [expanding, setExpanding] = useState<{ frame: BadgeFrame; color: string | null } | null>(
     null,
   );
   const progress = useSharedValue(0);
@@ -82,7 +75,7 @@ export default function TeamsScreen() {
     });
   }, []);
 
-  const pressTeam = (team: Team) => (frame: SquareFrame | null, color: string | null) => {
+  const pressTeam = (team: Team) => (frame: BadgeFrame | null, color: string | null) => {
     // No frame means no measurement, which means nothing to grow from —
     // navigate plainly rather than inventing a starting rectangle.
     if (!frame) {
@@ -98,8 +91,8 @@ export default function TeamsScreen() {
     });
   };
 
-  // Cleared when the grid is shown again, not when it is left: clearing on
-  // the way out would drop the color mid-push and flash the grid behind
+  // Cleared when the list is shown again, not when it is left: clearing on
+  // the way out would drop the color mid-push and flash the list behind
   // the arriving screen. The functional update makes the common case —
   // focusing with nothing expanded — a no-op rather than a re-render.
   useFocusEffect(
@@ -111,8 +104,16 @@ export default function TeamsScreen() {
   // Transforms rather than left/top/width/height: the latter re-run
   // layout on every frame of the animation, where a translate and a
   // scale are handled without one. The view is laid out at its *final*
-  // size and scaled down to the square's, so t=1 is the identity
+  // size and scaled down to the badge's, so t=1 is the identity
   // transform and the end state needs no correction.
+  //
+  // The overlay stays square-cornered even though it starts life over a
+  // disc. A full-screen view scaled to 38pt is scaled far harder
+  // horizontally than vertically, so a single borderRadius cannot render
+  // as a circle at t=0 whatever value it's given — matching the badge
+  // would mean animating width/height instead, and re-running layout
+  // every frame is exactly what this approach exists to avoid. The
+  // mismatch lasts one frame at 38pt.
   const overlayStyle = useAnimatedStyle(() => {
     const frame = expanding?.frame;
     if (!frame) return { opacity: 0 };
@@ -180,17 +181,9 @@ export default function TeamsScreen() {
           </View>
         ) : (
           <FlatList
-            data={cells}
-            keyExtractor={(item, index) => (item ? `${item.leagueId}:${item.id}` : `filler-${index}`)}
-            numColumns={2}
-            renderItem={({ item }) =>
-              item ? (
-                <TeamSquare team={item} onPress={pressTeam(item)} />
-              ) : (
-                <View style={styles.filler} />
-              )
-            }
-            columnWrapperStyle={styles.column}
+            data={followed}
+            keyExtractor={(item) => `${item.leagueId}:${item.id}`}
+            renderItem={({ item }) => <TeamBadgeRow team={item} onPress={pressTeam(item)} />}
             contentContainerStyle={styles.listContent}
           />
         )}
@@ -242,12 +235,6 @@ const styles = StyleSheet.create({
   headerSpacer: {
     flex: 1,
   },
-  column: {
-    gap: Spacing.two,
-  },
-  filler: {
-    flex: 1,
-  },
   overlay: {
     position: 'absolute',
     left: 0,
@@ -258,7 +245,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     // Same floating-tab-bar clearance as the feed — see BottomTabInset.
     paddingBottom: BottomTabInset,
-    gap: Spacing.two,
+    gap: 10,
   },
   centered: {
     flex: 1,

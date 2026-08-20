@@ -17,6 +17,8 @@ import '@/global.css';
 
 import { Platform, type TextStyle } from 'react-native';
 
+import type { ClaimType } from '@/lib/claim-type';
+
 export const Colors = {
   light: {
     /** ink — oklch(0.2 0.014 50) */
@@ -31,6 +33,17 @@ export const Colors = {
     textSecondary: '#685B52',
     /** brick red — oklch(0.5 0.13 35). Links and the primary CTA only. */
     accent: '#9F422B',
+    /**
+     * Teal, for the *state* of a control — an active filter, a checked
+     * row — and nothing else.
+     *
+     * A second accent, which the palette otherwise doesn't allow. It
+     * exists precisely so the rule about the first one can hold: brick
+     * red stays reserved for links and the outbound CTA, so "this
+     * filter is narrowing your feed" needed a colour that isn't red and
+     * isn't ink. Introduced with the dropdown filter controls.
+     */
+    accentControl: '#2D6B7A',
   },
   dark: {
     text: '#ffffff',
@@ -39,10 +52,53 @@ export const Colors = {
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
     accent: '#C8664E',
+    /** Lightened so the teal still reads against black. */
+    accentControl: '#6FB6C6',
   },
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+
+/**
+ * A palette colour at partial opacity.
+ *
+ * The dropdown controls are specified as translucent ink over the paper
+ * — a 4% fill inside a 16% border — rather than as their own opaque
+ * greys. Deriving them from `theme.text` instead of hard-coding the
+ * blended result is what makes them survive dark mode: the same call
+ * gives warm grey on cream and dim white on black.
+ *
+ * Every value in `Colors` is a 6-digit hex, which is the only form this
+ * appends an alpha byte to correctly. Don't hand it an `rgba()`.
+ */
+export function withAlpha(color: string, alpha: number): string {
+  const byte = Math.round(Math.max(0, Math.min(1, alpha)) * 255)
+    .toString(16)
+    .padStart(2, '0');
+  return `${color}${byte}`;
+}
+
+/**
+ * The claim badge's two colours, per claim type.
+ *
+ * Reported is the app's default and stays ink-on-paper, which also means
+ * it inverts with the theme. Rumor and take carry their own fixed hues
+ * — a story is no more a rumor at night — so both keep the cream text
+ * that reads on them in either mode rather than following `background`
+ * to black.
+ *
+ * These are the one place a colour means "what kind of thing this is".
+ * The accents above mean "what state this control is in"; keep the two
+ * vocabularies apart.
+ */
+export function claimBadgeColors(
+  type: ClaimType,
+  theme: { text: string; background: string },
+): { background: string; text: string } {
+  if (type === 'rumor') return { background: '#B5482E', text: Colors.light.background };
+  if (type === 'take') return { background: '#3A5A78', text: Colors.light.background };
+  return { background: theme.text, text: theme.background };
+}
 
 /**
  * Two families, split by job: serif for anything you *read* (headlines,
