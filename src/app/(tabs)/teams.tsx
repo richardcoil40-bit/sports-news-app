@@ -17,7 +17,7 @@ import { SettingsButton } from '@/components/settings-button';
 import { SquareFrame, TeamSquare } from '@/components/team-square';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useFavorites } from '@/hooks/use-favorites';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
@@ -236,6 +236,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.2,
+    // Same trailing-glyph clip as the feed's wordmark — TEAMS lost its S.
+    paddingRight: Spacing.three,
   },
   headerSpacer: {
     flex: 1,
@@ -254,7 +256,8 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.five,
+    // Same floating-tab-bar clearance as the feed — see BottomTabInset.
+    paddingBottom: BottomTabInset,
     gap: Spacing.two,
   },
   centered: {
