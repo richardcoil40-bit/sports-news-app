@@ -9,24 +9,57 @@ Last reviewed 2026-08-20.
 
 ---
 
-## Status: the service is built, not yet deployed or wired for everything it unlocks
+## Status: the service is deployed and live, and unlocks less than it was scoped to
 
-The backend service this file used to describe as the one missing piece now
-exists as code: `worker/` is a complete Cloudflare Worker exposing
-`POST /v1/classify` (see `worker/README.md` for the wire contract), and
+The backend service this file used to describe as the one missing piece is
+built, deployed, and serving: `worker/` is a Cloudflare Worker exposing
+`POST /v1/classify` (see `worker/README.md` for the wire contract),
 `src/lib/verdicts.ts` is the app-side client, wired into
-`team-news-pool.ts`'s enrichment step. **Nobody has deployed it** — no
-Cloudflare account, no KV namespace, no Anthropic API key, no
-`EXPO_PUBLIC_VERDICT_URL` set anywhere — so today this changes nothing
-about how the app behaves; `classifyHeadlines` sees the unset URL and never
-makes a network call. `docs/data-retention.md` was updated in the same
-change, per the one-way-door note at the bottom of this file.
+`team-news-pool.ts`'s enrichment step, and the tracked `.env` points the
+app at it. So every build from this repo now calls it on every pool fetch.
+
+An earlier version of this section said nobody had deployed it and that no
+`EXPO_PUBLIC_VERDICT_URL` was set anywhere. That went stale without anyone
+noticing, which is worth naming: the deploy is the event that changes what
+this app *does at runtime*, and a status note nobody updates on that event
+is worse than none. What's actually true as of 2026-08-20:
+
+| | |
+|---|---|
+| Worker | Deployed — `GET /health` returns `{"ok": true}` |
+| KV namespace | Created; id in `worker/wrangler.toml` |
+| Anthropic API key | Set via `wrangler secret put`, never in this repo |
+| `EXPO_PUBLIC_VERDICT_URL` | Set in the tracked `.env` — every build calls the service |
+| `CLIENT_TOKEN` | Set; the client sends it from the gitignored `.env.local` |
+
+Verify that last row rather than trusting it — an unauthenticated call
+should be refused, and the endpoint was open to the internet for a while
+before anyone checked:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  -H 'content-type: application/json' -d '{"items":[]}' \
+  https://nofrills-verdicts.richard-coil40.workers.dev/v1/classify
+```
+
+`401` is correct. `400` means `CLIENT_TOKEN` is unset on the Worker and
+anyone who reads the URL out of the app bundle can spend against the key —
+capped by `DAILY_CALL_CAP`, but spend it they can.
+
+The two brakes on cost are `DAILY_CALL_CAP` (40 model calls per UTC day, in
+`wrangler.toml`) and a $5 spend limit on the Anthropic account itself. Past
+the cap the endpoint keeps serving cached verdicts and reports `degraded`,
+which the app reads as "use the local rules" — a bug or an abused endpoint
+costs a capped amount and a slightly worse feed, never a surprise bill.
+
+`docs/data-retention.md` describes what the service sees; read that one, not
+this one, for the retention and privacy story.
 
 What this unlocks is narrower than what was originally scoped, though — see
 each numbered section below for which half of it actually landed:
 
 - **Better claim tagging (§3)** is the one item this genuinely delivers on,
-  once deployed: the verdict already carries a `claim` field.
+  and now does: the verdict already carries a `claim` field.
 - **Sources that find themselves (§1)** only got the *filter* half — a
   headline verdict's `sport` and `kind` fields can refine what local rules
   already found. The *discovery* half (asking a news-search service what's

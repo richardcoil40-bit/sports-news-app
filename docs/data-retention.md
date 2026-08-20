@@ -27,7 +27,7 @@ hand-rolled per module:
 | Stat leaders | `lib/team-leaders.ts` | Keyed by team ID — max 18 entries | None (process lifetime) |
 | Team colors | `lib/team-color.ts` | Keyed by team ID — max 18 entries | None (process lifetime) |
 | Player season stats | `lib/player-stats.ts` | Keyed by athlete ID — one per player screen opened | None (process lifetime) |
-| Verdict classifications | `lib/verdicts.ts` | Keyed by headline title — one per unique headline seen; no-op (empty) unless `EXPO_PUBLIC_VERDICT_URL` is set | None (process lifetime) |
+| Verdict classifications | `lib/verdicts.ts` | Keyed by headline title — one per unique headline seen; empty only if `EXPO_PUBLIC_VERDICT_URL` is cleared | None (process lifetime) |
 
 Force-quitting the app clears all of it. None of these can grow without
 limit, but they aren't all bounded the same way. The team-keyed caches are
@@ -40,9 +40,11 @@ so its ceiling is the number of athletes across all 18 rosters (order of
 cleared on quit, but worth stating precisely rather than filing it under
 "capped at 18" with the others. **Verdict classifications are the other
 one**, for the same reason (an entry per unique headline the app has ever
-asked about, not per team) — but only where `EXPO_PUBLIC_VERDICT_URL` is
-configured; otherwise this cache never gains an entry, since `lib/
-verdicts.ts` never makes the network call that would populate it.
+asked about, not per team). That one is live as of 2026-08-20 — the
+service is deployed and the tracked `.env` points at it. Clear
+`EXPO_PUBLIC_VERDICT_URL` and the cache never gains an entry, since
+`lib/verdicts.ts` then never makes the network call that would populate
+it.
 
 The auto-refresh added for the morning/noon/night cycle (`lib/refresh-
 schedule.ts`) doesn't change this: it just forces one of these same bounded
@@ -63,9 +65,9 @@ they're read by the app to decide what to fetch and what to show, and
 that's all.
 Network calls out are to ESPN's public endpoints, the RSS feeds listed in
 `lib/community-sources.ts` and `lib/feeds.ts`, made directly from the
-device the same way any RSS reader would, and — only where
-`EXPO_PUBLIC_VERDICT_URL` is configured — the verdicts service described
-below.
+device the same way any RSS reader would, and — wherever
+`EXPO_PUBLIC_VERDICT_URL` is configured, which as of 2026-08-20 is every
+build from this repo — the verdicts service described below.
 
 ## What the verdicts service sees
 
@@ -108,11 +110,28 @@ stale. Nothing else about a request is persisted on the worker: no logs of
 which title mapped to which app instance, no per-request history beyond
 KV's own bounded write pattern.
 
-**The default is still "nothing is transmitted."** `EXPO_PUBLIC_VERDICT_URL`
-is unset in every build that hasn't explicitly configured it, and
-`lib/verdicts.ts` never makes a network call when it's unset — this whole
-section describes what happens only once someone deliberately points the
-app at a running instance of `worker/`.
+**This section is no longer describing a hypothetical.** It originally
+ended by saying the default is "nothing is transmitted," on the grounds
+that `EXPO_PUBLIC_VERDICT_URL` is unset unless someone deliberately
+configures it. That stopped being true when the Worker was deployed and
+the URL was committed to the tracked `.env`: **every build from this repo
+now sends headline text to the verdicts service.** Everything above
+describes what the app actually does, not what it would do if someone
+switched it on.
+
+Note the shape of that mistake, because it is the same one this section
+was written to correct the first time. The claim was accurate when
+written and went false through a change somewhere else — a deploy and a
+one-line `.env` edit, neither of which looks like it touches privacy
+posture. The trigger to re-read this file is "the app started talking to
+something new," and that trigger fires in commits that don't mention this
+document.
+
+The escape hatch is unchanged and still one line: clear
+`EXPO_PUBLIC_VERDICT_URL` (in `.env`, or override it to empty in
+`.env.local`) and `lib/verdicts.ts` makes no network call at all, exactly
+as before the service existed. What changed is only which way the default
+points.
 
 ## Why this is worth stating explicitly
 

@@ -75,6 +75,35 @@ So: **the link must be removed or converted to Apple in-app purchase
 before any external TestFlight beta or App Store submission.** Not
 before — and not after.
 
+### "Internal" is narrower than it sounds — check which one you're doing
+
+The word doing the work above is *internal*, and it does not mean "a
+private group of people I chose." Apple's two TestFlight modes split on
+who the testers are, not on whether the build is publicly advertised:
+
+- **Internal** — testers must be members of your App Store Connect team,
+  each added individually with a role (Admin, App Manager, Developer,
+  Marketing). Up to 100 people, 30 devices each. **No Beta App Review.**
+- **External** — anyone else: friends, family, testers invited by email
+  or public link. Up to 10,000 people. **Requires Beta App Review**, a
+  lighter pass than full App Store review but a review by Apple all the
+  same.
+
+A build handed to a dozen friends who are not on the App Store Connect
+team is **external testing**, however unadvertised it is. That crosses
+the trigger point named above, even though nothing about it feels
+public. If the testers are going to be added as team members, it's
+internal and the trigger hasn't fired; if they're going to be invited by
+email, it has.
+
+Nothing about this blocks anything today: `DONATION_URL` is still `''`
+in `src/app/settings/developer.tsx` and the button hides itself, so
+there is no ask in the build to remove. The point is to reach that
+decision on purpose. Switching the URL on and inviting external testers
+are two changes that are individually harmless and jointly the thing
+this section exists to prevent — and the order they happen in decides
+whether anyone notices.
+
 Worth reading alongside the team-name/logo question above if this ever
 gets a real legal review before a public launch. A donation link is a
 small step away from framing this as a purely non-commercial passion
