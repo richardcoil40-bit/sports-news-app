@@ -14,7 +14,7 @@ on:
       max_failing:
         description: 'Fail the run if more than this many sources fail. Raise it for a calibration run.'
         required: false
-        default: '1'
+        default: '10'
 
 permissions:
   contents: read
@@ -24,16 +24,33 @@ permissions:
 # in which every single feed died would show a green check and send no
 # email, and this workflow would be decorative.
 #
-# Calibrate this number from a real run rather than guessing. The newest
-# report in docs/evidence/ is 34 passing / 1 failing (2026-08-18), but that
-# was taken from a home IP. Actions runners are datacenter IPs, and the
-# newspaper CDNs in the catalog are exactly the sort that 403 those while
-# working fine from a laptop. Dispatch this manually once with a high
-# max_failing, read the artifact, and set this to whatever the runner's
-# honest baseline turns out to be — a permanently red workflow teaches you
-# to ignore it, which is the same outcome as having no check at all.
+# The number below is calibrated from a real dispatch run (2026-08-21,
+# run 32532904159), not guessed. The runner sees 27 passing / 8 failing
+# where a home IP sees 34 / 1, and seven of those eight are artifacts of
+# where the runner sits rather than dead sources:
+#
+#   ESPN                  202  genuine — fails from a laptop too, see
+#                              docs/evidence/README.md
+#   Seattle Times         202  runner-only
+#   Extra Points          403  runner-only (Substack blocks datacenter IPs)
+#   Eleven Warriors       403  runner-only
+#   News-Gazette          429  runner-only, and the four 429s are one story:
+#   Lincoln Journal Star  429  all four are the same Lee Enterprises
+#   Omaha World-Herald    429  search/?f=rss platform, hit back-to-back
+#   Daily Nebraskan       429  inside a second from a single IP
+#
+# So 10 = the 8 known-noisy plus a little room for the 429s to wander,
+# which they will: they depend on request timing, not on whether the
+# publisher is alive.
+#
+# Be clear about what this check is therefore worth. It catches a
+# collapse — a whole platform going away, the catalog being emptied, the
+# extractor silently drifting. It cannot see individual rot in the seven
+# sources the runner can't reach at all. scripts/check-feeds.sh run from
+# a laptop is still the real instrument, and docs/evidence/ is still its
+# record; this is a smoke alarm, not a replacement.
 env:
-  MAX_FAILING: ${{ github.event.inputs.max_failing || '1' }}
+  MAX_FAILING: ${{ github.event.inputs.max_failing || '10' }}
 
 jobs:
   check-feeds:
