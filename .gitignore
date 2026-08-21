@@ -7,7 +7,12 @@ node_modules/
 .expo/
 dist/
 web-build/
-expo-env.d.ts
+# expo-env.d.ts is deliberately NOT ignored, despite the note inside it.
+# It is generated, but it is also the only thing declaring expo's ambient
+# module types — CSS imports especially. Ignored, `tsc --noEmit` passes on
+# any machine that has run the dev server and fails on a fresh clone, which
+# is exactly what CI is. Tracking it makes the typecheck reproducible; it
+# regenerates to identical content, so it doesn't churn.
 
 # Native
 .kotlin/
