@@ -42,12 +42,12 @@ jobs:
 
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # No `npm ci` on purpose: the script shells out to node only for its
       # source extractor, which uses nothing beyond `fs`.
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
 
@@ -67,7 +67,7 @@ jobs:
       # committing the report.
       - name: Upload evidence report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: feed-status-report
           path: ${{ steps.check.outputs.report }}
