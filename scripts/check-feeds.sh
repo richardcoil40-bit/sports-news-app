@@ -36,6 +36,45 @@ for arg in "$@"; do
 done
 
 UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+
+# Requests are paced, and a 429 is retried once after a longer wait.
+#
+# Both exist because of a CI run rather than a theory. From a GitHub
+# Actions runner this script reported thirteen of the catalog's local
+# papers as HTTP 429, while the same script from a laptop reported all
+# thirteen healthy. They share one CMS — the `search/?f=rss` URLs are
+# TownNews/BLOX, which Lee Enterprises papers and a lot of student papers
+# run — and the script was hitting all of them from a single IP inside two
+# seconds, which reads as a scrape. Which ones tripped varied run to run:
+# Lincoln Journal Star failed and Wisconsin State Journal passed, then the
+# reverse. That variance is the tell that it was our request pattern and
+# not their health.
+#
+# Don't spend more than this trying to be polite — it was measured and it
+# does not pay. Four dispatch runs on the same catalog:
+#
+#   no pacing                              17 failing, ~15s
+#   1s pace, 10s retry                     14 failing, ~3min
+#   10s pace on those URLs, 30s retry      13 failing, ~9.5min
+#   1s pace, 10s retry (repeat)            17 failing, ~3min
+#
+# Read those honestly: the spread is 13-17 whatever the configuration, so
+# pacing's apparent benefit is run-to-run noise, not a result. The 429s
+# are not a burst limit that spacing can satisfy — TownNews/BLOX refuses
+# the runner's datacenter IP as policy and answers 429 while doing it.
+# Those sites are unreachable from CI at any pace.
+#
+# The cheap second and the single retry stay anyway: they cost three
+# minutes of a job nobody waits on, they're the right way to treat someone
+# else's server, and they cost nothing at all locally. The ten-second
+# variant was tried and dropped. Don't rerun either experiment expecting
+# a different answer without new evidence.
+#
+# Both are env-overridable: PACE_SECONDS=0 restores the old fast behavior
+# for an impatient local run, where none of this matters — a home IP never
+# sees these 429s at all.
+PACE_SECONDS="${PACE_SECONDS:-1}"
+RETRY_SECONDS="${RETRY_SECONDS:-10}"
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
@@ -47,15 +86,27 @@ OUT="$EVIDENCE_DIR/feed-status-$STAMP.txt"
 pass=0
 fail=0
 
+fetch() {
+  curl -sS -L --compressed --max-time 20 \
+       -A "$UA" \
+       -o "$TMP" \
+       -w '%{http_code}' \
+       "$1" 2>/dev/null
+}
+
 check() {
   name="$1"
   url="$2"
 
-  status=$(curl -sS -L --compressed --max-time 20 \
-                -A "$UA" \
-                -o "$TMP" \
-                -w '%{http_code}' \
-                "$url" 2>/dev/null)
+  [ "$PACE_SECONDS" = "0" ] || sleep "$PACE_SECONDS"
+  status=$(fetch "$url")
+
+  # One retry, and only for rate limiting — see the note above. Anything
+  # else (404, 403, a timeout) is a real answer and gets reported as one.
+  if [ "$status" = "429" ]; then
+    sleep "$RETRY_SECONDS"
+    status=$(fetch "$url")
+  fi
 
   if [ "$status" != "200" ]; then
     printf '  %-26s %-9s %s\n' "$name" "HTTP $status" "$url"

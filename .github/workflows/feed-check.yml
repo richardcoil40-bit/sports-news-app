@@ -14,7 +14,7 @@ on:
       max_failing:
         description: 'Fail the run if more than this many sources fail. Raise it for a calibration run.'
         required: false
-        default: '10'
+        default: '22'
 
 permissions:
   contents: read
@@ -24,33 +24,41 @@ permissions:
 # in which every single feed died would show a green check and send no
 # email, and this workflow would be decorative.
 #
-# The number below is calibrated from a real dispatch run (2026-08-21,
-# run 32532904159), not guessed. The runner sees 27 passing / 8 failing
-# where a home IP sees 34 / 1, and seven of those eight are artifacts of
-# where the runner sits rather than dead sources:
+# The number below is calibrated from real dispatch runs, not guessed,
+# and re-calibrated after the SEC doubled the catalog. On 60 sources the
+# runner sees roughly 46 passing / 14 failing where a home IP sees 59 / 1.
+#
+# Thirteen of those fourteen are where the runner sits, not dead sources:
 #
 #   ESPN                  202  genuine — fails from a laptop too, see
 #                              docs/evidence/README.md
 #   Seattle Times         202  runner-only
-#   Extra Points          403  runner-only (Substack blocks datacenter IPs)
+#   Extra Points          403  runner-only (Substack refuses datacenter IPs)
 #   Eleven Warriors       403  runner-only
-#   News-Gazette          429  runner-only, and the four 429s are one story:
-#   Lincoln Journal Star  429  all four are the same Lee Enterprises
-#   Omaha World-Herald    429  search/?f=rss platform, hit back-to-back
-#   Daily Nebraskan       429  inside a second from a single IP
+#   9-13 local papers     429  runner-only, and all one story: they share
+#                              the TownNews/BLOX CMS (the search/?f=rss
+#                              URLs), which refuses datacenter IPs as
+#                              policy. Which nine varies run to run.
 #
-# So 10 = the 8 known-noisy plus a little room for the 429s to wander,
-# which they will: they depend on request timing, not on whether the
-# publisher is alive.
+# scripts/check-feeds.sh already paces requests and retries a 429 once.
+# Pacing them ten times harder was measured and changed nothing outside
+# noise — see the note in that script before trying it again.
 #
-# Be clear about what this check is therefore worth. It catches a
-# collapse — a whole platform going away, the catalog being emptied, the
-# extractor silently drifting. It cannot see individual rot in the seven
-# sources the runner can't reach at all. scripts/check-feeds.sh run from
-# a laptop is still the real instrument, and docs/evidence/ is still its
-# record; this is a smoke alarm, not a replacement.
+# 22 = headroom over the worst of four measured runs, which came in at 13,
+# 14, 17 and 17 failing on an unchanged catalog. That spread is the number
+# to design against: it depends on which sites the runner reaches before
+# being refused, not on whether any publisher is alive. A threshold at the
+# midpoint would fail most weeks for no reason, and a workflow that cries
+# wolf gets muted, which is the same as not having one.
+#
+# Be clear about what this check is therefore worth. It catches a collapse
+# — a whole platform going away, the catalog being emptied, the extractor
+# silently drifting. It cannot see the thirteen sources the runner can't
+# reach, which is most of the local-paper tier. scripts/check-feeds.sh run
+# from a laptop is still the real instrument and docs/evidence/ is still
+# its record; this is a smoke alarm, not a replacement.
 env:
-  MAX_FAILING: ${{ github.event.inputs.max_failing || '10' }}
+  MAX_FAILING: ${{ github.event.inputs.max_failing || '22' }}
 
 jobs:
   check-feeds:
