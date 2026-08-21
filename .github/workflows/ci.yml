@@ -1,0 +1,95 @@
+name: CI
+
+# Runs on every push to main, and on every pull request targeting main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# If you push a new commit to the same branch/PR while an earlier run is
+# still going, this cancels the older, now-stale run instead of letting
+# both finish — saves time and avoids confusing overlapping results.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Nothing in this workflow writes to the repo.
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v5
+
+      # Node 24 matches the dev machine (v24.19.0). Keep the two in step:
+      # testing on a Node nobody runs locally is how you get a CI failure
+      # with no local reproduction.
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # --- TypeScript check ---
+      # Resolves to the pinned local typescript (~6.0.3), not a floating
+      # npx download. Fails on type errors without emitting output files.
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      # --- Lint ---
+      # "npm run lint" is "expo lint" per package.json — eslint-config-expo
+      # is a devDependency, so npm ci above is all the setup it needs.
+      - name: Lint
+        run: npm run lint
+
+      # --- Unit tests ---
+      # "npm run test" is "vitest run" — the "run" subcommand already means
+      # "run once and exit," so no extra flags are needed here.
+      - name: Unit tests
+        run: npm run test
+
+      # --- expo-doctor ---
+      # Validates app.json / native config / dependency versions are
+      # consistent. continue-on-error because `npx expo-doctor` fetches the
+      # latest version on every run, so it can start failing on a day you
+      # changed nothing. Worth flipping to a blocking check once you've seen
+      # it come back clean a few times on SDK 57 and trust its "normal".
+      - name: expo-doctor
+        run: npx expo-doctor
+        continue-on-error: true
+
+  # worker/ is a separate package with its own lockfile and its own tsconfig.
+  # The root `npm ci` and root `tsc --noEmit` above do not cover it, so it
+  # needs its own job. There are no tests there — typecheck is all there is.
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: worker
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npm run typecheck

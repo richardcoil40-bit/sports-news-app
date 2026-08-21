@@ -1,0 +1,132 @@
+name: Feed liveness check
+
+# Runs weekly on its own schedule, and can also be triggered manually from
+# the Actions tab (the workflow_dispatch trigger adds a "Run workflow"
+# button). This is deliberately NOT tied to push/pull_request — a flaky
+# third-party feed shouldn't block a PR that has nothing to do with it.
+on:
+  schedule:
+    # Mondays at 13:17 UTC. Deliberately off the hour: GitHub's scheduler is
+    # busiest at :00 and delays those runs the longest.
+    - cron: '17 13 * * 1'
+  workflow_dispatch:
+    inputs:
+      max_failing:
+        description: 'Fail the run if more than this many sources fail. Raise it for a calibration run.'
+        required: false
+        default: '10'
+
+permissions:
+  contents: read
+
+# scripts/check-feeds.sh always exits 0 — it counts failures into the report
+# body, never into its exit status. Without the threshold step below, a week
+# in which every single feed died would show a green check and send no
+# email, and this workflow would be decorative.
+#
+# The number below is calibrated from a real dispatch run (2026-08-21,
+# run 32532904159), not guessed. The runner sees 27 passing / 8 failing
+# where a home IP sees 34 / 1, and seven of those eight are artifacts of
+# where the runner sits rather than dead sources:
+#
+#   ESPN                  202  genuine — fails from a laptop too, see
+#                              docs/evidence/README.md
+#   Seattle Times         202  runner-only
+#   Extra Points          403  runner-only (Substack blocks datacenter IPs)
+#   Eleven Warriors       403  runner-only
+#   News-Gazette          429  runner-only, and the four 429s are one story:
+#   Lincoln Journal Star  429  all four are the same Lee Enterprises
+#   Omaha World-Herald    429  search/?f=rss platform, hit back-to-back
+#   Daily Nebraskan       429  inside a second from a single IP
+#
+# So 10 = the 8 known-noisy plus a little room for the 429s to wander,
+# which they will: they depend on request timing, not on whether the
+# publisher is alive.
+#
+# Be clear about what this check is therefore worth. It catches a
+# collapse — a whole platform going away, the catalog being emptied, the
+# extractor silently drifting. It cannot see individual rot in the seven
+# sources the runner can't reach at all. scripts/check-feeds.sh run from
+# a laptop is still the real instrument, and docs/evidence/ is still its
+# record; this is a smoke alarm, not a replacement.
+env:
+  MAX_FAILING: ${{ github.event.inputs.max_failing || '10' }}
+
+jobs:
+  check-feeds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v5
+
+      # No `npm ci` on purpose: the script shells out to node only for its
+      # source extractor, which uses nothing beyond `fs`.
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Run feed check
+        id: check
+        run: |
+          bash scripts/check-feeds.sh | tee run.log
+          # The script writes a fresh timestamped file and prints its path.
+          # Capture that one specifically, so the upload below doesn't also
+          # sweep up the reports already committed under docs/evidence/.
+          report="$(sed -n 's/^Wrote //p' run.log | tail -1)"
+          echo "report=$report" >> "$GITHUB_OUTPUT"
+
+      # Downloadable under the run's "Artifacts" section, kept 90 days.
+      # Note that means CI runs do not maintain the docs/evidence/ record
+      # itself — that still comes from running the script locally and
+      # committing the report.
+      - name: Upload evidence report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: feed-status-report
+          path: ${{ steps.check.outputs.report }}
+          if-no-files-found: warn
+
+      - name: Fail if too many sources are down
+        env:
+          REPORT: ${{ steps.check.outputs.report }}
+        run: |
+          if [ -z "$REPORT" ] || [ ! -f "$REPORT" ]; then
+            echo "::error::No report was produced — check-feeds.sh failed before writing one."
+            exit 1
+          fi
+
+          # The script's own warning, promoted to a failure. If its regex
+          # extractor drifts out of sync with the shape of source-catalog.ts
+          # it finds zero sources, and a run that checked nothing at all
+          # reports a flawless score.
+          if grep -q 'extracted no sources' "$REPORT"; then
+            echo "::error::The source extractor found nothing — check-feeds.sh has drifted from src/lib/source-catalog.ts."
+            exit 1
+          fi
+
+          summary="$(grep -oE '[0-9]+ passing, [0-9]+ failing' "$REPORT" | tail -1)"
+          if [ -z "$summary" ]; then
+            echo "::error::Could not find the summary line in $REPORT."
+            exit 1
+          fi
+
+          passing="${summary%% passing*}"
+          failing="$(printf '%s' "$summary" | sed -E 's/.*, ([0-9]+) failing/\1/')"
+
+          echo "$summary (threshold: $MAX_FAILING failing)" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$passing" -eq 0 ]; then
+            echo "::error::Zero sources passed. That is far more likely to be the runner's network than every publisher dying at once — check the artifact before touching the catalog."
+            exit 1
+          fi
+
+          if [ "$failing" -gt "$MAX_FAILING" ]; then
+            echo "::error::$failing sources failing, above the threshold of $MAX_FAILING. Download the feed-status-report artifact for the per-source detail."
+            exit 1
+          fi
+
+          echo "$summary — within threshold."
