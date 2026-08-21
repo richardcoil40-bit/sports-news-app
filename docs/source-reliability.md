@@ -298,6 +298,8 @@ Two cautions learned the hard way:
 
 ## Coverage as it stands
 
+### Big Ten
+
 | Program | Tier 1 | Tier 2 | Tier 3 |
 |---|---|---|---|
 | Illinois | News-Gazette | — | The Champaign Room |
@@ -319,11 +321,69 @@ Two cautions learned the hard way:
 | Washington | Seattle Times | — | UW Dawg Pound |
 | Wisconsin | Wisconsin State Journal | — | Bucky's 5th Quarter |
 
-Plus ESPN, CBS Sports, and Yahoo (Tier 1) and Off Tackle Empire (Tier 3) and
-Extra Points (Tier 2) conference-wide.
+### SEC
+
+| Program | Tier 1 | Tier 2 | Tier 3 |
+|---|---|---|---|
+| Alabama | AL.com | — | Roll Bama Roll |
+| Arkansas | Democrat-Gazette | — | The Arkansas Traveler |
+| Auburn | Opelika-Auburn News, AL.com | — | — |
+| Florida | — | Gator Country | — |
+| Georgia | — | — | Dawg Sports, The Red & Black |
+| Kentucky | — | — | A Sea of Blue |
+| LSU | The Advocate | — | And The Valley Shook |
+| Mississippi State | Starkville Daily News | — | — |
+| Missouri | Post-Dispatch | — | Rock M Nation, Columbia Missourian |
+| Ole Miss | — | — | Red Cup Rebellion |
+| Oklahoma | Tulsa World | — | The OU Daily |
+| South Carolina | The Post and Courier | — | — |
+| Tennessee | — | — | Rocky Top Talk |
+| Texas | — | — | Burnt Orange Nation |
+| Texas A&M | The Eagle | — | Good Bull Hunting |
+| Vanderbilt | — | — | Anchor Of Gold |
+
+Plus ESPN, CBS Sports, and Yahoo (Tier 1) and Extra Points (Tier 2) across
+college football, and one conference-wide blog each: Off Tackle Empire
+(Tier 3) for the Big Ten, Saturday Down South (Tier 3) for the SEC.
 
 Weakest coverage: Iowa, Indiana, Purdue, Northwestern, and Maryland run on a
-single Tier 3 source each. Those are the programs to target next.
+single Tier 3 source each, as do Kentucky, Ole Miss, Tennessee and Texas.
+Mississippi State and South Carolina run on a single Tier 1 newsroom each,
+which is the same thinness from the other direction. Those are the programs
+to target next.
+
+### What the SEC cost, and why it was research and not code
+
+Checked 2026-08-21, and worth recording because the answer was different
+from the Big Ten's:
+
+- **SB Nation is half gone here.** Auburn, Arkansas, South Carolina,
+  Oklahoma and Mississippi State lost their blogs, as did Team Speed Kills,
+  the conference-wide one. Those six domains now reset the connection
+  rather than 404 — dead, not moved. Ten SEC blogs survive and are in.
+- **Alligator Army (Florida) still advertises a feed it no longer serves.**
+  The site is live and its own `<link rel="alternate">` points at
+  `/rss/index.xml`, which 404s. That is a broken feed on a working site,
+  so it is worth re-checking rather than writing off.
+- **Gannett is retired here too.** The Gainesville Sun, Knoxville News
+  Sentinel, Austin American-Statesman, Athens Banner-Herald, The Oklahoman,
+  Clarion Ledger, Tennessean, Montgomery Advertiser and Tuscaloosa News all
+  return 200 with an empty body — the same finding as the Big Ten's Des
+  Moines Register and IndyStar. McClatchy (Lexington Herald-Leader, The
+  State) resets the connection to any programmatic request, like the
+  Tribune papers do.
+- **The USA Today "Wire" team sites are gone.** Roll Tide Wire, Gators
+  Wire, Longhorns Wire and the rest all 404 — including the control
+  (Fighting Irish Wire), so this is the network being folded in, not a
+  path change.
+
+Three student papers went in and four did not, on the rule already
+established above: a whole-site WordPress `/feed/` carries campus news and
+opinion, so only sports-scoped feeds qualify. The Red & Black, The OU Daily
+and The Arkansas Traveler publish `?c=sports` feeds and are in; the Daily
+Texan, Vanderbilt Hustler, Daily Mississippian and The Maneater publish
+whole-site feeds and are deferred, exactly like The Lantern and the
+Michigan Daily.
 
 ### Deferred
 

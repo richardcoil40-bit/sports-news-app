@@ -343,10 +343,10 @@ running locally with full access:
 
 ## Scope
 
-Built for Big Ten college football today, with an explicit intent to
-expand to other sports and leagues. Favor sport-agnostic naming and
-structure where it doesn't cost real effort now, so that expansion is
-additive later rather than a rewrite.
+Built for college football today — the Big Ten and the SEC — with an
+explicit intent to expand to other sports and leagues. Favor
+sport-agnostic naming and structure where it doesn't cost real effort
+now, so that expansion is additive later rather than a rewrite.
 
 **Leagues are data, not code.** The catalog lives in
 `src/lib/__data__/leagues.json` and is read through
@@ -383,29 +383,45 @@ shouldn't gain any.
   deliberate groundwork: the day the catalog is fetched instead of
   bundled, no new trust code should be needed.
 
-Two tables are still conference-shaped and deliberately left alone. Both
-are keyed by team slug through `team-slug.ts`, which owns the one alias
-table reconciling ESPN's abbreviations ("Michigan St") with how a school
-is normally written — add a third table and key it the same way rather
+Two modules are still conference-shaped. Both are keyed by team slug
+through `team-slug.ts`, which owns the one alias table reconciling
+ESPN's abbreviations ("Michigan St", "Mississippi St") with how a school
+is normally written — add another table and key it the same way rather
 than re-deriving slugs:
 
-- `community-sources.ts` is a Big Ten–only source table. The *shape* is
-  league-agnostic; only the contents are Big Ten. The real cost of a
-  second conference is the research — every URL in there was verified
-  live — not the code.
+- `community-sources.ts` holds **one source table per conference**, and
+  the SEC's arrival is what proved the point: it was a day of verifying
+  URLs and about ten lines of code. Keep them as separate tables. Slugs
+  are unique per *school*, not per league, and realignment moves schools
+  between conferences — one merged map would eventually serve a school
+  another school's feeds.
 - `team-nicknames.ts` is what each team's local paper calls it
   ("Huskers", "Buckeye Talk"), used to filter that paper's broad sports
-  feed down to the program. Same story: research, not code.
+  feed down to the program. Same story: research, not code. Unlike the
+  sources, this is **one table across conferences on purpose** — the key
+  is a school, and a school's nicknames don't change when it changes
+  conference.
 
   **These are only safe against a source covering that team's own
   region.** "Wildcats" is four schools and "Bruins" is also an NHL team,
   so the national pool and ESPN's feed stay matched on the school name
   alone. Don't widen the callers without doing the per-nickname
-  disambiguation research first.
+  disambiguation research first. The SEC made that rule bite harder, not
+  less: "Tigers" is Auburn, LSU *and* Missouri, so none of the three
+  claims it, and "Bulldogs" belongs to Mississippi State (whose only
+  paper is in Starkville) but not to Georgia. `team-nicknames.test.ts`
+  holds the list of words that must never appear.
 
-No second league is shipped, and basketball appears only as a test
-descriptor in `leagues.test.ts` plus a fixture trimmed from ESPN's live
-NBA standings. Those exercise the two paths one league cannot: a league
-with no conference filter, and the nested `children[]` standings shape
-that comes back when you omit the filter. Adding a real second league is
-a product decision, not a code one.
+**Anything resolving *followed* teams must span every league.** A
+favorite is stored league-qualified (`"sec:333"`), so a screen holding
+one league's team list silently drops every favorite outside it. That is
+what `fetchAllTeams` is for, and what `useTeams()` with no argument
+returns; naming a league scopes it, which only the Favorites picker
+wants. This was invisible while the Big Ten was the only league.
+
+Basketball appears only as a test descriptor in `leagues.test.ts` plus a
+fixture trimmed from ESPN's live NBA standings. Those exercise the two
+paths a conference cannot: a league with no conference filter, and the
+nested `children[]` standings shape that comes back when you omit the
+filter. Adding a league in a *new sport* is still a product decision,
+not a code one.

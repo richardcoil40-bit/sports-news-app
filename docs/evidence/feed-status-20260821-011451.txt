@@ -1,0 +1,70 @@
+Feed liveness report
+  generated  2026-08-21 01:14:51 UTC
+  commit     0a20e40
+  script     scripts/check-feeds.sh
+
+In-app sources (read from src/lib/source-catalog.ts + src/lib/community-sources.ts)
+  ESPN                       HTTP 202  https://www.espn.com/espn/rss/ncf/news
+  CBS Sports                 OK        rss   36 items
+  Yahoo Sports               OK        rss   50 items
+  Extra Points               OK        rss   20 items
+  Off Tackle Empire          OK        atom  10 items
+  Saturday Down South        OK        rss   50 items
+  AL.com                     OK        rss   50 items
+  The News-Gazette           OK        rss   50 items
+  MLive                      OK        rss   50 items
+  Star Tribune               OK        rss   10 items
+  Lincoln Journal Star       OK        rss   50 items
+  Omaha World-Herald         OK        rss   50 items
+  Daily Nebraskan            OK        rss   50 items
+  Eleven Warriors            OK        rss   10 items
+  Cleveland.com              OK        rss   50 items
+  OregonLive                 OK        rss   50 items
+  PennLive                   OK        rss   50 items
+  NJ.com                     OK        rss   50 items
+  Los Angeles Times          OK        rss   97 items
+  The Seattle Times          OK        rss   34 items
+  Wisconsin State Journal    OK        rss   50 items
+  Arkansas Democrat-Gazette  OK        rss   150 items
+  The Arkansas Traveler      OK        rss   50 items
+  Opelika-Auburn News        OK        rss   50 items
+  Gator Country              OK        rss   20 items
+  The Red & Black            OK        rss   50 items
+  The Advocate               OK        rss   50 items
+  Starkville Daily News      OK        rss   50 items
+  St. Louis Post-Dispatch    OK        rss   50 items
+  Columbia Missourian        OK        rss   50 items
+  Tulsa World                OK        rss   50 items
+  The OU Daily               OK        rss   50 items
+  The Post and Courier       OK        rss   50 items
+  The Eagle                  OK        rss   50 items
+  The Champaign Room         OK        atom  10 items
+  The Crimson Quarry         OK        atom  10 items
+  Black Heart Gold Pants     OK        atom  10 items
+  Testudo Times              OK        atom  10 items
+  Maize n Brew               OK        atom  10 items
+  The Only Colors            OK        atom  10 items
+  The Daily Gopher           OK        atom  10 items
+  Corn Nation                OK        atom  10 items
+  Inside NU                  OK        atom  10 items
+  Land-Grant Holy Land       OK        atom  10 items
+  Addicted To Quack          OK        atom  10 items
+  Black Shoe Diaries         OK        atom  10 items
+  Hammer and Rails           OK        atom  10 items
+  On the Banks               OK        atom  10 items
+  UW Dawg Pound              OK        atom  10 items
+  Bucky's 5th Quarter        OK        atom  10 items
+  Roll Bama Roll             OK        atom  10 items
+  Dawg Sports                OK        atom  10 items
+  A Sea of Blue              OK        atom  10 items
+  And The Valley Shook       OK        atom  10 items
+  Rock M Nation              OK        atom  10 items
+  Red Cup Rebellion          OK        atom  10 items
+  Rocky Top Talk             OK        atom  10 items
+  Burnt Orange Nation        OK        atom  10 items
+  Good Bull Hunting          OK        atom  10 items
+  Anchor Of Gold             OK        atom  10 items
+
+----------------------------------------
+  59 passing, 1 failing
+----------------------------------------

@@ -10,6 +10,16 @@
     "seasonStartMonth": 8
   },
   {
+    "id": "sec",
+    "displayName": "SEC",
+    "sport": "Football",
+    "level": "College",
+    "espnSport": "football",
+    "espnLeaguePath": "college-football",
+    "espnGroup": 8,
+    "seasonStartMonth": 8
+  },
+  {
     "id": "nfl",
     "displayName": "NFL",
     "sport": "Football",

@@ -131,10 +131,13 @@ it only sharpens the sources already hand-written.
 
 ### 2. Adding a league without an app release
 
-The *code* boundary is closed and proven: an NFL entry was added to
-`src/lib/__data__/leagues.json`, nothing else was changed, and the team list,
-roster, schedule and colors all loaded correctly against the live API. (It was
-then removed — no second league ships.)
+The *code* boundary is closed and proven, now for real rather than in a
+trial: the SEC shipped as a catalog entry plus its research (a source table
+and nicknames, both keyed the same way the Big Ten's are). No module
+learned about a conference. The one thing that did need code was unrelated
+to the catalog — resolving *followed* teams had to start spanning leagues,
+because a favorite is stored league-qualified and every screen but the
+picker was holding a single league's list.
 
 But that file is bundled **inside** the app, so adding a league today still
 means an App Store release. The requirement was explicitly that it shouldn't.

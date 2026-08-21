@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
+import { DEFAULT_LEAGUE, getLeague } from '@/lib/league-catalog';
 import { League } from '@/lib/leagues';
 import {
   fetchLeagueFeeds,
@@ -48,6 +48,52 @@ describe('a league with no curated sources', () => {
 
   it('is left out of the periodic refresh', () => {
     expect(leaguesWithNationalFeeds().map((l) => l.id)).not.toContain(UNCURATED.id);
+  });
+});
+
+/**
+ * The SEC is the second curated league, and the first thing to prove is
+ * that the two are actually distinct — a shared national array and a
+ * shared slug helper are exactly the shapes that quietly collapse into
+ * one league serving the other's coverage.
+ */
+const SEC = getLeague('sec')!;
+
+describe('two curated leagues', () => {
+  it('share the sport-wide feeds', () => {
+    const bigTen = new Set(nationalFeedsFor(DEFAULT_LEAGUE).map((s) => s.id));
+    expect(nationalFeedsFor(SEC).filter((s) => bigTen.has(s.id)).map((s) => s.id)).toContain(
+      'espn-cfb',
+    );
+  });
+
+  it('each carry their own conference-wide blog and not the other\'s', () => {
+    expect(nationalFeedsFor(DEFAULT_LEAGUE).map((s) => s.id)).toContain('off-tackle-empire');
+    expect(nationalFeedsFor(SEC).map((s) => s.id)).toContain('saturday-down-south');
+    expect(nationalFeedsFor(SEC).map((s) => s.id)).not.toContain('off-tackle-empire');
+  });
+
+  it('resolve team sources from their own table only', () => {
+    expect(teamSourcesFor(SEC, 'Alabama').length).toBeGreaterThan(0);
+    // Michigan is a real slug in the Big Ten table — the SEC must not
+    // reach it, or two conferences sharing one map would go unnoticed.
+    expect(teamSourcesFor(SEC, 'Michigan')).toEqual([]);
+    expect(teamSourcesFor(DEFAULT_LEAGUE, 'Alabama')).toEqual([]);
+  });
+
+  it('resolve the short names ESPN abbreviates', () => {
+    expect(teamSourcesFor(SEC, 'Mississippi St').length).toBeGreaterThan(0);
+    expect(teamSourcesFor(SEC, 'Texas A&M').length).toBeGreaterThan(0);
+  });
+
+  it('tag SEC team sources as beat coverage too', () => {
+    expect(teamSourcesFor(SEC, 'Alabama').every((s) => s.reach === 'beat')).toBe(true);
+  });
+
+  it('are both in the periodic refresh', () => {
+    expect(leaguesWithNationalFeeds().map((l) => l.id)).toEqual(
+      expect.arrayContaining(['big-ten', 'sec']),
+    );
   });
 });
 

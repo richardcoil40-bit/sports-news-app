@@ -1,5 +1,5 @@
 import { createEntityCache } from '@/lib/cache';
-import { communitySourcesForTeam } from '@/lib/community-sources';
+import { bigTenSourcesForTeam, secSourcesForTeam } from '@/lib/community-sources';
 import { FeedSource, FetchAllResult, fetchFeeds } from '@/lib/feeds';
 import { getLeagues } from '@/lib/league-catalog';
 import { League } from '@/lib/leagues';
@@ -21,34 +21,54 @@ import { League } from '@/lib/leagues';
 
 /**
  * The national pool — sources that cover a whole sport rather than any one
- * team. Off Tackle Empire (conference-wide) and Extra Points (the business
- * of college sports) are both wider than a single program, so they count as
- * national even though neither is a big TV network.
+ * team. Extra Points (the business of college sports) is wider than a
+ * single program, so it counts as national even though it isn't a big TV
+ * network.
+ *
+ * Every conference in a sport shares these. They're one array rather than
+ * copied per league so a URL fix lands everywhere at once — and so the
+ * conference-wide blog below stays visibly the only part that differs.
  */
-const BIG_TEN_NATIONAL_FEEDS: FeedSource[] = [
+const NATIONAL_CFB_FEEDS: FeedSource[] = [
   { id: 'espn-cfb', name: 'ESPN', url: 'https://www.espn.com/espn/rss/ncf/news', tier: 1, scope: 'broad', reach: 'national' },
   { id: 'cbs-cfb', name: 'CBS Sports', url: 'https://www.cbssports.com/rss/headlines/college-football/', tier: 1, scope: 'broad', reach: 'national' },
   { id: 'yahoo-cfb', name: 'Yahoo Sports', url: 'https://sports.yahoo.com/college-football/rss.xml', tier: 1, scope: 'broad', reach: 'national' },
-  { id: 'off-tackle-empire', name: 'Off Tackle Empire', url: 'https://www.offtackleempire.com/rss/index.xml', tier: 3, scope: 'broad', reach: 'national' },
   { id: 'extra-points', name: 'Extra Points', url: 'https://extrapoints.substack.com/feed', tier: 2, scope: 'broad', reach: 'national' },
 ];
+
+/**
+ * A conference-wide blog counts as national by the same argument: it is
+ * wider than any one program, so it gets name-filtered down to the team
+ * like the rest of the pool rather than taken whole.
+ *
+ * The SEC's equivalent of Off Tackle Empire would have been SB Nation's
+ * Team Speed Kills, which Vox shut down — see community-sources.ts.
+ * Saturday Down South is the independent that covers that ground.
+ */
+const OFF_TACKLE_EMPIRE: FeedSource = { id: 'off-tackle-empire', name: 'Off Tackle Empire', url: 'https://www.offtackleempire.com/rss/index.xml', tier: 3, scope: 'broad', reach: 'national' };
+const SATURDAY_DOWN_SOUTH: FeedSource = { id: 'saturday-down-south', name: 'Saturday Down South', url: 'https://www.saturdaydownsouth.com/feed/', tier: 3, scope: 'broad', reach: 'national' };
 
 interface LeagueSources {
   /** Feeds covering the whole sport, fetched once and shared across teams. */
   nationalFeeds?: FeedSource[];
   /**
    * Per-team sources, resolved by the team's short name. A function rather
-   * than a table so each league keeps its own naming quirks — the Big Ten
-   * table is keyed by slug with aliases for ESPN's short names, and another
-   * league has no reason to be shaped the same way.
+   * than a table so each league keeps its own naming quirks — the two
+   * conference tables in community-sources.ts are keyed by slug with
+   * aliases for ESPN's short names, and a league that isn't a conference
+   * of schools has no reason to be shaped the same way.
    */
   teamSources?: (teamShortName: string) => FeedSource[];
 }
 
 const CATALOG: Record<string, LeagueSources> = {
   'big-ten': {
-    nationalFeeds: BIG_TEN_NATIONAL_FEEDS,
-    teamSources: communitySourcesForTeam,
+    nationalFeeds: [...NATIONAL_CFB_FEEDS, OFF_TACKLE_EMPIRE],
+    teamSources: bigTenSourcesForTeam,
+  },
+  'sec': {
+    nationalFeeds: [...NATIONAL_CFB_FEEDS, SATURDAY_DOWN_SOUTH],
+    teamSources: secSourcesForTeam,
   },
 };
 

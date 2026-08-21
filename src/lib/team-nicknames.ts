@@ -39,26 +39,63 @@ import { teamSlug } from '@/lib/team-slug';
  * The rule is that an entry has to survive being read in a metro sports
  * section that also covers pro teams.
  *
- * Big Ten only, exactly like community-sources.ts, and for the same
- * reason: the shape is league-agnostic, the contents are research.
+ * ## Why one table across conferences, where sources need two
+ *
+ * community-sources.ts keeps a table per conference because a slug
+ * collision there would serve one school another school's feeds. Here a
+ * collision is harmless in the same way it is meaningless: the key is a
+ * school, and a school has one set of nicknames whichever conference it
+ * currently plays in. Realignment moves the source table's entries between
+ * leagues; it doesn't change what Oklahoma is called.
+ *
+ * The contents are still research, exactly like community-sources.ts —
+ * which is most of what a second conference cost.
  */
 const NICKNAMES_BY_SLUG: Record<string, string[]> = {
+  alabama: ['Crimson Tide', 'Bama'],
+  // "Hogs" is what the Democrat-Gazette writes; the singular is left out
+  // because an Arkansas paper also covers actual hog farming.
+  arkansas: ['Razorback', 'Razorbacks', 'Hogs'],
+  // "Tigers" is claimed by three schools in this conference alone —
+  // Auburn, LSU and Missouri — plus Clemson and a baseball team in
+  // Detroit. So none of the three gets it, and each falls back to the one
+  // name nobody else uses. Auburn's is a yell rather than a nickname, and
+  // its papers print it constantly.
+  auburn: ['War Eagle'],
+  florida: ['Gator', 'Gators'],
+  // "Bulldogs" is Mississippi State's below and half of college sport's
+  // besides; "Dawgs" is Georgia's own spelling and nobody else's.
+  georgia: ['Dawg', 'Dawgs'],
   illinois: ['Illini', 'Fighting Illini'],
   indiana: ['Hoosier', 'Hoosiers'],
   iowa: ['Hawkeye', 'Hawkeyes'],
+  kentucky: ['Wildcat', 'Wildcats'],
   maryland: ['Terp', 'Terps', 'Terrapins'],
   michigan: ['Wolverine', 'Wolverines'],
   'michigan-state': ['Spartan', 'Spartans'],
   minnesota: ['Gopher', 'Gophers', 'Golden Gophers'],
+  // Safe here and not for Georgia because the rule is about the source,
+  // not the word: Mississippi State's only paper is in Starkville, where
+  // the Bulldogs are one team.
+  'mississippi-state': ['Bulldog', 'Bulldogs'],
+  missouri: ['Mizzou'],
   nebraska: ['Husker', 'Huskers', 'Cornhuskers'],
   northwestern: ['Wildcat', 'Wildcats'],
   'ohio-state': ['Buckeye', 'Buckeyes'],
+  oklahoma: ['Sooner', 'Sooners'],
+  'ole-miss': ['Rebel', 'Rebels'],
   oregon: ['Duck', 'Ducks'],
   'penn-state': ['Nittany Lion', 'Nittany Lions'],
   purdue: ['Boilermaker', 'Boilermakers'],
   rutgers: ['Scarlet Knight', 'Scarlet Knights'],
+  'south-carolina': ['Gamecock', 'Gamecocks'],
+  // "Vol" on its own is left out — it is how a volume number abbreviates.
+  tennessee: ['Vols', 'Volunteers'],
+  texas: ['Longhorn', 'Longhorns', 'Horns'],
+  'texas-am': ['Aggie', 'Aggies'],
   ucla: ['Bruin', 'Bruins'],
   usc: ['Trojan', 'Trojans'],
+  vanderbilt: ['Commodore', 'Commodores', 'Vandy'],
   washington: ['Husky', 'Huskies'],
   wisconsin: ['Badger', 'Badgers'],
 };

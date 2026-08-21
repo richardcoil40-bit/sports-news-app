@@ -11,11 +11,19 @@ export function TeamRow({
   onPress,
   following,
   onToggleFollow,
+  detail,
 }: {
   team: Team;
   onPress: () => void;
   following?: boolean;
   onToggleFollow?: () => void;
+  /**
+   * A line under the name — the team's league, where the list spans more
+   * than one. Passed in rather than derived here because most lists are
+   * already scoped to a single league, and repeating "Big Ten" down every
+   * row of the Big Ten's own team list is noise.
+   */
+  detail?: string;
 }) {
   const theme = useTheme();
 
@@ -27,9 +35,14 @@ export function TeamRow({
         ) : (
           <View style={[styles.logo, styles.placeholder, { backgroundColor: theme.backgroundElement }]} />
         )}
-        <ThemedText type="default" style={styles.name}>
-          {team.name}
-        </ThemedText>
+        <View style={styles.names}>
+          <ThemedText type="default">{team.name}</ThemedText>
+          {detail ? (
+            <ThemedText font="mono" themeColor="textSecondary" style={styles.detail}>
+              {detail}
+            </ThemedText>
+          ) : null}
+        </View>
       </TouchableOpacity>
 
       {onToggleFollow ? (
@@ -72,8 +85,15 @@ const styles = StyleSheet.create({
   placeholder: {
     borderRadius: 0,
   },
-  name: {
+  names: {
     flex: 1,
+    gap: 2,
+  },
+  detail: {
+    fontSize: 10.5,
+    lineHeight: 14,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   star: {
     paddingLeft: Spacing.two,

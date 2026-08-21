@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { League } from '@/lib/leagues';
-import { fetchTeams, Team } from '@/lib/teams';
+import { fetchAllTeams, fetchTeams, Team } from '@/lib/teams';
 
 /**
- * A league's teams. Defaults to the catalog's default league, which is
- * what every screen but the Favorites picker wants — the picker is the
- * one place that asks for a league by name.
+ * Teams, from one league or from all of them.
+ *
+ * Naming a league scopes it — that's the Favorites picker, which walks
+ * Sport → Level → League and so has a league in hand. Every other screen
+ * omits it and gets every available league, because what those screens
+ * actually do is resolve *followed* teams, and a favorite is stored
+ * league-qualified: holding one league's list can only ever resolve the
+ * favorites that happen to be in it. That was invisible while the Big Ten
+ * was the only league and became a bug the moment the SEC was added.
  */
 export function useTeams(league?: League) {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -24,7 +30,7 @@ export function useTeams(league?: League) {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchTeams(league);
+      const result = league ? await fetchTeams(league) : await fetchAllTeams();
       if (id !== requestId.current) return;
       setTeams(result);
     } catch {
