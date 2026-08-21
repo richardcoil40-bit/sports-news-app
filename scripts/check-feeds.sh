@@ -50,23 +50,25 @@ UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, l
 # reverse. That variance is the tell that it was our request pattern and
 # not their health.
 #
-# One second of spacing recovered only four of the thirteen, and which
-# four moved around between runs. That is the signature of a per-IP quota
-# counted across the whole platform rather than per domain: whichever
-# TownNews sites the script reaches first spend the budget, and the rest
-# are refused however politely they are asked. So those URLs get their own
-# much longer pace, and everything else keeps the cheap one.
+# Don't spend more than this trying to be polite — it was measured and it
+# does not pay. Three dispatch runs on the same catalog:
 #
-# The retry is what recovers a source that got refused anyway. A feed that
-# answers 429 twice, half a minute apart, is reported failing and deserves
-# to be.
+#   no pacing                              17 failing, ~15s
+#   1s pace, 10s retry                     14 failing, ~3min
+#   10s pace on those URLs, 30s retry      13 failing, ~9.5min
 #
-# All three are env-overridable: PACE_SECONDS=0 PLATFORM_PACE_SECONDS=0
-# restores the old fast behavior for an impatient local run, where none of
-# this matters — a home IP never sees these 429s at all.
+# Six extra minutes bought one source. So the 429s are not a burst limit
+# that spacing can satisfy — TownNews/BLOX is refusing the runner's
+# datacenter IP as policy, and answering 429 while doing it. Nine of those
+# sites are simply unreachable from CI and no pacing changes that. The
+# cheap second and the one retry stay because they cost nothing and are
+# good manners; the ten-second version was tried and deliberately dropped.
+#
+# Both are env-overridable: PACE_SECONDS=0 restores the old fast behavior
+# for an impatient local run, where none of this matters — a home IP never
+# sees these 429s at all.
 PACE_SECONDS="${PACE_SECONDS:-1}"
-PLATFORM_PACE_SECONDS="${PLATFORM_PACE_SECONDS:-10}"
-RETRY_SECONDS="${RETRY_SECONDS:-30}"
+RETRY_SECONDS="${RETRY_SECONDS:-10}"
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
@@ -90,10 +92,7 @@ check() {
   name="$1"
   url="$2"
 
-  case "$url" in
-    *"search/?f=rss"*) [ "$PLATFORM_PACE_SECONDS" = "0" ] || sleep "$PLATFORM_PACE_SECONDS" ;;
-    *)                 [ "$PACE_SECONDS" = "0" ] || sleep "$PACE_SECONDS" ;;
-  esac
+  [ "$PACE_SECONDS" = "0" ] || sleep "$PACE_SECONDS"
   status=$(fetch "$url")
 
   # One retry, and only for rate limiting — see the note above. Anything
