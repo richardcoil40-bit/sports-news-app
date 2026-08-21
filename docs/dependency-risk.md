@@ -4,19 +4,25 @@ Known advisories in this project's dependency tree that are **accepted
 rather than fixed**, why, and what would reverse that decision.
 
 Kept here for the same reason `data-retention.md` exists: so the answer to
-"you have 8 high-severity vulnerabilities, what are you doing about them"
+"you have 4 high-severity vulnerabilities, what are you doing about them"
 is something you can point to, rather than reconstruct under pressure. An
 accepted risk with no written reasoning and no re-evaluation trigger is
 indistinguishable from an ignored one.
 
-Last assessed 2026-08-20 against `expo@57.0.14`.
+Last assessed 2026-08-21 against `expo@57.0.15`.
 
 ## Current state
 
-`npm audit` reports **16 advisories: 0 critical, 8 high, 8 moderate.**
+`npm audit` reports **15 advisories: 0 critical, 4 high, 11 moderate.**
 
-All 16 trace to three root advisories. The other thirteen entries are the
+All 15 trace to three root advisories. The other twelve entries are the
 same three surfacing again at each package that depends on them.
+
+The counts moved on 2026-08-21 with the patch bump to `expo@57.0.15` (8
+high / 8 moderate became 4 high / 11 moderate). That is the dependency
+graph reshaping around the same three advisories, not a new finding: the
+root packages are still `image-size@1.2.1` and `uuid@7.0.3`, at the same
+versions, reached the same ways.
 
 | Severity | Package | Advisory | CVSS | Reached via |
 |---|---|---|---|---|
@@ -51,19 +57,21 @@ finding is bogus.
 ## Why the available "fix" is worse than the finding
 
 `npm audit` reports a fix is available. It is not an upgrade — it is a
-**major downgrade**. For twelve of the sixteen entries npm's proposed
-remediation is:
+**major downgrade**, and as of 2026-08-21 a deeper one than before. The
+`image-size` entries are now offered:
 
 ```
-{"name": "expo", "version": "53.0.27", "isSemVerMajor": true}
+{"name": "expo", "version": "46.0.21", "isSemVerMajor": true}
 ```
 
-A thirteenth is offered `expo-splash-screen@55.0.24`, also a major
-downgrade. That is Expo SDK 53, four majors *behind* the installed
-57.0.14. npm's resolver is not finding a patched newer release; it is
-finding an older tree that predates the advisory. Taking it would mean giving up React
+The `uuid` chain is offered `expo-splash-screen@55.0.24`, also a major
+downgrade. Expo 46 is eleven majors *behind* the installed 57.0.15 — the
+proposal was 53.0.27 when this was last assessed, so it is moving away
+from the installed tree, not toward it. npm's resolver is not finding a
+patched newer release; it is finding an older tree that predates the
+advisory. Taking it would mean giving up React
 19.2 / React Native 0.86, every Expo 57 API this app is built on, and
-whatever has been fixed in Expo between 53 and 57 — to remove a
+whatever has been fixed in Expo between 46 and 57 — to remove a
 build-time DoS. That trade is not worth making, and `npm audit fix`
 without `--force` will correctly decline to make it.
 
@@ -86,7 +94,7 @@ it and it must be assessed on its own:
   `react-native`, `expo-*` runtime modules, `fast-xml-parser`, or
   `@react-native-async-storage/async-storage`. `fast-xml-parser` deserves
   particular attention: it is the one dependency that parses hostile
-  input by design, since it reads XML from 35 third-party feeds. An
+  input by design, since it reads XML from 60 third-party feeds. An
   advisory there is a runtime finding, not a build-time one, and nothing
   in this file applies to it.
 - **A fix that does not require a downgrade** — re-check on every Expo SDK
@@ -103,5 +111,8 @@ npm audit
 
 Re-run on every dependency change and every Expo SDK upgrade, and update
 the table and the "last assessed" date above. If the counts have moved,
-the change is what needs assessing — a stable 16 is not news, and a new
-entry should never be waved through on the strength of this file.
+the change is what needs assessing — a stable count is not news, and a
+new entry should never be waved through on the strength of this file.
+Note that the total can move without anything meaningful changing, as it
+did on 2026-08-21: check whether the *root* advisories changed, not the
+tally.
