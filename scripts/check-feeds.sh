@@ -50,14 +50,23 @@ UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, l
 # reverse. That variance is the tell that it was our request pattern and
 # not their health.
 #
-# The pace is cheap insurance against looking like a burst. The retry is
-# what actually recovers a rate-limited source. A feed that answers 429
-# twice, ten seconds apart, is reported failing and deserves to be.
+# One second of spacing recovered only four of the thirteen, and which
+# four moved around between runs. That is the signature of a per-IP quota
+# counted across the whole platform rather than per domain: whichever
+# TownNews sites the script reaches first spend the budget, and the rest
+# are refused however politely they are asked. So those URLs get their own
+# much longer pace, and everything else keeps the cheap one.
 #
-# Both are env-overridable: PACE_SECONDS=0 restores the old fast behavior
-# for an impatient local run.
+# The retry is what recovers a source that got refused anyway. A feed that
+# answers 429 twice, half a minute apart, is reported failing and deserves
+# to be.
+#
+# All three are env-overridable: PACE_SECONDS=0 PLATFORM_PACE_SECONDS=0
+# restores the old fast behavior for an impatient local run, where none of
+# this matters — a home IP never sees these 429s at all.
 PACE_SECONDS="${PACE_SECONDS:-1}"
-RETRY_SECONDS="${RETRY_SECONDS:-10}"
+PLATFORM_PACE_SECONDS="${PLATFORM_PACE_SECONDS:-10}"
+RETRY_SECONDS="${RETRY_SECONDS:-30}"
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
@@ -81,7 +90,10 @@ check() {
   name="$1"
   url="$2"
 
-  [ "$PACE_SECONDS" = "0" ] || sleep "$PACE_SECONDS"
+  case "$url" in
+    *"search/?f=rss"*) [ "$PLATFORM_PACE_SECONDS" = "0" ] || sleep "$PLATFORM_PACE_SECONDS" ;;
+    *)                 [ "$PACE_SECONDS" = "0" ] || sleep "$PACE_SECONDS" ;;
+  esac
   status=$(fetch "$url")
 
   # One retry, and only for rate limiting — see the note above. Anything
