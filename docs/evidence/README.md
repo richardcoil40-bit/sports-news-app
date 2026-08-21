@@ -32,6 +32,7 @@ before adding a source, and periodically otherwise.
 | `feed-status-20260811-104400.txt` | Second pass, 2026-08-11. Retries of everything that failed the first pass, plus alternates for the programs left with no local newsroom. Produced by a since-removed `check-feeds-round2.sh`. |
 | `feed-status-20260813-024254.txt` | First run of the unified script, 2026-08-13. 34 of 35 in-app sources returning items. |
 | `feed-status-20260818-130515.txt` | 2026-08-18, first run printing the detected feed format. The run that made the Atom problem visible: **17 of 35 sources are `atom`**, and the app could only read `rss`. |
+| `feed-status-20260821-011451.txt` | 2026-08-21, the run that cleared the SEC's 24 new sources before they went in. 59 of 60 returning items; the one failure is ESPN's long-standing 202. |
 
 The two 2026-08-11 files predate the timestamping in the current script — those
 timestamps come from the files' modification times, which is exactly the

@@ -63,6 +63,21 @@ describe('the bundled catalog', () => {
   it('never defaults to a planned league', () => {
     expect(DEFAULT_LEAGUE.status).toBeUndefined();
   });
+
+  // Not a general "the catalog has N leagues" assertion — the point is
+  // that two conferences of the same sport can coexist, which is the
+  // shape every per-entity cache key and every stored favorite had to be
+  // built for before a second one could ship.
+  it('serves two college football conferences side by side', () => {
+    const conferences = getLeagues().filter(
+      (league) => league.sport === 'Football' && league.level === 'College',
+    );
+
+    expect(conferences.map((l) => l.id)).toEqual(expect.arrayContaining(['big-ten', 'sec']));
+    // Same sport and same ESPN league path — they are separated by the
+    // conference group filter alone, so those must differ.
+    expect(new Set(conferences.map((l) => l.espnGroup)).size).toBe(conferences.length);
+  });
 });
 
 describe('parseLeagues', () => {

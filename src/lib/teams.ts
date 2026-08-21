@@ -1,6 +1,6 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
-import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
+import { DEFAULT_LEAGUE, getLeagues } from '@/lib/league-catalog';
 import { espnSitePath, League } from '@/lib/leagues';
 
 /**
@@ -131,10 +131,42 @@ async function fetchTeamsUncached(league: League): Promise<Team[]> {
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const teamsCache = createEntityCache<string, Team[]>({ ttlMs: CACHE_TTL_MS });
 
-/** Defaults to the Big Ten — the only league wired up today. */
+/** One league's teams. Defaults to the catalog's first available league. */
 export async function fetchTeams(
   league: League = DEFAULT_LEAGUE,
   options?: { force?: boolean },
 ): Promise<Team[]> {
   return teamsCache.get(league.id, () => fetchTeamsUncached(league), { force: options?.force });
+}
+
+/**
+ * Every team the app can serve, across every available league.
+ *
+ * This is what anything resolving *followed* teams needs, and the reason
+ * is the whole point of league-qualified favorites: a favorite is stored
+ * as `"sec:333"`, so a screen holding only the Big Ten's team list can
+ * never resolve it. Before a second league existed the two were the same
+ * list, and the Teams tab and home feed both quietly assumed so — with
+ * the SEC added, that assumption drops every SEC team the user follows.
+ *
+ * `Promise.allSettled`, not `Promise.all`, and deliberately at odds with
+ * the throw-on-failure rule `fetchTeamsUncached` follows: one conference's
+ * standings endpoint being down should cost the user that conference, not
+ * every team they follow. The throw still stands when *nothing* resolves,
+ * which is the case that rule exists for — an empty list that looks like a
+ * successful load.
+ */
+export async function fetchAllTeams(options?: { force?: boolean }): Promise<Team[]> {
+  const leagues = getLeagues();
+  const results = await Promise.allSettled(leagues.map((league) => fetchTeams(league, options)));
+
+  const teams = results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+  if (teams.length === 0 && leagues.length > 0) {
+    throw new Error('No league team list could be loaded');
+  }
+
+  // Sorted across leagues rather than concatenated league by league, so a
+  // list spanning conferences still reads alphabetically. Callers that
+  // want them grouped have the leagueId to group on.
+  return teams.sort((a, b) => a.shortName.localeCompare(b.shortName));
 }

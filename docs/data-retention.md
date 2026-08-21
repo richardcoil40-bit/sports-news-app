@@ -20,12 +20,12 @@ hand-rolled per module:
 
 | Cache | File | Bound | TTL |
 |---|---|---|---|
-| National feed pool | `lib/feeds.ts` | Single entry, replaced (not appended) every fetch | 3 minutes |
-| Per-team news pool | `lib/team-news-pool.ts` | Keyed by team ID — max 18 entries (Big Ten only) | 3 minutes |
-| Team list | `lib/teams.ts` | Keyed by league — 1 entry today | 30 minutes |
-| Rosters | `lib/roster.ts` | Keyed by team ID — max 18 entries | None (process lifetime) |
-| Stat leaders | `lib/team-leaders.ts` | Keyed by team ID — max 18 entries | None (process lifetime) |
-| Team colors | `lib/team-color.ts` | Keyed by team ID — max 18 entries | None (process lifetime) |
+| National feed pool | `lib/source-catalog.ts` | Keyed by league — 2 entries (Big Ten, SEC) | 3 minutes |
+| Per-team news pool | `lib/team-news-pool.ts` | Keyed by sport + league path + team ID — max 34 entries (18 Big Ten, 16 SEC) | 3 minutes |
+| Team list | `lib/teams.ts` | Keyed by league — 2 entries today | 30 minutes |
+| Rosters | `lib/roster.ts` | Keyed by sport + league path + team ID — max 34 entries | None (process lifetime) |
+| Stat leaders | `lib/team-leaders.ts` | Keyed by sport + league path + team ID — max 34 entries | None (process lifetime) |
+| Team colors | `lib/team-color.ts` | Keyed by sport + league path + team ID — max 34 entries | None (process lifetime) |
 | Player season stats | `lib/player-stats.ts` | Keyed by athlete ID — one per player screen opened | None (process lifetime) |
 | Verdict classifications | `lib/verdicts.ts` | Keyed by headline title — one per unique headline seen; empty only if `EXPO_PUBLIC_VERDICT_URL` is cleared | None (process lifetime) |
 

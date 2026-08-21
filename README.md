@@ -4,10 +4,11 @@ A plain, ad-free, subscription-free feed of news for the teams you care
 about. No editorializing, no "top stories" algorithm, no clutter — just
 headlines from a curated set of sources, filtered to your teams.
 
-Currently scoped to Big Ten college football while the core is being
-proven out, with the explicit intent to expand to other sports and
-leagues later. Code and naming choices favor sport-agnostic terms where
-reasonable, so that expansion doesn't mean a rewrite.
+Currently scoped to college football — the Big Ten and the SEC — while
+the core is being proven out, with the explicit intent to expand to
+other sports and leagues later. Code and naming choices favor
+sport-agnostic terms where reasonable, so that expansion doesn't mean a
+rewrite.
 
 ## What's actually here
 

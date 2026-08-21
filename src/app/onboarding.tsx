@@ -1,5 +1,5 @@
 import { router, Stack } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,7 +10,9 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
+import { favoriteKey } from '@/lib/favorite-keys';
 import { markOnboarded, setFavorites } from '@/lib/favorites';
+import { getLeague } from '@/lib/league-catalog';
 import { Team } from '@/lib/teams';
 
 /**
@@ -26,6 +28,15 @@ export default function OnboardingScreen() {
   const theme = useTheme();
   const { teams, loading, error } = useTeams();
   const [selected, setSelected] = useState<Team[]>([]);
+
+  // The list is every available league's teams sorted together, so with
+  // more than one conference in it "Georgia" and "Michigan" sit side by
+  // side with nothing saying which is which. Labelled only when there is
+  // actually something to disambiguate.
+  const showLeague = useMemo(
+    () => new Set(teams.map((team) => team.leagueId)).size > 1,
+    [teams],
+  );
 
   const toggle = (team: Team) => {
     setSelected((current) =>
@@ -71,7 +82,9 @@ export default function OnboardingScreen() {
         ) : (
           <FlatList
             data={teams}
-            keyExtractor={(item) => item.id}
+            // League-qualified, like the Teams tab's: an ESPN id is only
+            // unique within a sport, and this list now spans conferences.
+            keyExtractor={(item) => favoriteKey(item.leagueId, item.id)}
             renderItem={({ item }) => (
               <TeamRow
                 team={item}
@@ -80,6 +93,7 @@ export default function OnboardingScreen() {
                   (t) => t.id === item.id && t.leagueId === item.leagueId,
                 )}
                 onToggleFollow={() => toggle(item)}
+                detail={showLeague ? getLeague(item.leagueId)?.displayName : undefined}
               />
             )}
             ItemSeparatorComponent={() => (

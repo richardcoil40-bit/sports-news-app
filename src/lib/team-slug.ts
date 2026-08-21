@@ -10,9 +10,14 @@
  */
 const SLUG_ALIASES: Record<string, string> = {
   'michigan-st': 'michigan-state',
+  'mississippi-st': 'mississippi-state',
   'ohio-st': 'ohio-state',
   'penn-st': 'penn-state',
   'washington-st': 'washington',
+  // Not an ESPN abbreviation like the rest — "Texas A&M" is already how the
+  // school is written. The ampersand is what the slugifier above collapses,
+  // and `texas-a-m` as a table key reads like a typo of one.
+  'texas-a-m': 'texas-am',
 };
 
 /** Lowercased, punctuation-collapsed, and resolved through the aliases. */

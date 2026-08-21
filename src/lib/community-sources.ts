@@ -7,6 +7,13 @@ import { teamSlug } from '@/lib/team-slug';
  * assumption that a feed "should" exist. Tiers follow the criteria in
  * docs/source-reliability.md.
  *
+ * One table per conference, each keyed by slug through team-slug.ts. The
+ * *shape* is league-agnostic and the contents are research — which is the
+ * whole reason a second conference took a day of verifying URLs and about
+ * ten lines of code.
+ *
+ * ## Big Ten
+ *
  * Two gaps are deliberate rather than oversights:
  *
  * - UCLA and USC have no SB Nation blog. Vox shut down its California team
@@ -29,7 +36,16 @@ const SB_NATION = (id: string, name: string, domain: string): FeedSource => ({
   scope: 'team',
 });
 
-const SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
+/** Alabama and Auburn share a statewide paper, the way UCLA and USC do. */
+const AL_COM: FeedSource = {
+  id: 'al-com',
+  name: 'AL.com',
+  url: 'https://www.al.com/arc/outboundfeeds/rss/category/sports/?outputType=xml',
+  tier: 1,
+  scope: 'broad',
+};
+
+const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   illinois: [
     SB_NATION('champaign-room', 'The Champaign Room', 'thechampaignroom.com'),
     {
@@ -186,17 +202,201 @@ const SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   ],
 };
 
-export function communitySourcesForTeam(teamShortName: string): FeedSource[] {
-  // Slug and aliases live in team-slug.ts, shared with the nickname table.
-  const sources = SOURCES_BY_SLUG[teamSlug(teamShortName)] ?? [];
+/**
+ * ## SEC
+ *
+ * Separate from the table above on purpose rather than merged into one
+ * map: slugs are unique per school, not per league, and realignment moves
+ * schools between conferences. Two tables keyed the same way cost nothing
+ * and can't collide.
+ *
+ * Vox shut down more of SB Nation in the SEC than in the Big Ten, so the
+ * gaps here are different ones and worth naming:
+ *
+ * - Auburn, Arkansas, South Carolina, Oklahoma and Mississippi State lost
+ *   their SB Nation blogs (College and Magnolia, Arkansas Fight, Garnet
+ *   And Black Attack, Crimson And Cream Machine, For Whom the Cowbell
+ *   Tolls). All five domains now reset the connection outright rather than
+ *   404 — they are gone, not moved. Team Speed Kills, the conference-wide
+ *   blog that would have been the SEC's Off Tackle Empire, went the same
+ *   way; Saturday Down South covers that ground instead.
+ *
+ * - Alligator Army (Florida) is still publishing and still advertises
+ *   `/rss/index.xml` in its own `<link rel="alternate">`, but that path
+ *   404s. That's a broken feed rather than a dead site, so it's worth
+ *   re-checking; Gator Country carries Florida for now.
+ *
+ * - Gannett owns the metro paper for Florida, Tennessee, Texas, Georgia,
+ *   Oklahoma and Mississippi (Gainesville Sun, Knoxville News Sentinel,
+ *   Austin American-Statesman, Athens Banner-Herald, The Oklahoman,
+ *   Clarion Ledger), and every one of those returns 200 with an empty
+ *   body — the same retirement documented for the Big Ten above. McClatchy
+ *   (Lexington Herald-Leader, The State) resets the connection to any
+ *   programmatic request, like the Tribune papers do.
+ */
+const SEC_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
+  alabama: [
+    SB_NATION('roll-bama-roll', 'Roll Bama Roll', 'rollbamaroll.com'),
+    AL_COM,
+  ],
+  arkansas: [
+    {
+      id: 'arkansas-democrat-gazette',
+      name: 'Arkansas Democrat-Gazette',
+      url: 'https://www.arkansasonline.com/rss/headlines/sports/',
+      tier: 1,
+      scope: 'broad',
+    },
+    {
+      id: 'arkansas-traveler',
+      name: 'The Arkansas Traveler',
+      url: 'https://www.uatrav.com/search/?f=rss&t=article&c=sports&l=50',
+      tier: 3,
+      scope: 'broad',
+    },
+  ],
+  // No blog left, so Auburn runs on its own small-city daily plus the
+  // statewide one it shares with Alabama.
+  auburn: [
+    {
+      id: 'opelika-auburn-news',
+      name: 'Opelika-Auburn News',
+      url: 'https://oanow.com/search/?f=rss&t=article&c=sports&l=50',
+      tier: 1,
+      scope: 'broad',
+    },
+    AL_COM,
+  ],
+  florida: [
+    {
+      id: 'gator-country',
+      name: 'Gator Country',
+      url: 'https://www.gatorcountry.com/feed/',
+      tier: 2,
+      scope: 'team',
+    },
+  ],
+  georgia: [
+    SB_NATION('dawg-sports', 'Dawg Sports', 'dawgsports.com'),
+    {
+      id: 'red-and-black',
+      name: 'The Red & Black',
+      url: 'https://www.redandblack.com/search/?f=rss&t=article&c=sports&l=50',
+      tier: 3,
+      scope: 'broad',
+    },
+  ],
+  kentucky: [SB_NATION('a-sea-of-blue', 'A Sea of Blue', 'aseaofblue.com')],
+  lsu: [
+    SB_NATION('and-the-valley-shook', 'And The Valley Shook', 'andthevalleyshook.com'),
+    // The paper's LSU section rather than its sports front: the latter is
+    // a stub that returns eight items no matter what `l` asks for, while
+    // this one is a full 50 and is already about one program — which is
+    // why it's scoped 'team' where every other newspaper here is 'broad'.
+    //
+    // The comment sits above the entry rather than inside it because
+    // scripts/check-feeds.sh extracts sources by matching `name:` and
+    // `url:` as adjacent lines. Split them and the source silently drops
+    // out of the liveness report while still being fetched by the app.
+    {
+      id: 'the-advocate',
+      name: 'The Advocate',
+      url: 'https://www.theadvocate.com/search/?f=rss&t=article&c=sports/lsu&l=50',
+      tier: 1,
+      scope: 'team',
+    },
+  ],
+  'mississippi-state': [
+    {
+      id: 'starkville-daily-news',
+      name: 'Starkville Daily News',
+      url: 'https://www.starkvilledailynews.com/search/?f=rss&t=article&c=sports&l=50',
+      tier: 1,
+      scope: 'broad',
+    },
+  ],
+  missouri: [
+    SB_NATION('rock-m-nation', 'Rock M Nation', 'rockmnation.com'),
+    {
+      id: 'st-louis-post-dispatch',
+      name: 'St. Louis Post-Dispatch',
+      url: 'https://www.stltoday.com/search/?f=rss&t=article&c=sports&l=50',
+      tier: 1,
+      scope: 'broad',
+    },
+    // Operated by the Missouri School of Journalism, which is a real
+    // affiliation to the university it covers — but the same one the Daily
+    // Nebraskan already carries, and tier 3 is where this app has
+    // consistently filed student and campus newsrooms. Tier 4 is for
+    // athletics-department output, not for a newsroom with an editor.
+    {
+      id: 'columbia-missourian',
+      name: 'Columbia Missourian',
+      url: 'https://www.columbiamissourian.com/search/?f=rss&t=article&c=sports&l=50',
+      tier: 3,
+      scope: 'broad',
+    },
+  ],
+  'ole-miss': [SB_NATION('red-cup-rebellion', 'Red Cup Rebellion', 'redcuprebellion.com')],
+  oklahoma: [
+    {
+      id: 'tulsa-world',
+      name: 'Tulsa World',
+      url: 'https://tulsaworld.com/search/?f=rss&t=article&c=sports&l=50',
+      tier: 1,
+      scope: 'broad',
+    },
+    {
+      id: 'ou-daily',
+      name: 'The OU Daily',
+      url: 'https://www.oudaily.com/search/?f=rss&t=article&c=sports&l=50',
+      tier: 3,
+      scope: 'broad',
+    },
+  ],
+  'south-carolina': [
+    {
+      id: 'post-and-courier',
+      name: 'The Post and Courier',
+      url: 'https://www.postandcourier.com/search/?f=rss&t=article&c=sports&l=50',
+      tier: 1,
+      scope: 'broad',
+    },
+  ],
+  tennessee: [SB_NATION('rocky-top-talk', 'Rocky Top Talk', 'rockytoptalk.com')],
+  texas: [SB_NATION('burnt-orange-nation', 'Burnt Orange Nation', 'burntorangenation.com')],
+  'texas-am': [
+    SB_NATION('good-bull-hunting', 'Good Bull Hunting', 'goodbullhunting.com'),
+    {
+      id: 'the-eagle',
+      name: 'The Eagle',
+      url: 'https://theeagle.com/search/?f=rss&t=article&c=sports&l=50',
+      tier: 1,
+      scope: 'broad',
+    },
+  ],
+  vanderbilt: [SB_NATION('anchor-of-gold', 'Anchor Of Gold', 'anchorofgold.com')],
+};
 
-  // Everything in this file is beat coverage by definition — a team blog,
-  // an independent that covers one program, or a metro paper's sports
-  // section. Tagged here in one place rather than repeated on every
-  // entry, so a source added later can't accidentally be left untagged
-  // and get filed under national. Note this can't be derived from
-  // `scope`: local newsrooms are broad-scoped (they cover pro teams and
-  // other sports too, so they need name-filtering) but are still beat
-  // coverage of the program.
+/**
+ * Everything in this file is beat coverage by definition — a team blog, an
+ * independent that covers one program, or a metro paper's sports section.
+ * Tagged in one place rather than repeated on every entry, so a source
+ * added later can't accidentally be left untagged and get filed under
+ * national. Note this can't be derived from `scope`: local newsrooms are
+ * broad-scoped (they cover pro teams and other sports too, so they need
+ * name-filtering) but are still beat coverage of the program.
+ */
+function beatSources(table: Record<string, FeedSource[]>, teamShortName: string): FeedSource[] {
+  // Slug and aliases live in team-slug.ts, shared with the nickname table.
+  const sources = table[teamSlug(teamShortName)] ?? [];
   return sources.map((source) => ({ ...source, reach: 'beat' as const }));
+}
+
+export function bigTenSourcesForTeam(teamShortName: string): FeedSource[] {
+  return beatSources(BIG_TEN_SOURCES_BY_SLUG, teamShortName);
+}
+
+export function secSourcesForTeam(teamShortName: string): FeedSource[] {
+  return beatSources(SEC_SOURCES_BY_SLUG, teamShortName);
 }

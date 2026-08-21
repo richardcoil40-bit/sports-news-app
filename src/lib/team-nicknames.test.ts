@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { communitySourcesForTeam } from '@/lib/community-sources';
+import { bigTenSourcesForTeam, secSourcesForTeam } from '@/lib/community-sources';
 import { filterArticlesForTeams } from '@/lib/conference-filter';
 import { Article } from '@/lib/feeds';
 import { localNamesFor, schoolNamesFor, teamNicknamesFor } from '@/lib/team-nicknames';
@@ -16,6 +16,13 @@ describe('teamNicknamesFor', () => {
     expect(teamNicknamesFor('Michigan St')).toContain('Spartans');
     expect(teamNicknamesFor('Ohio St')).toContain('Buckeyes');
     expect(teamNicknamesFor('Penn St')).toContain('Nittany Lions');
+    expect(teamNicknamesFor('Mississippi St')).toContain('Bulldogs');
+  });
+
+  // The ampersand is collapsed by the slugifier, not abbreviated by ESPN,
+  // but it resolves through the same alias table.
+  it('resolves a name the slugifier mangles', () => {
+    expect(teamNicknamesFor('Texas A&M')).toContain('Aggies');
   });
 
   it('returns empty for a team nobody has researched', () => {
@@ -49,7 +56,13 @@ describe('the ambiguity rule', () => {
   const everyNickname = new Set(
     ['Illinois', 'Indiana', 'Iowa', 'Maryland', 'Michigan', 'Michigan St', 'Minnesota',
      'Nebraska', 'Northwestern', 'Ohio St', 'Oregon', 'Penn St', 'Purdue', 'Rutgers',
-     'UCLA', 'USC', 'Washington', 'Wisconsin'].flatMap(teamNicknamesFor),
+     'UCLA', 'USC', 'Washington', 'Wisconsin',
+     // The SEC is held to the same list. "Tigers" is the one that bites
+     // here — Auburn, LSU and Missouri all answer to it, so none of them
+     // claims it.
+     'Alabama', 'Arkansas', 'Auburn', 'Florida', 'Georgia', 'Kentucky', 'LSU',
+     'Mississippi St', 'Missouri', 'Ole Miss', 'Oklahoma', 'South Carolina',
+     'Tennessee', 'Texas', 'Texas A&M', 'Vanderbilt'].flatMap(teamNicknamesFor),
   );
 
   for (const word of MUST_NOT_APPEAR) {
@@ -63,7 +76,10 @@ describe('the ambiguity rule', () => {
   // unreachable — harmless, but worth noticing rather than assuming.
   it('every team with nicknames has at least one source', () => {
     for (const name of ['Nebraska', 'Ohio St', 'Michigan', 'Washington']) {
-      expect(communitySourcesForTeam(name).length).toBeGreaterThan(0);
+      expect(bigTenSourcesForTeam(name).length).toBeGreaterThan(0);
+    }
+    for (const name of ['Alabama', 'Arkansas', 'Auburn', 'Mississippi St', 'Missouri']) {
+      expect(secSourcesForTeam(name).length).toBeGreaterThan(0);
     }
   });
 });
