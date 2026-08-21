@@ -1,64 +1,51 @@
 name: Feed liveness check
 
-# Runs weekly on its own schedule, and can also be triggered manually from
-# the Actions tab (the workflow_dispatch trigger adds a "Run workflow"
-# button). This is deliberately NOT tied to push/pull_request — a flaky
-# third-party feed shouldn't block a PR that has nothing to do with it.
+# Manual only. The weekly schedule was removed deliberately — see the note
+# below. This is also NOT tied to push/pull_request: a flaky third-party
+# feed shouldn't block a PR that has nothing to do with it.
 on:
-  schedule:
-    # Mondays at 13:17 UTC. Deliberately off the hour: GitHub's scheduler is
-    # busiest at :00 and delays those runs the longest.
-    - cron: '17 13 * * 1'
-  workflow_dispatch:
-    inputs:
-      max_failing:
-        description: 'Fail the run if more than this many sources fail. Raise it for a calibration run.'
-        required: false
-        default: '22'
+  workflow_dispatch: {}
 
 permissions:
   contents: read
 
 # scripts/check-feeds.sh always exits 0 — it counts failures into the report
-# body, never into its exit status. Without the threshold step below, a week
-# in which every single feed died would show a green check and send no
-# email, and this workflow would be decorative.
+# body, never into its exit status. Without the comparison step below, a run
+# in which every feed died would show a green check and say nothing.
 #
-# The number below is calibrated from real dispatch runs, not guessed,
-# and re-calibrated after the SEC doubled the catalog. On 60 sources the
-# runner sees roughly 46 passing / 14 failing where a home IP sees 59 / 1.
+# WHAT THIS CHECKS, AND WHAT IT CANNOT
 #
-# Thirteen of those fourteen are where the runner sits, not dead sources:
+# From a laptop the catalog reports 59 passing / 1 failing. From a GitHub
+# runner it reports 43-47 / 13-17, and all but one of those failures is the
+# runner's address rather than a dead source: two 202s, two 403s, and the
+# sixteen TownNews/BLOX papers (the search/?f=rss URLs), which refuse
+# datacenter IPs with a 429. Which subset of the sixteen fails moves around
+# run to run. Pacing requests ten times further apart was measured and
+# changed nothing outside noise — see scripts/check-feeds.sh before retrying.
 #
-#   ESPN                  202  genuine — fails from a laptop too, see
-#                              docs/evidence/README.md
-#   Seattle Times         202  runner-only
-#   Extra Points          403  runner-only (Substack refuses datacenter IPs)
-#   Eleven Warriors       403  runner-only
-#   9-13 local papers     429  runner-only, and all one story: they share
-#                              the TownNews/BLOX CMS (the search/?f=rss
-#                              URLs), which refuses datacenter IPs as
-#                              policy. Which nine varies run to run.
+# That baseline is why this doesn't use a failure count. A count threshold
+# had to sit at 22-of-60 to survive a normal run, which meant eight real
+# deaths could hide underneath it — a green check that meant almost nothing.
+# Instead the step below compares the *set* of failing sources against
+# docs/evidence/ci-unreachable.txt and reports only names that aren't on it.
+# One new failure among the ~40 sources CI can reach is now enough to fail
+# the run, and the sixteen it can't reach stay the laptop's job.
 #
-# scripts/check-feeds.sh already paces requests and retries a 429 once.
-# Pacing them ten times harder was measured and changed nothing outside
-# noise — see the note in that script before trying it again.
+# WHY THERE IS NO SCHEDULE
 #
-# 22 = headroom over the worst of four measured runs, which came in at 13,
-# 14, 17 and 17 failing on an unchanged catalog. That spread is the number
-# to design against: it depends on which sites the runner reaches before
-# being refused, not on whether any publisher is alive. A threshold at the
-# midpoint would fail most weeks for no reason, and a workflow that cries
-# wolf gets muted, which is the same as not having one.
+# It ran weekly for exactly as long as it took to notice that a green weekly
+# run was reassurance nobody had earned. With the baseline comparison the
+# signal is real, but the coverage still isn't: a third of the catalog is
+# invisible from here, and the part that's invisible is the local-paper tier,
+# which is the hardest to replace and the most likely to quietly die. A
+# recurring green check on the other two-thirds is precisely the kind of
+# thing that stops people running the real check.
 #
-# Be clear about what this check is therefore worth. It catches a collapse
-# — a whole platform going away, the catalog being emptied, the extractor
-# silently drifting. It cannot see the thirteen sources the runner can't
-# reach, which is most of the local-paper tier. scripts/check-feeds.sh run
-# from a laptop is still the real instrument and docs/evidence/ is still
-# its record; this is a smoke alarm, not a replacement.
-env:
-  MAX_FAILING: ${{ github.event.inputs.max_failing || '22' }}
+# So this is a tool you point at something, not a heartbeat. Run it from the
+# Actions tab when you want a second opinion from a different network.
+# scripts/check-feeds.sh from a laptop remains the instrument, and
+# docs/evidence/ remains the record. Restoring the schedule is four lines if
+# a future catalog is less hostile to datacenter IPs than this one.
 
 jobs:
   check-feeds:
@@ -98,12 +85,17 @@ jobs:
           path: ${{ steps.check.outputs.report }}
           if-no-files-found: warn
 
-      - name: Fail if too many sources are down
+      - name: Compare failures against the known-unreachable baseline
         env:
           REPORT: ${{ steps.check.outputs.report }}
+          BASELINE: docs/evidence/ci-unreachable.txt
         run: |
           if [ -z "$REPORT" ] || [ ! -f "$REPORT" ]; then
             echo "::error::No report was produced — check-feeds.sh failed before writing one."
+            exit 1
+          fi
+          if [ ! -f "$BASELINE" ]; then
+            echo "::error::Baseline $BASELINE is missing. Without it every known-unreachable source reads as a new failure."
             exit 1
           fi
 
@@ -121,20 +113,65 @@ jobs:
             echo "::error::Could not find the summary line in $REPORT."
             exit 1
           fi
-
           passing="${summary%% passing*}"
-          failing="$(printf '%s' "$summary" | sed -E 's/.*, ([0-9]+) failing/\1/')"
-
-          echo "$summary (threshold: $MAX_FAILING failing)" >> "$GITHUB_STEP_SUMMARY"
-
           if [ "$passing" -eq 0 ]; then
             echo "::error::Zero sources passed. That is far more likely to be the runner's network than every publisher dying at once — check the artifact before touching the catalog."
             exit 1
           fi
 
-          if [ "$failing" -gt "$MAX_FAILING" ]; then
-            echo "::error::$failing sources failing, above the threshold of $MAX_FAILING. Download the feed-status-report artifact for the per-source detail."
+          # Pull the name column off every failing line. Matching on the
+          # status token rather than fixed columns on purpose: the name field
+          # is padded to 26, and a longer name would overflow it and shift
+          # every column after it.
+          awk '{
+            line = substr($0, 3)
+            if (match(line, /[ ]+(HTTP [0-9][0-9][0-9]|EMPTY)([ ]|$)/)) {
+              print substr(line, 1, RSTART - 1)
+            }
+          }' "$REPORT" | sort -u > failing.txt
+
+          # Two views of the baseline. Everything on it is allowed to fail;
+          # only the entries NOT marked "~" (intermittent) are expected to
+          # fail every single time, so only those are worth flagging when
+          # they pass. Without that split, the 3-7 TownNews papers that
+          # happen to succeed on any given run would be reported as
+          # recoveries every time — telling you to prune entries you have to
+          # keep, which is how a notice trains people to ignore it.
+          entries="$(grep -v '^[[:space:]]*#' "$BASELINE" | sed 's/[[:space:]]*$//' | grep -v '^$')"
+          printf '%s\n' "$entries" | sed 's/^~[[:space:]]*//' | sort -u > baseline.txt
+          printf '%s\n' "$entries" | grep -v '^~' | sort -u > stable.txt
+
+          new_failures="$(comm -23 failing.txt baseline.txt)"
+          recovered="$(comm -13 failing.txt stable.txt)"
+
+          {
+            echo "$summary"
+            echo ""
+            echo "Baseline: $(wc -l < baseline.txt | tr -d ' ') sources known unreachable from CI."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Not a failure — a source that came back means the baseline is
+          # carrying an excuse it no longer needs. Surfaced so the list gets
+          # pruned rather than quietly growing into a blanket exemption.
+          if [ -n "$recovered" ]; then
+            {
+              echo ""
+              echo "Recovered — consider removing from $BASELINE:"
+              printf '%s\n' "$recovered" | sed 's/^/  - /'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice::These baseline sources passed and could be pruned: $(printf '%s' "$recovered" | tr '\n' ' ')"
+          fi
+
+          if [ -n "$new_failures" ]; then
+            {
+              echo ""
+              echo "NEW failures, not on the baseline:"
+              printf '%s\n' "$new_failures" | sed 's/^/  - /'
+            } >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "$new_failures" | while IFS= read -r name; do
+              echo "::error::$name is failing and is not a known-unreachable source. Download the feed-status-report artifact for its status code."
+            done
             exit 1
           fi
 
-          echo "$summary — within threshold."
+          echo "$summary — no failures outside the known-unreachable baseline."

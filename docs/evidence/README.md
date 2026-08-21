@@ -38,6 +38,29 @@ The two 2026-08-11 files predate the timestamping in the current script — thos
 timestamps come from the files' modification times, which is exactly the
 ambiguity the new naming avoids.
 
+## `ci-unreachable.txt`
+
+Not a report — the list of sources that fail from a GitHub Actions runner but
+not from a laptop, used by `.github/workflows/feed-check.yml` to tell a new
+failure apart from the runner's address.
+
+Twenty of the sixty sources are on it, and sixteen of those twenty are one
+story: the local papers sharing the TownNews/BLOX CMS (the `search/?f=rss`
+URLs) refuse datacenter IPs with a 429. Pacing requests ten times further
+apart was measured across four dispatch runs and changed nothing outside noise
+— the measurements are in `scripts/check-feeds.sh`, so don't spend the
+afternoon rediscovering them.
+
+A `~` prefix marks an entry as intermittent, which all sixteen of those are:
+which subset fails moves run to run. The workflow never suggests pruning those.
+It does flag an unmarked entry that passes, so the list can't quietly turn into
+a set of permanent excuses.
+
+The practical consequence is worth stating plainly: **CI cannot watch the
+local-paper tier at all** — the hardest sources to replace and the likeliest to
+die quietly. That is why the workflow has no schedule and why running this
+script from a laptop is still the real check.
+
 ## Silent failures — resolved 2026-08-18
 
 Two problems here, one much larger than the other, both now fixed in

@@ -1,0 +1,57 @@
+# Sources that fail from a GitHub Actions runner but not from a laptop.
+#
+# The feed-liveness workflow compares each run's failures against this list
+# and reports only the ones that aren't on it. That is the whole point: a
+# count-based threshold had to be set so loose (22 of 60) that real rot could
+# hide under it, while this lets the check react to a single new failure
+# among the sources CI can actually reach.
+#
+# One name per line, matching the name column in the report exactly.
+# Blank lines and # comments are ignored.
+#
+# A leading "~" means intermittent: expected to fail *sometimes*. The
+# workflow never suggests pruning those, because a run where one of them
+# passes is normal rather than evidence it recovered. Everything without a
+# "~" is expected to fail every time, so if one of those passes the workflow
+# says so — that's what keeps this list from rotting into permanent excuses.
+# Measured 2026-08-21 across four dispatch runs (32532904159, 32533626897,
+# 32533974955, 32534721347).
+
+# --- Genuinely broken, and known ---
+# Answers 202 with an empty body from anywhere, laptop included. See the
+# write-up in docs/evidence/README.md.
+ESPN
+
+# --- Refuse datacenter IPs (403) ---
+Extra Points
+Eleven Warriors
+
+# --- Answers 202 to a runner, 200 to a laptop ---
+The Seattle Times
+
+# --- TownNews/BLOX papers: refuse datacenter IPs with 429 ---
+# All sixteen share one CMS (the search/?f=rss URLs). Between 9 and 13 of
+# them fail on any given run and *which* ones varies run to run, so all
+# sixteen are listed — a run where a different subset fails is normal, not
+# news. Pacing requests ten times further apart changed nothing outside
+# noise; see the measurements in scripts/check-feeds.sh before retrying it.
+#
+# This is the real cost of running the check from CI: these sixteen are the
+# local-paper tier, the hardest sources to replace, and CI cannot watch any
+# of them. Running scripts/check-feeds.sh from a laptop is what covers them.
+~ The News-Gazette
+~ Lincoln Journal Star
+~ Omaha World-Herald
+~ Daily Nebraskan
+~ Wisconsin State Journal
+~ The Arkansas Traveler
+~ Opelika-Auburn News
+~ The Red & Black
+~ The Advocate
+~ Starkville Daily News
+~ St. Louis Post-Dispatch
+~ Columbia Missourian
+~ Tulsa World
+~ The OU Daily
+~ The Post and Courier
+~ The Eagle
