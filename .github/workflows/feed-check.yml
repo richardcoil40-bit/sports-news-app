@@ -14,7 +14,7 @@ on:
       max_failing:
         description: 'Fail the run if more than this many sources fail. Raise it for a calibration run.'
         required: false
-        default: '18'
+        default: '22'
 
 permissions:
   contents: read
@@ -35,19 +35,21 @@ permissions:
 #   Seattle Times         202  runner-only
 #   Extra Points          403  runner-only (Substack refuses datacenter IPs)
 #   Eleven Warriors       403  runner-only
-#   ~9 local papers       429  runner-only, and all one story: they share
+#   9-13 local papers     429  runner-only, and all one story: they share
 #                              the TownNews/BLOX CMS (the search/?f=rss
 #                              URLs), which refuses datacenter IPs as
 #                              policy. Which nine varies run to run.
 #
 # scripts/check-feeds.sh already paces requests and retries a 429 once.
-# Pacing them ten times harder was measured and bought exactly one more
-# source for six more minutes, so it isn't a rate limit that patience can
-# satisfy — see the note in that script before trying it again.
+# Pacing them ten times harder was measured and changed nothing outside
+# noise — see the note in that script before trying it again.
 #
-# 18 = the ~14 known-noisy plus room for the 429s to wander, which they do:
-# they depend on which sites the runner reaches before being refused, not
-# on whether the publisher is alive.
+# 22 = headroom over the worst of four measured runs, which came in at 13,
+# 14, 17 and 17 failing on an unchanged catalog. That spread is the number
+# to design against: it depends on which sites the runner reaches before
+# being refused, not on whether any publisher is alive. A threshold at the
+# midpoint would fail most weeks for no reason, and a workflow that cries
+# wolf gets muted, which is the same as not having one.
 #
 # Be clear about what this check is therefore worth. It catches a collapse
 # — a whole platform going away, the catalog being emptied, the extractor
@@ -56,7 +58,7 @@ permissions:
 # from a laptop is still the real instrument and docs/evidence/ is still
 # its record; this is a smoke alarm, not a replacement.
 env:
-  MAX_FAILING: ${{ github.event.inputs.max_failing || '18' }}
+  MAX_FAILING: ${{ github.event.inputs.max_failing || '22' }}
 
 jobs:
   check-feeds:

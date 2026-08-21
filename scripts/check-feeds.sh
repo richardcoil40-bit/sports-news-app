@@ -51,18 +51,24 @@ UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, l
 # not their health.
 #
 # Don't spend more than this trying to be polite — it was measured and it
-# does not pay. Three dispatch runs on the same catalog:
+# does not pay. Four dispatch runs on the same catalog:
 #
 #   no pacing                              17 failing, ~15s
 #   1s pace, 10s retry                     14 failing, ~3min
 #   10s pace on those URLs, 30s retry      13 failing, ~9.5min
+#   1s pace, 10s retry (repeat)            17 failing, ~3min
 #
-# Six extra minutes bought one source. So the 429s are not a burst limit
-# that spacing can satisfy — TownNews/BLOX is refusing the runner's
-# datacenter IP as policy, and answering 429 while doing it. Nine of those
-# sites are simply unreachable from CI and no pacing changes that. The
-# cheap second and the one retry stay because they cost nothing and are
-# good manners; the ten-second version was tried and deliberately dropped.
+# Read those honestly: the spread is 13-17 whatever the configuration, so
+# pacing's apparent benefit is run-to-run noise, not a result. The 429s
+# are not a burst limit that spacing can satisfy — TownNews/BLOX refuses
+# the runner's datacenter IP as policy and answers 429 while doing it.
+# Those sites are unreachable from CI at any pace.
+#
+# The cheap second and the single retry stay anyway: they cost three
+# minutes of a job nobody waits on, they're the right way to treat someone
+# else's server, and they cost nothing at all locally. The ten-second
+# variant was tried and dropped. Don't rerun either experiment expecting
+# a different answer without new evidence.
 #
 # Both are env-overridable: PACE_SECONDS=0 restores the old fast behavior
 # for an impatient local run, where none of this matters — a home IP never
