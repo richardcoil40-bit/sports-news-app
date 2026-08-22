@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ArticleCard } from '@/components/article-card';
 import { CaughtUpMarker } from '@/components/caught-up-marker';
-import { CollapsibleSection } from '@/components/collapsible-section';
+import { CollapsibleSectionHeader } from '@/components/collapsible-section';
 import { DropdownPill, type DropdownOption } from '@/components/dropdown-pill';
 import { SettingsButton } from '@/components/settings-button';
 import { Logo } from '@/components/logo';
@@ -185,6 +185,69 @@ export default function FeedScreen() {
     [visibleArticles, cutoff],
   );
 
+  // Which collapsed sections are open. It lives here rather than inside
+  // each header because the stories under a header are rows of the list
+  // below, not children of it — see CollapsibleSectionHeader. Still only
+  // for as long as this screen is mounted: a remembered "earlier" would
+  // quietly turn the endless feed back on.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (id: string) =>
+    setOpenSections((current) => ({ ...current, [id]: !current[id] }));
+
+  type FeedRow =
+    | { kind: 'card'; key: string; article: (typeof visibleArticles)[number]; ruled: boolean }
+    | { kind: 'marker'; key: string; message: string }
+    | { kind: 'section'; key: string; id: string; label: string; count: number; open: boolean };
+
+  /**
+   * One flat list of rows, rather than a list of the brief plus a footer
+   * holding the other two sections.
+   *
+   * A FlatList only virtualizes what is in `data`. Chatter and Earlier used
+   * to be `.map()`ed into plain Views inside ListFooterComponent, which
+   * makes the whole of each one a single list item — so opening Earlier
+   * mounted every card in it at once, and `splitBrief` puts most of a
+   * multi-team feed there. Section headers and the finish line are rows of
+   * their own now, and a *closed* section costs exactly one row.
+   */
+  const rows = useMemo<FeedRow[]>(() => {
+    // Each card draws its own top rule instead of leaning on
+    // ItemSeparatorComponent, because its neighbours are no longer all
+    // cards: a separator above the caught-up marker or a section header
+    // would sit on top of the 1.5px rule each of those already draws.
+    const cards = (group: string, items: typeof visibleArticles): FeedRow[] =>
+      items.map((article, index) => ({
+        kind: 'card',
+        // Qualified by section, since a link is only unique within one and
+        // all three are now keys in the same list.
+        key: `${group}:${article.link}`,
+        article,
+        ruled: index > 0,
+      }));
+
+    if (!sectioned || !sections) return cards('feed', visibleArticles);
+
+    const out: FeedRow[] = cards('brief', sections.brief);
+    out.push({
+      kind: 'marker',
+      key: 'caught-up',
+      message: caughtUpMessage(sections, periodLabel),
+    });
+
+    for (const { id, label, items } of [
+      { id: 'chatter', label: 'rumors & takes', items: sections.chatter },
+      { id: 'earlier', label: 'earlier', items: sections.earlier },
+    ]) {
+      // Omitted rather than rendered as a header reading "0 earlier".
+      if (items.length === 0) continue;
+      const open = openSections[id] ?? false;
+      out.push({ kind: 'section', key: `section:${id}`, id, label, count: items.length, open });
+      if (open) out.push(...cards(id, items));
+    }
+
+    return out;
+  }, [sectioned, sections, visibleArticles, periodLabel, openSections]);
+
   // Widened past Article because the detail screen shows the same claim
   // chip the row does, and re-classifying there would repeat a few hundred
   // regex tests for a story that was already classified to get here. It is
@@ -221,16 +284,28 @@ export default function FeedScreen() {
     />
   );
 
-  // The collapsed sections render their rows themselves rather than
-  // through a list, so they have to draw the rule the FlatList's
-  // separator draws for the brief above — without one under the section
-  // header, whose own bottom border already closes that edge.
-  const renderSectionCard = (item: (typeof visibleArticles)[number], index: number) => (
-    <View key={item.link}>
-      {index > 0 ? <View style={[styles.separator, { backgroundColor: theme.text }]} /> : null}
-      {renderCard(item)}
-    </View>
-  );
+  const renderRow = ({ item }: { item: FeedRow }) => {
+    if (item.kind === 'marker') return <CaughtUpMarker message={item.message} />;
+    if (item.kind === 'section') {
+      return (
+        <CollapsibleSectionHeader
+          label={item.label}
+          count={item.count}
+          open={item.open}
+          onToggle={() => toggleSection(item.id)}
+        />
+      );
+    }
+    // No rule above the first card of a section: the header's own bottom
+    // border already closes that edge, and the brief's first card sits
+    // directly under the one the screen header draws.
+    return (
+      <View>
+        {item.ruled ? <View style={[styles.separator, { backgroundColor: theme.text }]} /> : null}
+        {renderCard(item.article)}
+      </View>
+    );
+  };
 
   // What the empty states call the current scope. Only names a team when
   // exactly one is selected — "no reported news for Nebraska and two
@@ -387,25 +462,9 @@ export default function FeedScreen() {
           </View>
         ) : (
           <FlatList
-            data={sectioned && sections ? sections.brief : visibleArticles}
-            keyExtractor={(item) => item.link}
-            renderItem={({ item }) => renderCard(item)}
-            ItemSeparatorComponent={() => (
-              <View style={[styles.separator, { backgroundColor: theme.text }]} />
-            )}
-            ListFooterComponent={
-              sectioned && sections ? (
-                <View>
-                  <CaughtUpMarker message={caughtUpMessage(sections, periodLabel)} />
-                  <CollapsibleSection label="rumors & takes" count={sections.chatter.length}>
-                    {sections.chatter.map(renderSectionCard)}
-                  </CollapsibleSection>
-                  <CollapsibleSection label="earlier" count={sections.earlier.length}>
-                    {sections.earlier.map(renderSectionCard)}
-                  </CollapsibleSection>
-                </View>
-              ) : null
-            }
+            data={rows}
+            keyExtractor={(item) => item.key}
+            renderItem={renderRow}
             // A brief longer than the viewport reaches its "end" during
             // initial layout, so onEndReached alone would retire stories
             // nobody scrolled to. briefWasSeen() distinguishes that from a
@@ -422,10 +481,11 @@ export default function FeedScreen() {
             scrollEventThrottle={200}
             onEndReached={sectioned ? () => reachedEnd(briefWasSeen()) : undefined}
             onEndReachedThreshold={0.1}
-            // Suppressed in sectioned mode: the caught-up marker in the
-            // footer already says there's nothing new, and this copy is
-            // written for the whole feed — it would claim the feed is empty
-            // while Earlier sits one tap below holding two dozen stories.
+            // Suppressed in sectioned mode, where the caught-up marker is
+            // itself a row and already says there's nothing new. This copy
+            // is written for the whole feed — it would claim the feed is
+            // empty while Earlier sits one tap below holding two dozen
+            // stories.
             ListEmptyComponent={
               sectioned ? null : (
               <View style={styles.centered}>

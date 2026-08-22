@@ -20,6 +20,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Colors, fontFamilyFor } from '@/constants/theme';
 import { hasOnboarded, hydrateFavorites } from '@/lib/favorites';
+import { refreshLeagueCatalog } from '@/lib/league-catalog';
 import { refreshIfNewPeriod } from '@/lib/refresh-schedule';
 
 SplashScreen.preventAutoHideAsync();
@@ -45,6 +46,24 @@ function useAutoRefresh() {
     });
 
     return () => subscription.remove();
+  }, []);
+}
+
+/**
+ * Pulls the league catalog from the Worker once per launch, so a league
+ * added on the server reaches this device without an App Store release.
+ *
+ * Deliberately fire-and-forget, and deliberately not sequenced ahead of
+ * favorites hydration or the first-launch redirect below. Both of those
+ * decide what the user sees in the first frame, and holding them behind a
+ * network call would trade a working app on the bundled catalog for a
+ * spinner whenever the network is slow. `refreshLeagueCatalog` never
+ * installs an unusable list and logs when it falls back, so the worst case
+ * here is the app running the catalog it shipped with.
+ */
+function useLeagueCatalogRefresh() {
+  useEffect(() => {
+    refreshLeagueCatalog();
   }, []);
 }
 
@@ -142,6 +161,7 @@ const HEADER_OPTIONS = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   useFonts(FONTS);
+  useLeagueCatalogRefresh();
   useAutoRefresh();
   useFirstLaunchRouting();
   return (

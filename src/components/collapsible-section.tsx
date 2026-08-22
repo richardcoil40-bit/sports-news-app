@@ -1,5 +1,4 @@
-import { ReactNode, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -11,40 +10,43 @@ import { useTheme } from '@/hooks/use-theme';
  * Used for both "rumors & takes" and "earlier", because they're the same
  * affordance and one component is better than two that drift apart.
  *
- * Starts closed every visit and that state is deliberately **not**
- * persisted. The point of the brief is that the default path through the
- * screen ends; remembering that you opened Earlier yesterday would quietly
- * turn the endless feed back on and undo the whole thing.
+ * It renders the header **only**, and is told whether it is open rather
+ * than remembering: the rows it reveals are rows of the feed's own list,
+ * so that this stays virtualized when Earlier holds two hundred stories.
+ * Wrapping them as children would have put them all inside one list item,
+ * which is the whole problem — mounting every card at once is exactly what
+ * a FlatList exists to avoid.
+ *
+ * Open state therefore lives on the screen, and still lasts only as long
+ * as the screen is mounted. That part is deliberate: the point of the
+ * brief is that the default path through it ends, and remembering that you
+ * opened Earlier yesterday would quietly turn the endless feed back on.
  */
-export function CollapsibleSection({
+export function CollapsibleSectionHeader({
   label,
   count,
-  children,
+  open,
+  onToggle,
 }: {
   label: string;
   count: number;
-  children: ReactNode;
+  open: boolean;
+  onToggle: () => void;
 }) {
   const theme = useTheme();
-  const [open, setOpen] = useState(false);
-
-  if (count === 0) return null;
 
   return (
-    <View>
-      <TouchableOpacity
-        onPress={() => setOpen((v) => !v)}
-        activeOpacity={0.6}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        accessibilityLabel={`${count} ${label}`}
-        style={[styles.header, { borderBottomColor: theme.text }]}>
-        <ThemedText type="smallBold" style={styles.label}>
-          {open ? '▾' : '▸'} {count} {label}
-        </ThemedText>
-      </TouchableOpacity>
-      {open ? children : null}
-    </View>
+    <TouchableOpacity
+      onPress={onToggle}
+      activeOpacity={0.6}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      accessibilityLabel={`${count} ${label}`}
+      style={[styles.header, { borderBottomColor: theme.text }]}>
+      <ThemedText type="smallBold" style={styles.label}>
+        {open ? '▾' : '▸'} {count} {label}
+      </ThemedText>
+    </TouchableOpacity>
   );
 }
 

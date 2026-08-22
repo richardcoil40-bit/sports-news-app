@@ -36,6 +36,20 @@ import { aliasIssues, teamSlug } from '@/lib/team-slug';
  * This file used to hardcode its 34 teams inline, as team-nicknames.test.ts
  * still did for the ambiguity rule. Both were correct at 34 teams and
  * neither survives 900.
+ *
+ * ## Why a hosted catalog doesn't route around this
+ *
+ * The catalog is served by the Worker now, so in principle a league could
+ * reach every install without anyone running `npm test`. It can't, and the
+ * reason is one import: `worker/src/index.ts` serves
+ * `__data__/leagues.json` itself, reached across from this repo rather than
+ * copied. A league only exists by being added to the file this reads, so
+ * the gate covers the deploy path and the bundle path at once.
+ *
+ * That is load-bearing rather than incidental. If the Worker ever grows its
+ * own copy of the catalog — a KV entry, a second file, anything editable
+ * without this repo — the gate stops applying to the way leagues actually
+ * ship, and it will still pass.
  */
 
 const snapshotLeagues: Record<string, (typeof snapshot.leagues)[keyof typeof snapshot.leagues]> =

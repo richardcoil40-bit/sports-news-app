@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import corpus from '@/lib/__fixtures__/cluster-corpus.json';
 import {
@@ -251,10 +251,18 @@ describe('degenerate inputs', () => {
     expect(clusters).toHaveLength(2);
   });
 
-  it('skips clustering entirely past the safety cap', () => {
+  // The result of the cap is indistinguishable from a feed with no
+  // duplicates in it, so the warning is the only way anyone finds out.
+  it('skips clustering entirely past the safety cap, and says so', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const same = 'Michigan hires Brian Hartline as offensive coordinator';
     const many = Array.from({ length: 1600 }, () => article(same));
+
     expect(clusterArticles(many)).toHaveLength(1600);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toContain('1600');
+
+    warn.mockRestore();
   });
 
   it('stays fast on a realistically large feed', () => {

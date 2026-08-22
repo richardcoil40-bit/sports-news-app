@@ -410,6 +410,46 @@ new constant, and never an edit to a module. The goal it serves is that
 adding the NFL should not require shipping a new build of the app, so
 resist anything that puts a league back into TypeScript.
 
+**And it is hosted, so it doesn't require shipping a build at all.**
+`GET /v1/leagues` on the Worker in `worker/` serves that same JSON file —
+imported across from the app repo rather than copied, so the served copy and
+the bundled one can't drift. `refreshLeagueCatalog()` fires once from
+`_layout.tsx` and installs the result over the bundled list; the bundled file
+stays as the shipped default and the offline fallback. Adding a league is now
+an edit to that JSON plus a `wrangler deploy`.
+
+Three things about that are load-bearing:
+
+- **The fetch throws; it never degrades to empty.** This is `teams.ts`'s
+  exception, for `teams.ts`'s reason, and it is the easiest thing here to get
+  backwards. `fetchLeagueCatalog` rejects on a non-OK response, on a body that
+  isn't JSON, and on JSON that yields no *available* league — an empty array,
+  an array of junk, or a catalog of nothing but planned entries.
+  `refreshLeagueCatalog` catches that and keeps whatever list is in force. A
+  catalog that degrades to `[]` is an app with no tabs, no filters and no
+  favorites, rendering as though it loaded fine. A document that yields
+  *some* leagues alongside junk is a success — `parseLeagues` drops bad
+  entries individually, the same line the feed layer draws between a quiet
+  publisher and a broken source.
+- **`DEFAULT_LEAGUE` stays pinned to the bundled catalog** while
+  `getLeagues()` / `getCatalogLeagues()` / `getLeague()` follow whatever is
+  installed. Its callers resolve an *absent* league id — a favorite written
+  before keys were league-qualified, a deep link that arrived without one —
+  and those are questions about what this build shipped with. A remote
+  reorder silently changing which league a legacy favorite migrates into
+  would be worse, and invisible.
+- **Screens that render the catalog use `useLeagueCatalog()`**, not
+  `getCatalogLeagues()` directly, so a remote list landing a moment after a
+  picker mounts re-renders it instead of sitting unseen until the screen
+  remounts. Everything else reads `getLeagues()` at fetch time, which is
+  already whatever is in force by then. `getLeagues()` memoizes its filtered
+  array and `install` invalidates it — don't reintroduce a fresh
+  `.filter()` per call, it's read from three render paths.
+
+With `EXPO_PUBLIC_CATALOG_URL` unset, none of this touches the network and
+the catalog is exactly the bundled file — the same hard requirement
+`verdicts.ts` holds itself to for `EXPO_PUBLIC_VERDICT_URL`.
+
 `League` itself (the type, plus the pure URL/season helpers) stays in
 `src/lib/leagues.ts`. That file holds no league data at all, and
 shouldn't gain any.
@@ -450,9 +490,11 @@ shouldn't gain any.
   until games are played, and setting it a month early silently returns
   zero stat leaders all preseason.
 - **`parseLeagues` validates as if the data were hostile**, dropping bad
-  entries individually and falling back to the bundled catalog. That is
-  deliberate groundwork: the day the catalog is fetched instead of
-  bundled, no new trust code should be needed.
+  entries individually and falling back to the bundled catalog. That was
+  written as groundwork for the day the catalog arrived over the network,
+  and when that day came it needed no new trust code: not a line of it
+  changed. Keep it that way — validation belongs at that one gate, not
+  spread across the callers.
 
 Two modules are still conference-shaped. Both are keyed by team slug
 through `team-slug.ts`, which owns the one alias table reconciling

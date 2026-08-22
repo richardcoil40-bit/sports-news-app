@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import {
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
   useWindowDimensions,
@@ -55,6 +56,12 @@ interface Anchor {
 
 const PANEL_GAP = 8;
 const SCREEN_MARGIN = 12;
+/**
+ * A floor for the panel, for a pill low enough on screen that there is
+ * barely any room under it. Overhanging the bottom edge by a little is
+ * better than a panel too short to show a row.
+ */
+const MIN_PANEL_HEIGHT = 120;
 
 export function DropdownPill({
   label,
@@ -86,7 +93,7 @@ export function DropdownPill({
   style?: StyleProp<ViewStyle>;
 }) {
   const theme = useTheme();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const pill = useRef<View>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
 
@@ -113,17 +120,24 @@ export function DropdownPill({
   // doesn't hang off it. Right-aligned panels are positioned from the
   // right edge for the same reason the design does: the filter pill sits
   // against it, and measuring from the left would need the pill's width.
+  const panelTop = anchor ? anchor.y + anchor.height + PANEL_GAP : 0;
   const panelPosition = anchor
     ? align === 'right'
       ? {
           right: Math.max(SCREEN_MARGIN, screenWidth - (anchor.x + anchor.width)),
-          top: anchor.y + anchor.height + PANEL_GAP,
+          top: panelTop,
         }
       : {
           left: Math.max(SCREEN_MARGIN, Math.min(anchor.x, screenWidth - panelWidth - SCREEN_MARGIN)),
-          top: anchor.y + anchor.height + PANEL_GAP,
+          top: panelTop,
         }
     : null;
+
+  // The teams panel holds one row per followed team, so its height is user
+  // data: at thirty follows it ran off the bottom of the screen with the
+  // last rows unreachable. Capped to what is actually below the pill and
+  // scrolled past that.
+  const panelMaxHeight = Math.max(MIN_PANEL_HEIGHT, screenHeight - panelTop - SCREEN_MARGIN);
 
   return (
     <>
@@ -184,38 +198,48 @@ export function DropdownPill({
               panelPosition,
               { width: panelWidth, backgroundColor: theme.background, borderColor: theme.text },
             ]}>
-            {options.map((option, index) => (
-              <TouchableOpacity
-                key={option.key}
-                onPress={() => choose(option.key)}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityState={{ selected: option.selected }}
-                style={[
-                  styles.row,
-                  index > 0 && {
-                    borderTopWidth: 1,
-                    borderTopColor: withAlpha(theme.text, 0.14),
-                  },
-                ]}>
-                <ThemedText font="mono" numberOfLines={1} style={styles.rowLabel}>
-                  {option.label}
-                </ThemedText>
-                {/*
-                  Always rendered, and hidden with opacity rather than
-                  unmounted: the labels would otherwise shift sideways as
-                  rows are checked and unchecked under the finger.
-                */}
-                <ThemedText
-                  font="mono"
+            {/*
+              A ScrollView rather than a FlatList: the panel is capped at
+              roughly a screen of rows, so there is nothing here worth
+              virtualizing, and a VirtualizedList nested in a Modal over
+              the feed's own list is a fight not worth picking. maxHeight
+              lives on the scroller so a short list still sizes the panel
+              to its content.
+            */}
+            <ScrollView style={{ maxHeight: panelMaxHeight }} bounces={false}>
+              {options.map((option, index) => (
+                <TouchableOpacity
+                  key={option.key}
+                  onPress={() => choose(option.key)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: option.selected }}
                   style={[
-                    styles.check,
-                    { color: theme.accentControl, opacity: option.selected ? 1 : 0 },
+                    styles.row,
+                    index > 0 && {
+                      borderTopWidth: 1,
+                      borderTopColor: withAlpha(theme.text, 0.14),
+                    },
                   ]}>
-                  ✓
-                </ThemedText>
-              </TouchableOpacity>
-            ))}
+                  <ThemedText font="mono" numberOfLines={1} style={styles.rowLabel}>
+                    {option.label}
+                  </ThemedText>
+                  {/*
+                    Always rendered, and hidden with opacity rather than
+                    unmounted: the labels would otherwise shift sideways as
+                    rows are checked and unchecked under the finger.
+                  */}
+                  <ThemedText
+                    font="mono"
+                    style={[
+                      styles.check,
+                      { color: theme.accentControl, opacity: option.selected ? 1 : 0 },
+                    ]}>
+                    ✓
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         ) : null}
       </Modal>

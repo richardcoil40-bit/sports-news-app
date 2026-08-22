@@ -14,10 +14,13 @@ no user accounts, no article content, no usage or behavioral history. See
 a single overwritten value rather than a log.
 
 Every other cache in the codebase is in-memory only and exists for the
-lifetime of the running app process. They're all created through
+lifetime of the running app process. All but one are created through
 `createEntityCache` in `lib/cache.ts` — one helper,
 so what's cached and for how long is visible in one place rather than
-hand-rolled per module.
+hand-rolled per module. The exception is the league catalog, which isn't
+keyed by anything: it's a single fetched list held in a module variable and
+replaced at most once per launch, so there is no key to evict and nothing
+for that helper to do.
 
 Two independent limits apply, and the distinction matters: **`ttlMs` bounds
 staleness, `maxEntries` bounds size.** An expired entry keeps its payload
@@ -38,6 +41,7 @@ least-recently-used on insert.
 | Team colors | `lib/team-color.ts` | Sport + league path + team ID | 100 | None (process lifetime) |
 | Player season stats | `lib/player-stats.ts` | Athlete ID — one per player screen opened | 500 | None (process lifetime) |
 | Verdict classifications | `lib/verdicts.ts` | Headline title — one per unique headline seen; empty only if `EXPO_PUBLIC_VERDICT_URL` is cleared | 2000 | None (process lifetime) |
+| League catalog | `lib/league-catalog.ts` | Not a keyed cache — a single list, fetched at most once per launch and held in a module variable. Bounded by the catalog itself, a few KB | n/a | None (process lifetime) |
 
 Force-quitting the app clears all of it. **The team list is the one cache
 with no size bound, and deliberately: its key is a league, so the catalog
@@ -87,7 +91,11 @@ Network calls out are to ESPN's public endpoints, the RSS feeds listed in
 `lib/community-sources.ts` and `lib/feeds.ts`, made directly from the
 device the same way any RSS reader would, and — wherever
 `EXPO_PUBLIC_VERDICT_URL` is configured, which as of 2026-08-20 is every
-build from this repo — the verdicts service described below.
+build from this repo — the verdicts service described below. Since
+2026-08-22 there is one more, to the same Worker: a single
+`GET /v1/leagues` per launch for the league catalog, wherever
+`EXPO_PUBLIC_CATALOG_URL` is set. It sends no body and no query string, so
+unlike the verdicts calls it carries nothing at all — see below.
 
 ## What the verdicts service sees
 
@@ -121,6 +129,17 @@ there is no user identifier anywhere in the request to correlate a pattern
 back to a person. But "no identifier" is not the same claim as "no
 transmission," and this file exists to keep those two claims from getting
 conflated again.
+
+**The catalog request is a different shape and worth separating:** the
+`GET /v1/leagues` call added on 2026-08-22 goes to the same Worker but sends
+no request body, no query string and no header the app invented — it is a
+plain GET for a static public list. There is no pattern in it to reveal: one
+request per launch, identical from every device, regardless of which teams
+that device follows. What Cloudflare sees is what any web server sees of any
+visitor (an IP and a timestamp), and nothing about it distinguishes one
+user's app from another's. It is mentioned here rather than omitted because
+the rule this file was rewritten to hold is that *any* new outbound call gets
+documented in the change that adds it, not after.
 
 **Retention on the worker side:** verdicts are cached in Cloudflare KV,
 keyed by a SHA-256 hash of the normalized headline text, for
