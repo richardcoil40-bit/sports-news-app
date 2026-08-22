@@ -1,0 +1,256 @@
+{
+  "leagues": {
+    "big-ten": {
+      "displayName": "Big Ten",
+      "pro": false,
+      "generated": "2026-08-22",
+      "teams": [
+        {
+          "id": "356",
+          "slug": "illinois",
+          "shortName": "Illinois",
+          "displayName": "Illinois Fighting Illini",
+          "mascot": "Fighting Illini"
+        },
+        {
+          "id": "84",
+          "slug": "indiana",
+          "shortName": "Indiana",
+          "displayName": "Indiana Hoosiers",
+          "mascot": "Hoosiers"
+        },
+        {
+          "id": "2294",
+          "slug": "iowa",
+          "shortName": "Iowa",
+          "displayName": "Iowa Hawkeyes",
+          "mascot": "Hawkeyes"
+        },
+        {
+          "id": "120",
+          "slug": "maryland",
+          "shortName": "Maryland",
+          "displayName": "Maryland Terrapins",
+          "mascot": "Terrapins"
+        },
+        {
+          "id": "130",
+          "slug": "michigan",
+          "shortName": "Michigan",
+          "displayName": "Michigan Wolverines",
+          "mascot": "Wolverines"
+        },
+        {
+          "id": "127",
+          "slug": "michigan-state",
+          "shortName": "Michigan St",
+          "displayName": "Michigan State Spartans",
+          "mascot": "Spartans"
+        },
+        {
+          "id": "135",
+          "slug": "minnesota",
+          "shortName": "Minnesota",
+          "displayName": "Minnesota Golden Gophers",
+          "mascot": "Golden Gophers"
+        },
+        {
+          "id": "158",
+          "slug": "nebraska",
+          "shortName": "Nebraska",
+          "displayName": "Nebraska Cornhuskers",
+          "mascot": "Cornhuskers"
+        },
+        {
+          "id": "77",
+          "slug": "northwestern",
+          "shortName": "Northwestern",
+          "displayName": "Northwestern Wildcats",
+          "mascot": "Wildcats"
+        },
+        {
+          "id": "194",
+          "slug": "ohio-state",
+          "shortName": "Ohio State",
+          "displayName": "Ohio State Buckeyes",
+          "mascot": "Buckeyes"
+        },
+        {
+          "id": "2483",
+          "slug": "oregon",
+          "shortName": "Oregon",
+          "displayName": "Oregon Ducks",
+          "mascot": "Ducks"
+        },
+        {
+          "id": "213",
+          "slug": "penn-state",
+          "shortName": "Penn State",
+          "displayName": "Penn State Nittany Lions",
+          "mascot": "Nittany Lions"
+        },
+        {
+          "id": "2509",
+          "slug": "purdue",
+          "shortName": "Purdue",
+          "displayName": "Purdue Boilermakers",
+          "mascot": "Boilermakers"
+        },
+        {
+          "id": "164",
+          "slug": "rutgers",
+          "shortName": "Rutgers",
+          "displayName": "Rutgers Scarlet Knights",
+          "mascot": "Scarlet Knights"
+        },
+        {
+          "id": "26",
+          "slug": "ucla",
+          "shortName": "UCLA",
+          "displayName": "UCLA Bruins",
+          "mascot": "Bruins"
+        },
+        {
+          "id": "30",
+          "slug": "usc",
+          "shortName": "USC",
+          "displayName": "USC Trojans",
+          "mascot": "Trojans"
+        },
+        {
+          "id": "264",
+          "slug": "washington",
+          "shortName": "Washington",
+          "displayName": "Washington Huskies",
+          "mascot": "Huskies"
+        },
+        {
+          "id": "275",
+          "slug": "wisconsin",
+          "shortName": "Wisconsin",
+          "displayName": "Wisconsin Badgers",
+          "mascot": "Badgers"
+        }
+      ]
+    },
+    "sec": {
+      "displayName": "SEC",
+      "pro": false,
+      "generated": "2026-08-22",
+      "teams": [
+        {
+          "id": "333",
+          "slug": "alabama",
+          "shortName": "Alabama",
+          "displayName": "Alabama Crimson Tide",
+          "mascot": "Crimson Tide"
+        },
+        {
+          "id": "8",
+          "slug": "arkansas",
+          "shortName": "Arkansas",
+          "displayName": "Arkansas Razorbacks",
+          "mascot": "Razorbacks"
+        },
+        {
+          "id": "2",
+          "slug": "auburn",
+          "shortName": "Auburn",
+          "displayName": "Auburn Tigers",
+          "mascot": "Tigers"
+        },
+        {
+          "id": "57",
+          "slug": "florida",
+          "shortName": "Florida",
+          "displayName": "Florida Gators",
+          "mascot": "Gators"
+        },
+        {
+          "id": "61",
+          "slug": "georgia",
+          "shortName": "Georgia",
+          "displayName": "Georgia Bulldogs",
+          "mascot": "Bulldogs"
+        },
+        {
+          "id": "96",
+          "slug": "kentucky",
+          "shortName": "Kentucky",
+          "displayName": "Kentucky Wildcats",
+          "mascot": "Wildcats"
+        },
+        {
+          "id": "99",
+          "slug": "lsu",
+          "shortName": "LSU",
+          "displayName": "LSU Tigers",
+          "mascot": "Tigers"
+        },
+        {
+          "id": "344",
+          "slug": "mississippi-state",
+          "shortName": "Mississippi St",
+          "displayName": "Mississippi State Bulldogs",
+          "mascot": "Bulldogs"
+        },
+        {
+          "id": "142",
+          "slug": "missouri",
+          "shortName": "Missouri",
+          "displayName": "Missouri Tigers",
+          "mascot": "Tigers"
+        },
+        {
+          "id": "201",
+          "slug": "oklahoma",
+          "shortName": "Oklahoma",
+          "displayName": "Oklahoma Sooners",
+          "mascot": "Sooners"
+        },
+        {
+          "id": "145",
+          "slug": "ole-miss",
+          "shortName": "Ole Miss",
+          "displayName": "Ole Miss Rebels",
+          "mascot": "Rebels"
+        },
+        {
+          "id": "2579",
+          "slug": "south-carolina",
+          "shortName": "South Carolina",
+          "displayName": "South Carolina Gamecocks",
+          "mascot": "Gamecocks"
+        },
+        {
+          "id": "2633",
+          "slug": "tennessee",
+          "shortName": "Tennessee",
+          "displayName": "Tennessee Volunteers",
+          "mascot": "Volunteers"
+        },
+        {
+          "id": "251",
+          "slug": "texas",
+          "shortName": "Texas",
+          "displayName": "Texas Longhorns",
+          "mascot": "Longhorns"
+        },
+        {
+          "id": "245",
+          "slug": "texas-am",
+          "shortName": "Texas A&M",
+          "displayName": "Texas A&M Aggies",
+          "mascot": "Aggies"
+        },
+        {
+          "id": "238",
+          "slug": "vanderbilt",
+          "shortName": "Vanderbilt",
+          "displayName": "Vanderbilt Commodores",
+          "mascot": "Commodores"
+        }
+      ]
+    }
+  }
+}

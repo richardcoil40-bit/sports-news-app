@@ -19,7 +19,16 @@ bash scripts/check-feeds.sh --candidates # also re-probe the rejected candidates
 Each run writes `feed-status-<UTC timestamp>.txt` here and echoes to stdout.
 The in-app list is read out of `src/lib/source-catalog.ts` and
 `src/lib/community-sources.ts` rather than duplicated in the script, so it
-can't drift from what the app actually fetches.
+can't drift from what the app actually fetches. The per-team half is
+*imported* rather than parsed — a regex over the source literals silently
+missed every source built by a helper, which is a report that checks two
+thirds of the catalog and looks exactly like a clean one.
+
+`scripts/review/propose.mjs` probes on identical terms, per team, while
+building a league's review worksheet — same user agent, same timeout, same
+single 429 retry, same "200 with no items is a failure". A worksheet that
+graded a feed more generously than this would approve sources the report
+then fails.
 
 There's no fixed schedule. Worth doing when a source looks quiet in the app,
 before adding a source, and periodically otherwise.
@@ -33,6 +42,7 @@ before adding a source, and periodically otherwise.
 | `feed-status-20260813-024254.txt` | First run of the unified script, 2026-08-13. 34 of 35 in-app sources returning items. |
 | `feed-status-20260818-130515.txt` | 2026-08-18, first run printing the detected feed format. The run that made the Atom problem visible: **17 of 35 sources are `atom`**, and the app could only read `rss`. |
 | `feed-status-20260821-011451.txt` | 2026-08-21, the run that cleared the SEC's 24 new sources before they went in. 59 of 60 returning items; the one failure is ESPN's long-standing 202. |
+| `feed-status-20260822-232959.txt` | 2026-08-22, the run confirming the script still sees the whole catalog after the extractor stopped parsing `community-sources.ts` and started importing it. Same 60 sources, same 59/1. |
 
 The two 2026-08-11 files predate the timestamping in the current script — those
 timestamps come from the files' modification times, which is exactly the

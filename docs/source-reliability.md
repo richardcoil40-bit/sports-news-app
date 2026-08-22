@@ -285,15 +285,61 @@ Two cautions learned the hard way:
   respectively. ESPN returns 202 to curl while serving the app fine, so a
   non-200 isn't automatically fatal either.
 
+### Owners already ruled out
+
+Failures come in matched pairs, because a paper is usually dead for its
+owner's reason rather than its own. Check this table before verifying
+anything — the point of writing it down is that Gannett does not get
+re-tested once per team it owns.
+
+| Owner | Failure mode | Verdict |
+| --- | --- | --- |
+| Gannett | 200 with an empty body on every documented path | Retired the feature. Give up. |
+| Tribune | 403 to any programmatic request, any path or agent | Actively blocked. Give up. |
+| McClatchy | Connection reset to any programmatic request | Actively blocked. Give up. |
+| Vox / SB Nation (California) | Sites shut down after AB5 | Gone. UCLA and USC have no blog. |
+| Vox / SB Nation (elsewhere) | Domain resets rather than 404s | Gone, not moved. |
+| USA Today "Wire" | 404 including the control site | Network folded in. |
+| Advance | Live on `/arc/outboundfeeds/rss/category/sports/` | Works. Try this path first. |
+| Lee | Live on `/search/?f=rss&t=article&c=sports&l=50` | Works. Try this path first. |
+
+The dead ones are also `DEAD_FEED_OWNERS` in
+`src/lib/community-sources.ts`, composed into the per-team reason each
+league's table carries, so the finding is reachable from the code as well
+as from here. The two live ones are `OWNER_FEED_URL` in the same file —
+builders rather than prose, since a paper on one of these chains has a
+feed URL that is purely a function of its host, and the review tooling
+probes a candidate through the same builder the table would use.
+
 ## Applying this
 
-1. Run the feed checker; keep only what actually returns items.
-2. For each survivor, spend a few minutes on criteria 1–3 and assign a tier.
-3. Record the tier with the feed definition in
+Start with `node scripts/review/propose.mjs <leagueId>`, which does steps
+1 and 2 below for a whole league and writes them into a worksheet — see
+`docs/review/README.md`. The steps are still the steps; the script is
+what stops them being done from memory at 900 teams.
+
+1. Check the ruled-out table above before spending time on a paper — most
+   metro papers in a new league belong to a chain already tested. The dead
+   ones are `DEAD_FEED_OWNERS` in `src/lib/community-sources.ts`, and a
+   candidate host tagged with one is skipped without a request.
+2. Run the feed checker; keep only what actually returns items. The two
+   live chains have URL builders — `OWNER_FEED_URL` in the same file — so
+   a candidate is probed at the exact path the table would give it rather
+   than at a second guess.
+3. For each survivor, spend a few minutes on criteria 1–3 and assign a tier.
+   `scripts/review/vet.mjs --ai` will propose one against these criteria if
+   the Worker's vetting endpoint is deployed; it is a proposal, it is off by
+   default, and tier 0 with `uncertain: true` is the answer it is supposed
+   to give when it is recognising a name rather than assessing one.
+4. Record the tier with the feed definition in
    `src/lib/community-sources.ts`, alongside a `scope` of `team` or `broad` —
    a metro sports section carries pro teams and other sports, so it has to be
    filtered down to the program by name, while a team blog can be taken whole.
-4. Re-check annually, or whenever a source's ownership or business model
+5. Record the outcome either way: a team key present in that league's table
+   is what marks it reviewed, and anything ruled out goes in the reasons
+   table beside it. An absent key means nobody has looked, and
+   `team-review.test.ts` fails a shipped league that still has one.
+6. Re-check annually, or whenever a source's ownership or business model
    changes.
 
 ## Coverage as it stands
