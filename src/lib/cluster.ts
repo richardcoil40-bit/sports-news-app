@@ -337,7 +337,17 @@ export function clusterArticles<T extends ClusterableArticle>(
   const minSharedRare = options?.minSharedRareTokens ?? DEFAULT_MIN_SHARED_RARE;
 
   if (articles.length === 0) return [];
-  if (articles.length > MAX_INPUT) return articles.map((a) => singleton(a));
+  if (articles.length > MAX_INPUT) {
+    // A correctness cliff, and a silent one: the return shape is identical
+    // to a feed that genuinely had no duplicates in it, so no caller can
+    // tell clustering was skipped. Worth saying out loud because it fires
+    // exactly backwards from intuition — clustering turns *off* on the
+    // busiest day, when there is the most to collapse.
+    console.warn(
+      `[cluster] ${articles.length} articles is over MAX_INPUT (${MAX_INPUT}) — skipping clustering, every story stays a singleton`,
+    );
+    return articles.map((a) => singleton(a));
+  }
 
   // Newest first, nulls last — the same ordering the pools already use.
   const sorted = [...articles].sort((a, b) => {
