@@ -483,6 +483,26 @@ than re-deriving slugs:
   paper is in Starkville) but not to Georgia. `team-nicknames.test.ts`
   holds the list of words that must never appear.
 
+**In both tables, a present key is a decision and an absent key is a
+gap.** `[]` used to answer two different questions — "researched, nothing
+here is worth adding" and "nobody has ever looked at this league" — and
+at 34 teams you catch that by reading the file, at 900 you never catch it
+at all. So `lsu: []` is a nickname ruling, and a slug that appears in
+neither table has not been ruled on. `team-review.ts` reads that second
+question off the same tables (`createTeamReview`, `nicknameReviewFor`,
+`bigTenSourceReviewFor`); the lookups still return `?? []`, so nothing
+about what the app fetches changed.
+
+Every empty entry needs a line in that file's reasons table saying what
+was ruled out, and a *partial* entry may carry one too — that's where the
+ownership research lives (`DEAD_FEED_OWNERS`: Gannett retired RSS,
+Tribune 403s, McClatchy resets, Vox shut the blogs down, USA Today folded
+the Wire sites in). It is composed per team rather than restated, so a
+new league running into Gannett reads the finding instead of spending an
+afternoon rediscovering it. `team-review.test.ts` fails on an empty entry
+with no reason and on a reason orphaned from its entry — both of which
+read as research still in force.
+
 **Anything resolving *followed* teams must span every league the user
 follows — and stop there.** A favorite is stored league-qualified
 (`"sec:333"`), so a screen holding one league's team list silently drops

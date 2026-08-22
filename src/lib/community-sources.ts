@@ -1,4 +1,5 @@
 import { FeedSource } from '@/lib/feeds';
+import { createTeamReview, ReviewState } from '@/lib/team-review';
 import { teamSlug } from '@/lib/team-slug';
 
 /**
@@ -26,7 +27,54 @@ import { teamSlug } from '@/lib/team-slug';
  *   empty body. Chicago Tribune and Baltimore Sun (Illinois/Northwestern and
  *   Maryland) return 403 to any programmatic request. Neither is a wrong-URL
  *   problem, so those programs run on their SB Nation blog alone for now.
+ *
+ * ## Present-with-nothing vs. absent
+ *
+ * A team key in either table means someone ruled on that team; an absent
+ * key means nobody has looked. `[]` is therefore a decision, and needs a
+ * line in that league's reasons table below saying what was ruled out.
+ * See team-review.ts. Both tables happen to be complete for the teams
+ * these two leagues ship, so the reasons tables carry the *partial* cases
+ * instead — a team that has a blog but no reachable metro paper — which is
+ * where the ownership research above stops being re-done once per team.
  */
+
+/**
+ * Chain-level rulings, in one place because the failures come in matched
+ * pairs: a paper is dead because its owner retired or blocked RSS, not
+ * because its URL is wrong. The per-team reasons below compose these, so
+ * the next league that runs into Gannett reads the finding rather than
+ * spending an afternoon rediscovering it. Full write-ups, with the paths
+ * that were tried, in docs/source-reliability.md.
+ */
+const GANNETT =
+  'Gannett has retired RSS: every documented path returns 200 with an ' +
+  'empty body, which is a shut-off feature rather than a wrong URL';
+const TRIBUNE =
+  'Tribune returns HTTP 403 to any programmatic request, regardless of ' +
+  'path or user agent';
+const MCCLATCHY =
+  'McClatchy resets the connection to any programmatic request, the way ' +
+  'the Tribune papers 403';
+const VOX_AB5 =
+  'Vox shut down its California SB Nation team sites after AB5 made the ' +
+  'contributor model unworkable there';
+const VOX_SHUTDOWN =
+  'Vox shut the SB Nation blog down — the domain resets the connection ' +
+  'outright rather than 404ing, so it is gone rather than moved';
+const USA_TODAY_WIRE =
+  "USA Today's Wire team sites are all 404, including the control " +
+  '(Fighting Irish Wire), so the network was folded in rather than moved';
+
+/** The same rulings by owner, for anything that wants to read them. */
+export const DEAD_FEED_OWNERS: Record<string, string> = {
+  gannett: GANNETT,
+  tribune: TRIBUNE,
+  mcclatchy: MCCLATCHY,
+  'vox-ab5': VOX_AB5,
+  'vox-shutdown': VOX_SHUTDOWN,
+  'usa-today-wire': USA_TODAY_WIRE,
+};
 
 const SB_NATION = (id: string, name: string, domain: string): FeedSource => ({
   id,
@@ -200,6 +248,23 @@ const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
       scope: 'broad',
     },
   ],
+};
+
+/**
+ * What was checked for a Big Ten team and ruled out. Every `[]` above
+ * needs a line here; a team with a partial list gets one too, which is
+ * most of these — the entry is a blog, and this is why there's no paper
+ * beside it.
+ */
+const BIG_TEN_NO_SOURCE_REASONS: Record<string, string> = {
+  illinois: `Chicago Tribune: ${TRIBUNE}. The News-Gazette carries the program instead.`,
+  indiana: `Indianapolis Star: ${GANNETT}. No local newsroom feed available.`,
+  iowa: `Des Moines Register: ${GANNETT}. No local newsroom feed available.`,
+  maryland: `Baltimore Sun: ${TRIBUNE}. No local newsroom feed available.`,
+  northwestern: `Chicago Tribune: ${TRIBUNE}. No local newsroom feed available.`,
+  purdue: `Indianapolis Star and Journal & Courier: ${GANNETT}. No local newsroom feed available.`,
+  ucla: `No SB Nation blog: ${VOX_AB5}. The LA Times covers both LA programs.`,
+  usc: `No SB Nation blog: ${VOX_AB5}. The LA Times covers both LA programs.`,
 };
 
 /**
@@ -378,6 +443,23 @@ const SEC_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   vanderbilt: [SB_NATION('anchor-of-gold', 'Anchor Of Gold', 'anchorofgold.com')],
 };
 
+/** The SEC's half of the same record. See BIG_TEN_NO_SOURCE_REASONS. */
+const SEC_NO_SOURCE_REASONS: Record<string, string> = {
+  alabama: `The Tuscaloosa News: ${GANNETT}. Roll Tide Wire: ${USA_TODAY_WIRE}. AL.com carries the program.`,
+  arkansas: `Arkansas Fight is gone: ${VOX_SHUTDOWN}.`,
+  auburn: `College and Magnolia is gone: ${VOX_SHUTDOWN}. Montgomery Advertiser: ${GANNETT}.`,
+  florida: `Alligator Army still publishes and still advertises /rss/index.xml, but that path 404s — a broken feed on a working site, so worth re-checking rather than writing off. Gainesville Sun: ${GANNETT}. Gators Wire: ${USA_TODAY_WIRE}.`,
+  georgia: `Athens Banner-Herald: ${GANNETT}. The Red & Black, the student paper, carries what a metro paper would.`,
+  kentucky: `Lexington Herald-Leader: ${MCCLATCHY}. No local newsroom feed available.`,
+  'mississippi-state': `For Whom the Cowbell Tolls is gone: ${VOX_SHUTDOWN}. The Starkville Daily News carries the program.`,
+  'ole-miss': `Clarion Ledger, the statewide paper: ${GANNETT}. No local newsroom feed verified for Oxford.`,
+  oklahoma: `Crimson And Cream Machine is gone: ${VOX_SHUTDOWN}. The Oklahoman: ${GANNETT}. Tulsa World and the OU Daily carry the program.`,
+  'south-carolina': `Garnet And Black Attack is gone: ${VOX_SHUTDOWN}. The State: ${MCCLATCHY}. The Post and Courier carries the program.`,
+  tennessee: `Knoxville News Sentinel: ${GANNETT}. No local newsroom feed available.`,
+  texas: `Austin American-Statesman: ${GANNETT}. Longhorns Wire: ${USA_TODAY_WIRE}. No local newsroom feed available.`,
+  vanderbilt: `Tennessean: ${GANNETT}. No local newsroom feed available.`,
+};
+
 /**
  * Everything in this file is beat coverage by definition — a team blog, an
  * independent that covers one program, or a metro paper's sports section.
@@ -399,4 +481,25 @@ export function bigTenSourcesForTeam(teamShortName: string): FeedSource[] {
 
 export function secSourcesForTeam(teamShortName: string): FeedSource[] {
   return beatSources(SEC_SOURCES_BY_SLUG, teamShortName);
+}
+
+const bigTenReview = createTeamReview(BIG_TEN_SOURCES_BY_SLUG, BIG_TEN_NO_SOURCE_REASONS);
+const secReview = createTeamReview(SEC_SOURCES_BY_SLUG, SEC_NO_SOURCE_REASONS);
+
+/**
+ * Whether a team's sources have been ruled on, and what was ruled out.
+ * One function per table for the reason there are two tables: a slug is
+ * unique per school, not per league, and realignment moves schools.
+ */
+export function bigTenSourceReviewFor(teamShortName: string): ReviewState {
+  return bigTenReview.reviewFor(teamShortName);
+}
+
+export function secSourceReviewFor(teamShortName: string): ReviewState {
+  return secReview.reviewFor(teamShortName);
+}
+
+/** Empty in healthy tables — see TeamReview.issues. */
+export function communitySourceReviewIssues(): string[] {
+  return [...bigTenReview.issues(), ...secReview.issues()];
 }

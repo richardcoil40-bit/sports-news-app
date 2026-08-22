@@ -285,15 +285,43 @@ Two cautions learned the hard way:
   respectively. ESPN returns 202 to curl while serving the app fine, so a
   non-200 isn't automatically fatal either.
 
+### Owners already ruled out
+
+Failures come in matched pairs, because a paper is usually dead for its
+owner's reason rather than its own. Check this table before verifying
+anything — the point of writing it down is that Gannett does not get
+re-tested once per team it owns.
+
+| Owner | Failure mode | Verdict |
+| --- | --- | --- |
+| Gannett | 200 with an empty body on every documented path | Retired the feature. Give up. |
+| Tribune | 403 to any programmatic request, any path or agent | Actively blocked. Give up. |
+| McClatchy | Connection reset to any programmatic request | Actively blocked. Give up. |
+| Vox / SB Nation (California) | Sites shut down after AB5 | Gone. UCLA and USC have no blog. |
+| Vox / SB Nation (elsewhere) | Domain resets rather than 404s | Gone, not moved. |
+| USA Today "Wire" | 404 including the control site | Network folded in. |
+| Advance | Live on `/arc/outboundfeeds/rss/category/sports/` | Works. Try this path first. |
+| Lee | Live on `/search/?f=rss&t=article&c=sports&l=50` | Works. Try this path first. |
+
+The dead ones are also `DEAD_FEED_OWNERS` in
+`src/lib/community-sources.ts`, composed into the per-team reason each
+league's table carries, so the finding is reachable from the code as well
+as from here.
+
 ## Applying this
 
-1. Run the feed checker; keep only what actually returns items.
-2. For each survivor, spend a few minutes on criteria 1–3 and assign a tier.
-3. Record the tier with the feed definition in
+1. Check the ruled-out table above before spending time on a paper — most
+   metro papers in a new league belong to a chain already tested.
+2. Run the feed checker; keep only what actually returns items.
+3. For each survivor, spend a few minutes on criteria 1–3 and assign a tier.
+4. Record the tier with the feed definition in
    `src/lib/community-sources.ts`, alongside a `scope` of `team` or `broad` —
    a metro sports section carries pro teams and other sports, so it has to be
    filtered down to the program by name, while a team blog can be taken whole.
-4. Re-check annually, or whenever a source's ownership or business model
+5. Record the outcome either way: a team key present in that league's table
+   is what marks it reviewed, and anything ruled out goes in the reasons
+   table beside it. An absent key means nobody has looked.
+6. Re-check annually, or whenever a source's ownership or business model
    changes.
 
 ## Coverage as it stands

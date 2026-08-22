@@ -13,7 +13,12 @@ const SLUG_ALIASES: Record<string, string> = {
   'mississippi-st': 'mississippi-state',
   'ohio-st': 'ohio-state',
   'penn-st': 'penn-state',
-  'washington-st': 'washington',
+  // Not 'washington': the other aliases expand an abbreviation to the same
+  // school, and this one used to resolve to a different one — Washington
+  // State inheriting Washington's nicknames and the Seattle Times. Latent,
+  // since neither shipped league has Washington State, and invisible at
+  // every call site because the wrong answer is a plausible one.
+  'washington-st': 'washington-state',
   // Not an ESPN abbreviation like the rest — "Texas A&M" is already how the
   // school is written. The ampersand is what the slugifier above collapses,
   // and `texas-a-m` as a table key reads like a typo of one.
