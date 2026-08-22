@@ -90,7 +90,10 @@ export function teamSourcesFor(league: League, teamShortName: string): FeedSourc
  * serve each other's national coverage.
  */
 const CACHE_TTL_MS = 3 * 60 * 1000;
-const nationalPoolCache = createEntityCache<string, FetchAllResult>({ ttlMs: CACHE_TTL_MS });
+// Keyed per league, so the catalog already bounds this. The explicit cap is
+// a backstop for a catalog served from the network rather than bundled,
+// where the number of leagues stops being something this repo controls.
+const nationalPoolCache = createEntityCache<string, FetchAllResult>({ ttlMs: CACHE_TTL_MS, maxEntries: 50 });
 
 const EMPTY_RESULT: FetchAllResult = { articles: [], failedSources: [] };
 

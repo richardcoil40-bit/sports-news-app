@@ -3,7 +3,9 @@ import { fetchWithTimeout } from '@/lib/http';
 import { espnCacheKey, espnSitePath, League } from '@/lib/leagues';
 
 // `null` is a real cached answer here ("no usable color"), not a miss.
-const colorCache = createEntityCache<string, string | null>();
+// Bounded like the other visited-team caches; entries are a single hex
+// string, so the bound is about the key count, not the payload.
+const colorCache = createEntityCache<string, string | null>({ maxEntries: 100 });
 
 async function fetchTeamColorUncached(teamId: string, league: League): Promise<string | null> {
   const url = `https://site.api.espn.com/apis/site/v2/sports/${espnSitePath(league)}/teams/${teamId}`;

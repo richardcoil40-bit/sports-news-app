@@ -132,7 +132,10 @@ interface RawOddsRoot {
  * the tab is opened.
  */
 const SCHEDULE_TTL_MS = 3 * 60 * 1000;
-const scheduleCache = createEntityCache<string, ScheduledGame[]>({ ttlMs: SCHEDULE_TTL_MS });
+// Bounded for the same reason as the other visited-team caches: the TTL
+// bounds staleness, not size, and the home screen reads a schedule per
+// followed team on mount.
+const scheduleCache = createEntityCache<string, ScheduledGame[]>({ ttlMs: SCHEDULE_TTL_MS, maxEntries: 100 });
 
 /**
  * Deliberately lets a failure escape rather than caching an empty schedule:

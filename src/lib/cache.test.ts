@@ -159,6 +159,72 @@ describe('createEntityCache', () => {
     });
   });
 
+  describe('maxEntries', () => {
+    it('evicts the oldest key once the bound is passed', async () => {
+      const cache = createEntityCache<string, string>({ maxEntries: 3 });
+
+      for (const key of ['a', 'b', 'c', 'd']) {
+        await cache.get(key, async () => `value-${key}`);
+      }
+
+      expect(cache.peek('a')).toBeUndefined();
+      expect(cache.peek('b')).toBe('value-b');
+      expect(cache.peek('c')).toBe('value-c');
+      expect(cache.peek('d')).toBe('value-d');
+    });
+
+    it('refetches an evicted key rather than serving it stale', async () => {
+      const load = vi.fn(async () => 'value');
+      const cache = createEntityCache<string, string>({ maxEntries: 1 });
+
+      await cache.get('a', load);
+      await cache.get('b', load);
+      await cache.get('a', load);
+
+      expect(load).toHaveBeenCalledTimes(3);
+    });
+
+    // Eviction order is *use*, not insertion. Without this the entry every
+    // screen reads is discarded as readily as one nothing has touched since
+    // it landed, which is the opposite of what a bound is for.
+    it('a cache hit counts as a use and spares that key', async () => {
+      const cache = createEntityCache<string, string>({ maxEntries: 2 });
+
+      await cache.get('a', async () => 'value-a');
+      await cache.get('b', async () => 'value-b');
+      await cache.get('a', async () => 'unused'); // hit, moves 'a' to newest
+      await cache.get('c', async () => 'value-c');
+
+      expect(cache.peek('b')).toBeUndefined();
+      expect(cache.peek('a')).toBe('value-a');
+      expect(cache.peek('c')).toBe('value-c');
+    });
+
+    // peek is the last-resort fallback path. Letting it renew an entry would
+    // preferentially retain the stalest things the cache holds.
+    it('a peek does not spare a key from eviction', async () => {
+      const cache = createEntityCache<string, string>({ maxEntries: 2 });
+
+      await cache.get('a', async () => 'value-a');
+      await cache.get('b', async () => 'value-b');
+      expect(cache.peek('a')).toBe('value-a');
+      await cache.get('c', async () => 'value-c');
+
+      expect(cache.peek('a')).toBeUndefined();
+    });
+
+    it('keeps every entry when no bound is given', async () => {
+      const cache = createEntityCache<string, number>();
+
+      for (let i = 0; i < 200; i += 1) {
+        await cache.get(`k${i}`, async () => i);
+      }
+
+      expect(cache.peek('k0')).toBe(0);
+      expect(cache.peek('k199')).toBe(199);
+    });
+  });
+
   describe('peek', () => {
     it('returns the last resolved value regardless of TTL', async () => {
       vi.useFakeTimers();

@@ -30,7 +30,9 @@ function athleteIdFromRef(ref: string | undefined): string | null {
   return match ? match[1] : null;
 }
 
-const cache = createEntityCache<string, StatLeader[]>();
+// Keyed by a team the user visited, so bounded like roster.ts — see the note
+// there. A few stat lines per entry, so the ceiling is generous.
+const cache = createEntityCache<string, StatLeader[]>({ maxEntries: 100 });
 
 async function fetchUncached(teamId: string, league: League): Promise<StatLeader[]> {
   const season = lastCompletedSeason(league);

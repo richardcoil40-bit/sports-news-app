@@ -26,7 +26,10 @@ import { Team } from '@/lib/teams';
  */
 export default function OnboardingScreen() {
   const theme = useTheme();
-  const { teams, loading, error } = useTeams();
+  // Every league, explicitly. This is the one screen that can't be scoped
+  // by what you already follow, because on a first launch you follow
+  // nothing — scoping here would offer an empty list to pick from.
+  const { teams, loading, error } = useTeams('all');
   const [selected, setSelected] = useState<Team[]>([]);
 
   // The list is every available league's teams sorted together, so with

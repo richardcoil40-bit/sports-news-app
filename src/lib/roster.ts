@@ -32,7 +32,12 @@ const POSITION_GROUPS: PositionGroup[] = ['offense', 'defense', 'specialTeam'];
 
 // Full rosters run large (100+ players' worth of fields). Cached per team so
 // leaving and re-entering a team's Players tab doesn't re-fetch every time.
-const rosterCache = createEntityCache<string, Player[]>();
+//
+// Bounded because the key is a team the user *visited*, so this grows with
+// browsing rather than with the catalog — and each entry is a whole roster,
+// which makes it the heaviest per-entry cache in the app. A hundred teams'
+// worth is far more than one session revisits.
+const rosterCache = createEntityCache<string, Player[]>({ maxEntries: 100 });
 
 async function fetchTeamRosterUncached(teamId: string, league: League): Promise<Player[]> {
   const url = `https://site.api.espn.com/apis/site/v2/sports/${espnSitePath(league)}/teams/${teamId}/roster`;

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { favoriteKey, migrateFavoriteIds, parseFavoriteKey } from '@/lib/favorite-keys';
+import {
+  favoriteKey,
+  leagueIdsFrom,
+  migrateFavoriteIds,
+  parseFavoriteKey,
+} from '@/lib/favorite-keys';
 
 /**
  * This is persisted user data with no server behind it, so the migration has
@@ -107,5 +112,45 @@ describe('migrateFavoriteIds', () => {
         'big-ten:194',
       ]);
     });
+  });
+});
+
+/**
+ * The whole reason favorites are stored league-qualified pays off here: the
+ * set of leagues worth fetching is readable off the stored keys, with no
+ * network call to find out which ones matter. Anything scoping work to what
+ * the user follows goes through this.
+ */
+describe('leagueIdsFrom', () => {
+  it('dedupes and sorts', () => {
+    expect(leagueIdsFrom(['sec:333', 'big-ten:130', 'sec:99', 'big-ten:213'])).toEqual([
+      'big-ten',
+      'sec',
+    ]);
+  });
+
+  // Order has to be a function of the set, not of insertion: callers key
+  // effects and caches on the joined string, and an order that moved when you
+  // followed someone would re-fire them for no reason.
+  it('gives the same answer whatever order the favorites arrived in', () => {
+    expect(leagueIdsFrom(['sec:333', 'big-ten:130'])).toEqual(
+      leagueIdsFrom(['big-ten:130', 'sec:333']),
+    );
+  });
+
+  it('is empty for no favorites', () => {
+    expect(leagueIdsFrom([])).toEqual([]);
+  });
+
+  // Same posture as the migration above: this reads persisted data, so an
+  // entry it can't parse is skipped rather than allowed to poison the set.
+  it('skips unparseable entries rather than inventing a league', () => {
+    expect(leagueIdsFrom(['big-ten:130', '130', '', ':99', 'sec:'])).toEqual(['big-ten']);
+  });
+
+  // parseFavoriteKey splits on the first colon only, and this has to agree
+  // with it — an ESPN id is not ours to guarantee is colon-free.
+  it('reads only up to the first separator', () => {
+    expect(leagueIdsFrom(['big-ten:13:0'])).toEqual(['big-ten']);
   });
 });

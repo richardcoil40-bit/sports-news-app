@@ -91,6 +91,33 @@ const CLASSIFY_TIMEOUT_MS = 6000;
  */
 const memo = new Map<string, Verdict | null>();
 
+/**
+ * The one cache here keyed by something with no ceiling at all. Every other
+ * cache in `src/lib/` is keyed by a team, a player or a league — finite sets
+ * the catalog bounds — while this one gains an entry per unique headline the
+ * app has ever seen, which just keeps going for as long as the process runs.
+ * Two thousand is many refreshes' worth of new articles and a few hundred KB.
+ *
+ * Note this is not the cache that matters for cost: the cross-user one in the
+ * worker's KV store is, and evicting here only means re-asking the worker,
+ * which answers from KV without spending a model call.
+ */
+const MEMO_MAX_ENTRIES = 2000;
+
+/**
+ * Same LRU-by-reinsertion trick `cache.ts` uses — a Map iterates in insertion
+ * order, so deleting and re-adding moves a key to the newest end.
+ */
+function remember(title: string, verdict: Verdict | null) {
+  memo.delete(title);
+  memo.set(title, verdict);
+  while (memo.size > MEMO_MAX_ENTRIES) {
+    const oldest = memo.keys().next();
+    if (oldest.done) break;
+    memo.delete(oldest.value);
+  }
+}
+
 function verdictUrl(): string | undefined {
   const url = process.env.EXPO_PUBLIC_VERDICT_URL;
   return url && url.trim() ? url.replace(/\/+$/, '') : undefined;
@@ -154,7 +181,11 @@ export async function classifyHeadlines(items: ClassifyItem[]): Promise<Map<stri
   const toFetch: ClassifyItem[] = [];
   for (const item of items) {
     if (memo.has(item.title)) {
-      results.set(item.id, memo.get(item.title) ?? null);
+      const verdict = memo.get(item.title) ?? null;
+      results.set(item.id, verdict);
+      // A hit is a use: a headline still circulating across refreshes should
+      // outlive one that was seen once and has since fallen off every feed.
+      remember(item.title, verdict);
     } else {
       toFetch.push(item);
     }
@@ -178,7 +209,7 @@ export async function classifyHeadlines(items: ClassifyItem[]): Promise<Map<stri
         // this process. A network/timeout failure is not — memoizing it
         // would turn one bad request into a permanent blind spot for that
         // headline, so only successful batches write to `memo`.
-        memo.set(item.title, verdict);
+        remember(item.title, verdict);
       }
     } else {
       for (const item of batch) results.set(item.id, null);
