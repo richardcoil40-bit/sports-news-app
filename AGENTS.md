@@ -480,8 +480,29 @@ than re-deriving slugs:
   disambiguation research first. The SEC made that rule bite harder, not
   less: "Tigers" is Auburn, LSU *and* Missouri, so none of the three
   claims it, and "Bulldogs" belongs to Mississippi State (whose only
-  paper is in Starkville) but not to Georgia. `team-nicknames.test.ts`
-  holds the list of words that must never appear.
+  paper is in Starkville) but not to Georgia.
+
+  **`nickname-safety.ts` is where that rule stopped being prose.** The
+  thing to keep straight is that it splits in two, and the halves work
+  differently on purpose:
+
+  - **A college mascot collision is decided by the sources.** Two schools
+    can share "Bulldogs" indefinitely as long as each is only matched
+    against its own city's paper. It becomes a defect the moment they
+    share a `scope: 'broad'` source — that is the `shared-source` hazard,
+    and the gate fails on it. A collision without a shared source is
+    `contested`: a note, because whether two papers overlap in region is
+    not derivable from anything in this repo.
+  - **A professional team's name is decided by the word.** No region
+    resolves it — every metro sports section covers the NFL — so those
+    are `reserved` outright. `RESERVED_NICKNAMES` in `team-nicknames.ts`
+    is the curated floor, and every name in a snapshotted pro league is
+    added to it, so reviewing the NFL once reserves its 32 mascots
+    without anyone maintaining a list.
+
+  That list used to be nine words hardcoded in `team-nicknames.test.ts`
+  alongside a hardcoded 34-team roster. Both were right and neither
+  scales; more to the point, a flat word list asks the wrong question.
 
 **In both tables, a present key is a decision and an absent key is a
 gap.** `[]` used to answer two different questions — "researched, nothing
@@ -502,6 +523,36 @@ new league running into Gannett reads the finding instead of spending an
 afternoon rediscovering it. `team-review.test.ts` fails on an empty entry
 with no reason and on a reason orphaned from its entry — both of which
 read as research still in force.
+
+**And the gate is what makes that convention cost something.**
+`scripts/review/propose.mjs <leagueId>` writes a worksheet to
+`docs/review/` and a roster snapshot to `__data__/reviewed-teams.json`;
+`team-review.test.ts` reads the snapshot and fails a league the catalog
+serves that has no snapshot, or that has a team missing from either
+table. So flipping a league off `"status": "planned"` without doing the
+research fails `npm test`. `docs/review/README.md` is the workflow.
+
+Three things about the tooling that are easy to undo by accident:
+
+- **The scripts import the app's modules; they do not parse them.** Node
+  24 strips types on import, and `scripts/lib/app-modules.mjs` resolves
+  the `@/` alias, so `check-feeds.sh` and the review scripts read the
+  real tables. That is only possible while nothing they reach imports
+  JSON or an npm package at runtime, and while type-only imports carry
+  the `type` keyword — Node cannot tell otherwise and emits a real
+  import that fails. Both constraints are why `loadAppModule` throws with
+  an explanation instead of letting a resolution error surface.
+- **A source helper is not cosmetic.** `SB_NATION`, `ADVANCE` and `LEE`
+  name the owner at the call site, which is the unit these papers fail
+  in — and `check-feeds.sh` used to regex adjacent `name:`/`url:` lines
+  plus a special case for `SB_NATION(...)`, so adding the other two would
+  have silently dropped 22 sources from the liveness report while the app
+  kept fetching them. It imports the table now, so it can't.
+- **`vet.mjs --ai` is off by default and stays that way.** The free steps
+  eliminate most candidates first, and the Worker's `/v1/vet-source` has
+  its own cap, counter, token and API key — deliberately with no fallback
+  to the app's. Source vetting must not be able to spend the budget the
+  live feed runs on.
 
 **Anything resolving *followed* teams must span every league the user
 follows — and stop there.** A favorite is stored league-qualified

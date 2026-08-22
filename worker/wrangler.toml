@@ -7,6 +7,11 @@
 #   npx wrangler secret put ANTHROPIC_API_KEY
 #   npx wrangler secret put CLIENT_TOKEN           # optional, see README
 #   npx wrangler deploy
+#
+# Source vetting (/v1/vet-source) is off until its own key is set, and
+# deliberately has no fallback to the key above:
+#   npx wrangler secret put VET_ANTHROPIC_API_KEY  # enables the endpoint
+#   npx wrangler secret put VET_TOKEN              # optional, as CLIENT_TOKEN
 
 name = "nofrills-verdicts"
 main = "src/index.ts"
@@ -39,3 +44,20 @@ DAILY_CALL_CAP = "40"
 # Verdicts are about a fixed string of text, so they never go stale — this
 # TTL exists only to bound storage, not to refresh anything.
 VERDICT_TTL_DAYS = "90"
+
+# Source vetting. Every value here is separate from the four above rather
+# than shared, so that scoring candidate sources can never eat the budget
+# the live app's verdicts run on. See the header of src/index.ts.
+
+# Not the cheapest model, unlike MODEL, and for the reason stated there:
+# classification is one enum per field, while this weighs seven criteria
+# and has to explain each. Volume is a few dozen sources per league,
+# reviewed by hand — so the cost of the better model is rounding, and the
+# cost of a wrong tier that reads as researched is not.
+VET_MODEL = "claude-opus-5"
+
+# Far lower than DAILY_CALL_CAP because the shape of the work is different:
+# a person runs `vet.mjs --ai` for one league, reads the output, and stops.
+# Ten calls of twenty sources is two hundred sources, which is more than any
+# league has. A number this small is meant to be noticed if something loops.
+VET_DAILY_CALL_CAP = "10"

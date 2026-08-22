@@ -1,5 +1,5 @@
-import { FeedSource } from '@/lib/feeds';
-import { createTeamReview, ReviewState } from '@/lib/team-review';
+import type { FeedSource } from '@/lib/feeds';
+import { createTeamReview, type ReviewState } from '@/lib/team-review';
 import { teamSlug } from '@/lib/team-slug';
 
 /**
@@ -76,59 +76,93 @@ export const DEAD_FEED_OWNERS: Record<string, string> = {
   'usa-today-wire': USA_TODAY_WIRE,
 };
 
+/**
+ * Where each surviving chain publishes, keyed by the owner rather than by
+ * the paper.
+ *
+ * Every one of these serves all of its papers from a single path, so a
+ * paper's feed URL is a function of its host — which is the same shape
+ * SB_NATION has had since the Big Ten, generalized to the two chains the
+ * SEC added. Naming the owner at each call site is the point: these papers
+ * live and die as a chain, not one at a time. Gannett retired RSS across
+ * 130 papers at once, and the sixteen TownNews/BLOX sites below are the
+ * same sixteen a CI runner cannot reach.
+ *
+ * Exported as builders so scripts/review/propose.mjs probes the exact URL
+ * this table would produce for a candidate host, rather than a second
+ * guess at the same path. The live/dead findings behind them are the owner
+ * table in docs/source-reliability.md.
+ */
+export const OWNER_FEED_URL: Record<string, (host: string) => string> = {
+  advance: (host) => `https://${host}/arc/outboundfeeds/rss/category/sports/?outputType=xml`,
+  lee: (host) => `https://${host}/search/?f=rss&t=article&c=sports&l=50`,
+  'sb-nation': (host) => `https://${host}/rss/index.xml`,
+};
+
+/**
+ * Vox's network. Takes a bare domain because every one of these is on
+ * `www.`; the two newspaper chains take a full host, because theirs are
+ * split roughly evenly and the host is what was actually verified.
+ */
 const SB_NATION = (id: string, name: string, domain: string): FeedSource => ({
   id,
   name,
-  url: `https://www.${domain}/rss/index.xml`,
+  url: OWNER_FEED_URL['sb-nation'](`www.${domain}`),
   tier: 3,
   scope: 'team',
 });
 
-/** Alabama and Auburn share a statewide paper, the way UCLA and USC do. */
-const AL_COM: FeedSource = {
-  id: 'al-com',
-  name: 'AL.com',
-  url: 'https://www.al.com/arc/outboundfeeds/rss/category/sports/?outputType=xml',
+/** Advance Local — metro papers, all tier 1 and all broad sports sections. */
+const ADVANCE = (id: string, name: string, host: string): FeedSource => ({
+  id,
+  name,
+  url: OWNER_FEED_URL.advance(host),
   tier: 1,
   scope: 'broad',
-};
+});
+
+/**
+ * Lee Enterprises and the student papers on the same TownNews/BLOX CMS.
+ * The tier is a parameter because the CMS spans both: a metro daily is
+ * tier 1 and a campus newsroom is tier 3, and they are otherwise identical
+ * down to the query string.
+ */
+const LEE = (
+  id: string,
+  name: string,
+  host: string,
+  tier: FeedSource['tier'] = 1,
+): FeedSource => ({
+  id,
+  name,
+  url: OWNER_FEED_URL.lee(host),
+  tier,
+  scope: 'broad',
+});
+
+/** Alabama and Auburn share a statewide paper, the way UCLA and USC do. */
+const AL_COM: FeedSource = ADVANCE('al-com', 'AL.com', 'www.al.com');
 
 const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   illinois: [
     SB_NATION('champaign-room', 'The Champaign Room', 'thechampaignroom.com'),
-    {
-      id: 'news-gazette',
-      name: 'The News-Gazette',
-      url: 'https://www.news-gazette.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 1,
-      scope: 'broad',
-    },
+    LEE('news-gazette', 'The News-Gazette', 'www.news-gazette.com'),
   ],
   indiana: [SB_NATION('crimson-quarry', 'The Crimson Quarry', 'crimsonquarry.com')],
   iowa: [SB_NATION('bhgp', 'Black Heart Gold Pants', 'blackheartgoldpants.com')],
   maryland: [SB_NATION('testudo-times', 'Testudo Times', 'testudotimes.com')],
   michigan: [
     SB_NATION('maize-n-brew', 'Maize n Brew', 'maizenbrew.com'),
-    {
-      id: 'mlive',
-      name: 'MLive',
-      url: 'https://www.mlive.com/arc/outboundfeeds/rss/category/sports/?outputType=xml',
-      tier: 1,
-      scope: 'broad',
-    },
+    ADVANCE('mlive', 'MLive', 'www.mlive.com'),
   ],
   'michigan-state': [
     SB_NATION('only-colors', 'The Only Colors', 'theonlycolors.com'),
-    {
-      id: 'mlive',
-      name: 'MLive',
-      url: 'https://www.mlive.com/arc/outboundfeeds/rss/category/sports/?outputType=xml',
-      tier: 1,
-      scope: 'broad',
-    },
+    ADVANCE('mlive', 'MLive', 'www.mlive.com'),
   ],
   minnesota: [
     SB_NATION('daily-gopher', 'The Daily Gopher', 'thedailygopher.com'),
+    // Independently owned and on its own path rather than a chain's, so
+    // this one stays a literal.
     {
       id: 'star-tribune',
       name: 'Star Tribune',
@@ -139,27 +173,9 @@ const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   ],
   nebraska: [
     SB_NATION('corn-nation', 'Corn Nation', 'cornnation.com'),
-    {
-      id: 'lincoln-journal-star',
-      name: 'Lincoln Journal Star',
-      url: 'https://journalstar.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 1,
-      scope: 'broad',
-    },
-    {
-      id: 'omaha-world-herald',
-      name: 'Omaha World-Herald',
-      url: 'https://omaha.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 1,
-      scope: 'broad',
-    },
-    {
-      id: 'daily-nebraskan',
-      name: 'Daily Nebraskan',
-      url: 'https://www.dailynebraskan.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 3,
-      scope: 'broad',
-    },
+    LEE('lincoln-journal-star', 'Lincoln Journal Star', 'journalstar.com'),
+    LEE('omaha-world-herald', 'Omaha World-Herald', 'omaha.com'),
+    LEE('daily-nebraskan', 'Daily Nebraskan', 'www.dailynebraskan.com', 3),
   ],
   northwestern: [SB_NATION('inside-nu', 'Inside NU', 'insidenu.com')],
   'ohio-state': [
@@ -171,44 +187,20 @@ const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
       tier: 2,
       scope: 'team',
     },
-    {
-      id: 'cleveland-com',
-      name: 'Cleveland.com',
-      url: 'https://www.cleveland.com/arc/outboundfeeds/rss/category/sports/?outputType=xml',
-      tier: 1,
-      scope: 'broad',
-    },
+    ADVANCE('cleveland-com', 'Cleveland.com', 'www.cleveland.com'),
   ],
   oregon: [
     SB_NATION('addicted-to-quack', 'Addicted To Quack', 'addictedtoquack.com'),
-    {
-      id: 'oregonlive',
-      name: 'OregonLive',
-      url: 'https://www.oregonlive.com/arc/outboundfeeds/rss/category/sports/?outputType=xml',
-      tier: 1,
-      scope: 'broad',
-    },
+    ADVANCE('oregonlive', 'OregonLive', 'www.oregonlive.com'),
   ],
   'penn-state': [
     SB_NATION('black-shoe-diaries', 'Black Shoe Diaries', 'blackshoediaries.com'),
-    {
-      id: 'pennlive',
-      name: 'PennLive',
-      url: 'https://www.pennlive.com/arc/outboundfeeds/rss/category/sports/?outputType=xml',
-      tier: 1,
-      scope: 'broad',
-    },
+    ADVANCE('pennlive', 'PennLive', 'www.pennlive.com'),
   ],
   purdue: [SB_NATION('hammer-and-rails', 'Hammer and Rails', 'hammerandrails.com')],
   rutgers: [
     SB_NATION('on-the-banks', 'On the Banks', 'onthebanks.com'),
-    {
-      id: 'nj-com',
-      name: 'NJ.com',
-      url: 'https://www.nj.com/arc/outboundfeeds/rss/category/sports/?outputType=xml',
-      tier: 1,
-      scope: 'broad',
-    },
+    ADVANCE('nj-com', 'NJ.com', 'www.nj.com'),
   ],
   ucla: [
     {
@@ -240,13 +232,7 @@ const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   ],
   wisconsin: [
     SB_NATION('buckys-5th-quarter', "Bucky's 5th Quarter", 'buckys5thquarter.com'),
-    {
-      id: 'wisconsin-state-journal',
-      name: 'Wisconsin State Journal',
-      url: 'https://madison.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 1,
-      scope: 'broad',
-    },
+    LEE('wisconsin-state-journal', 'Wisconsin State Journal', 'madison.com'),
   ],
 };
 
@@ -312,24 +298,12 @@ const SEC_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
       tier: 1,
       scope: 'broad',
     },
-    {
-      id: 'arkansas-traveler',
-      name: 'The Arkansas Traveler',
-      url: 'https://www.uatrav.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 3,
-      scope: 'broad',
-    },
+    LEE('arkansas-traveler', 'The Arkansas Traveler', 'www.uatrav.com', 3),
   ],
   // No blog left, so Auburn runs on its own small-city daily plus the
   // statewide one it shares with Alabama.
   auburn: [
-    {
-      id: 'opelika-auburn-news',
-      name: 'Opelika-Auburn News',
-      url: 'https://oanow.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 1,
-      scope: 'broad',
-    },
+    LEE('opelika-auburn-news', 'Opelika-Auburn News', 'oanow.com'),
     AL_COM,
   ],
   florida: [
@@ -343,13 +317,7 @@ const SEC_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   ],
   georgia: [
     SB_NATION('dawg-sports', 'Dawg Sports', 'dawgsports.com'),
-    {
-      id: 'red-and-black',
-      name: 'The Red & Black',
-      url: 'https://www.redandblack.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 3,
-      scope: 'broad',
-    },
+    LEE('red-and-black', 'The Red & Black', 'www.redandblack.com', 3),
   ],
   kentucky: [SB_NATION('a-sea-of-blue', 'A Sea of Blue', 'aseaofblue.com')],
   lsu: [
@@ -372,73 +340,31 @@ const SEC_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
     },
   ],
   'mississippi-state': [
-    {
-      id: 'starkville-daily-news',
-      name: 'Starkville Daily News',
-      url: 'https://www.starkvilledailynews.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 1,
-      scope: 'broad',
-    },
+    LEE('starkville-daily-news', 'Starkville Daily News', 'www.starkvilledailynews.com'),
   ],
   missouri: [
     SB_NATION('rock-m-nation', 'Rock M Nation', 'rockmnation.com'),
-    {
-      id: 'st-louis-post-dispatch',
-      name: 'St. Louis Post-Dispatch',
-      url: 'https://www.stltoday.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 1,
-      scope: 'broad',
-    },
+    LEE('st-louis-post-dispatch', 'St. Louis Post-Dispatch', 'www.stltoday.com'),
     // Operated by the Missouri School of Journalism, which is a real
     // affiliation to the university it covers — but the same one the Daily
     // Nebraskan already carries, and tier 3 is where this app has
     // consistently filed student and campus newsrooms. Tier 4 is for
     // athletics-department output, not for a newsroom with an editor.
-    {
-      id: 'columbia-missourian',
-      name: 'Columbia Missourian',
-      url: 'https://www.columbiamissourian.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 3,
-      scope: 'broad',
-    },
+    LEE('columbia-missourian', 'Columbia Missourian', 'www.columbiamissourian.com', 3),
   ],
   'ole-miss': [SB_NATION('red-cup-rebellion', 'Red Cup Rebellion', 'redcuprebellion.com')],
   oklahoma: [
-    {
-      id: 'tulsa-world',
-      name: 'Tulsa World',
-      url: 'https://tulsaworld.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 1,
-      scope: 'broad',
-    },
-    {
-      id: 'ou-daily',
-      name: 'The OU Daily',
-      url: 'https://www.oudaily.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 3,
-      scope: 'broad',
-    },
+    LEE('tulsa-world', 'Tulsa World', 'tulsaworld.com'),
+    LEE('ou-daily', 'The OU Daily', 'www.oudaily.com', 3),
   ],
   'south-carolina': [
-    {
-      id: 'post-and-courier',
-      name: 'The Post and Courier',
-      url: 'https://www.postandcourier.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 1,
-      scope: 'broad',
-    },
+    LEE('post-and-courier', 'The Post and Courier', 'www.postandcourier.com'),
   ],
   tennessee: [SB_NATION('rocky-top-talk', 'Rocky Top Talk', 'rockytoptalk.com')],
   texas: [SB_NATION('burnt-orange-nation', 'Burnt Orange Nation', 'burntorangenation.com')],
   'texas-am': [
     SB_NATION('good-bull-hunting', 'Good Bull Hunting', 'goodbullhunting.com'),
-    {
-      id: 'the-eagle',
-      name: 'The Eagle',
-      url: 'https://theeagle.com/search/?f=rss&t=article&c=sports&l=50',
-      tier: 1,
-      scope: 'broad',
-    },
+    LEE('the-eagle', 'The Eagle', 'theeagle.com'),
   ],
   vanderbilt: [SB_NATION('anchor-of-gold', 'Anchor Of Gold', 'anchorofgold.com')],
 };
@@ -485,6 +411,53 @@ export function secSourcesForTeam(teamShortName: string): FeedSource[] {
 
 const bigTenReview = createTeamReview(BIG_TEN_SOURCES_BY_SLUG, BIG_TEN_NO_SOURCE_REASONS);
 const secReview = createTeamReview(SEC_SOURCES_BY_SLUG, SEC_NO_SOURCE_REASONS);
+
+/**
+ * One conference's table as data, for the review gate and
+ * scripts/review/propose.mjs.
+ *
+ * The lookups above answer for one team, which is all the app needs. Two
+ * questions the reviewer asks can only be answered across the whole table:
+ * which teams have been ruled on at all, and which of them share a source —
+ * the second being what decides whether a nickname collision matters. See
+ * nickname-safety.ts.
+ *
+ * `sourcesBySlug` is the same object the lookup reads, not a copy, so the
+ * two cannot disagree about what is in the table.
+ */
+export interface CuratedSourceTable {
+  readonly sourcesBySlug: Readonly<Record<string, readonly FeedSource[]>>;
+  readonly reviewFor: (teamShortName: string) => ReviewState;
+}
+
+export const BIG_TEN_CURATED: CuratedSourceTable = {
+  sourcesBySlug: BIG_TEN_SOURCES_BY_SLUG,
+  reviewFor: (teamShortName) => bigTenReview.reviewFor(teamShortName),
+};
+
+export const SEC_CURATED: CuratedSourceTable = {
+  sourcesBySlug: SEC_SOURCES_BY_SLUG,
+  reviewFor: (teamShortName) => secReview.reviewFor(teamShortName),
+};
+
+/**
+ * Which league each table serves.
+ *
+ * Keyed by league id here, rather than in source-catalog.ts where the rest
+ * of the league→sources mapping lives, for one reason: scripts/review/ has
+ * to read this from plain Node, and source-catalog.ts reaches feeds.ts and
+ * the league catalog at runtime — an npm package and a JSON import, neither
+ * of which loads that way. This file reaches nothing, which is what keeps
+ * the review tooling reading the real tables instead of parsing them.
+ *
+ * A league absent from here has no curated per-team sources, which is a
+ * normal state and not a gap — see the note on `teamSources` in
+ * source-catalog.ts.
+ */
+export const CURATED_SOURCE_TABLES: Readonly<Record<string, CuratedSourceTable>> = {
+  'big-ten': BIG_TEN_CURATED,
+  sec: SEC_CURATED,
+};
 
 /**
  * Whether a team's sources have been ruled on, and what was ruled out.

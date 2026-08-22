@@ -12,7 +12,8 @@
 # The in-app list is read out of src/lib/source-catalog.ts and
 # src/lib/community-sources.ts
 # rather than duplicated here, so it can't drift from what the app actually
-# fetches. Add a source there and it's covered here automatically.
+# fetches. Add a source there and it's covered here automatically. The
+# per-team half is imported rather than parsed — see extract_in_app_sources.
 #
 # A FAIL can mean "no feed" or "wrong URL" — for newspapers especially, treat
 # it as a prompt to go find the real URL, not proof the outlet has no feed.
@@ -143,28 +144,56 @@ section() {
   printf '\n%s\n' "$1"
 }
 
-# Pulls "name<TAB>url" out of the two source files: object literals with
-# adjacent name/url fields, plus the SB_NATION(id, name, domain) helper, which
-# builds its url from a template.
+# Pulls "name<TAB>url" out of the two source files.
+#
+# The per-team sources are IMPORTED rather than parsed. They used to be
+# read with a regex over adjacent name:/url: lines plus a special case for
+# the SB_NATION() helper, and that shape had a bad failure mode: adding a
+# second helper — ADVANCE() and LEE(), when the chains were generalized —
+# dropped twenty-two sources from this report while the app went on
+# fetching them, and a report that quietly checks two thirds of the catalog
+# looks exactly like a clean one. Importing the module removes the failure
+# instead of patching it: the script sees what the app sees, because it is
+# the same code. See scripts/lib/app-modules.mjs for how that works with no
+# build step and no node_modules.
+#
+# The national feeds in source-catalog.ts are still read with the regex,
+# and have to be: that module reaches feeds.ts and the league catalog at
+# runtime — an npm package and a JSON import — so it cannot be loaded this
+# way. It has no helpers either, which is what makes the regex safe there
+# and unsafe next door.
 extract_in_app_sources() {
-  node -e '
+  node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON -e '
     const fs = require("fs");
     const out = [];
-    const NAME_URL = /name:\s*(["\x27])(.+?)\1,\s*url:\s*(["\x27])(.+?)\3/g;
-    for (const file of ["src/lib/source-catalog.ts", "src/lib/community-sources.ts"]) {
-      const src = fs.readFileSync(file, "utf8");
-      for (const m of src.matchAll(NAME_URL)) out.push([m[2], m[4]]);
-    }
-    const cs = fs.readFileSync("src/lib/community-sources.ts", "utf8");
-    const SBN = /SB_NATION\(\s*["\x27][^"\x27]+["\x27],\s*(["\x27])(.+?)\1,\s*(["\x27])(.+?)\3\s*\)/g;
-    for (const m of cs.matchAll(SBN)) out.push([m[2], `https://www.${m[4]}/rss/index.xml`]);
 
-    const seen = new Set();
-    for (const [name, url] of out) {
-      if (seen.has(url)) continue;
-      seen.add(url);
-      console.log(`${name}\t${url}`);
-    }
+    const NAME_URL = /name:\s*(["\x27])(.+?)\1,\s*url:\s*(["\x27])(.+?)\3/g;
+    const src = fs.readFileSync("src/lib/source-catalog.ts", "utf8");
+    for (const m of src.matchAll(NAME_URL)) out.push([m[2], m[4]]);
+
+    import("./scripts/lib/app-modules.mjs")
+      .then(({ loadAppModule }) => loadAppModule("@/lib/community-sources"))
+      .then((community) => {
+        for (const table of Object.values(community.CURATED_SOURCE_TABLES)) {
+          for (const feeds of Object.values(table.sourcesBySlug)) {
+            for (const feed of feeds) out.push([feed.name, feed.url]);
+          }
+        }
+
+        const seen = new Set();
+        for (const [name, url] of out) {
+          if (seen.has(url)) continue;
+          seen.add(url);
+          console.log(`${name}\t${url}`);
+        }
+      })
+      .catch((error) => {
+        // Loud, and on stderr so it cannot be mistaken for a source line.
+        // The caller treats an empty extraction as a failure too, but this
+        // says which half broke.
+        console.error(`!! could not read the community sources: ${error.message}`);
+        process.exit(1);
+      });
   '
 }
 

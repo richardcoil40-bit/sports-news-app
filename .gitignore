@@ -41,6 +41,11 @@ yarn-error.*
 # ahead of `.env` — see the header comment in `.env` for the full rule.
 .env*.local
 
+# Wrangler's local state and temp dirs, written by `wrangler dev` and
+# `wrangler deploy`. The Worker's own source and config under worker/ are
+# tracked; this is machine-local.
+worker/.wrangler/
+
 # typescript
 *.tsbuildinfo
 

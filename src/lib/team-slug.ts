@@ -25,11 +25,71 @@ const SLUG_ALIASES: Record<string, string> = {
   'texas-a-m': 'texas-am',
 };
 
-/** Lowercased, punctuation-collapsed, and resolved through the aliases. */
-export function teamSlug(teamShortName: string): string {
-  const slug = String(teamShortName ?? '')
+/**
+ * Whether an alias *shortens* a name rather than expanding one.
+ *
+ * Every alias here exists to turn ESPN's abbreviation into the way a
+ * school is normally written, which always adds information:
+ * `michigan-st` → `michigan-state`. An alias that drops a word does the
+ * opposite and lands on a *different school* — `washington-st` →
+ * `washington` did exactly that, and would have served Washington State
+ * the Huskies, the Seattle Times and UW Dawg Pound with nothing on the
+ * screen looking wrong.
+ *
+ * Word-wise rather than by string prefix, so `texas-a-m` → `texas-am`
+ * (which collapses punctuation rather than dropping a word) doesn't trip
+ * it.
+ */
+function dropsAWord(from: string, to: string): boolean {
+  const fromWords = from.split('-');
+  const toWords = to.split('-');
+  return toWords.length < fromWords.length && toWords.every((word, i) => word === fromWords[i]);
+}
+
+/**
+ * The warning for one team's alias, or null if there's nothing to say.
+ * Printed per team by scripts/review/propose.mjs.
+ */
+export function aliasWarningFor(teamShortName: string): string | null {
+  const raw = rawTeamSlug(teamShortName);
+  const resolved = SLUG_ALIASES[raw];
+  if (!resolved || !dropsAWord(raw, resolved)) return null;
+  return `"${raw}" resolves to "${resolved}", which drops a word and so names a different school`;
+}
+
+/**
+ * Every alias that shortens rather than expands. Empty in a healthy table
+ * — team-review.test.ts asserts that, because this is the one defect in
+ * this file that produces a plausible wrong answer rather than an obvious
+ * one, and it stays latent until a league that has the affected school
+ * ships.
+ */
+export function aliasIssues(): string[] {
+  return Object.entries(SLUG_ALIASES)
+    .filter(([from, to]) => dropsAWord(from, to))
+    .map(([from, to]) => `${from} -> ${to}: the alias drops a word, so it names a different school`);
+}
+
+/**
+ * The slug before aliases — lowercased and punctuation-collapsed, and
+ * nothing else.
+ *
+ * Exported for one caller: scripts/review/propose.mjs prints "aliased to
+ * X" on a team's worksheet block, which needs both halves of the answer —
+ * whether an alias fired at all is the difference between the two. Whether
+ * that alias is *wrong* is `aliasWarningFor` above, deliberately here
+ * rather than in the script, so the worksheet and the gate can't hold two
+ * opinions about one table.
+ */
+export function rawTeamSlug(teamShortName: string): string {
+  return String(teamShortName ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+/** Lowercased, punctuation-collapsed, and resolved through the aliases. */
+export function teamSlug(teamShortName: string): string {
+  const slug = rawTeamSlug(teamShortName);
   return SLUG_ALIASES[slug] ?? slug;
 }

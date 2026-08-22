@@ -4,12 +4,20 @@ The one backend service NoFrills needs — see `docs/deferred-work.md` in the
 main repo for why it exists and what it unlocks. This file is about running
 and deploying it; that one is about the decision.
 
-One route. It classifies a batch of headline titles and returns a
-league-agnostic verdict for each: what sport it's about, which teams are
-named, whether it's a report/rumor/take, and whether it's news, promo, or
-institutional filler. The client (`src/lib/verdicts.ts` in the main app)
-applies its own policy to the verdict fields — this service never sees a
-team, a league, or a user.
+Two routes, and they share nothing but the file they're in.
+
+**`POST /v1/classify`** is the one the app calls. It classifies a batch of
+headline titles and returns a league-agnostic verdict for each: what sport
+it's about, which teams are named, whether it's a report/rumor/take, and
+whether it's news, promo, or institutional filler. The client
+(`src/lib/verdicts.ts` in the main app) applies its own policy to the
+verdict fields — this service never sees a team, a league, or a user.
+
+**`POST /v1/vet-source`** is developer tooling, called by hand from
+`scripts/review/vet.mjs --ai` a few times per league. It scores a candidate
+news source against the criteria in `docs/source-reliability.md`. It is off
+until you give it its own API key, and it has its own cap, counter and
+token — see its section below for why none of that is shared.
 
 ## Deploy
 
@@ -20,6 +28,13 @@ npx wrangler kv namespace create VERDICTS      # paste the returned id into wran
 npx wrangler secret put ANTHROPIC_API_KEY
 npx wrangler secret put CLIENT_TOKEN           # optional — see Auth below
 npx wrangler deploy
+```
+
+Source vetting stays off unless you also set its key:
+
+```bash
+npx wrangler secret put VET_ANTHROPIC_API_KEY  # enables POST /v1/vet-source
+npx wrangler secret put VET_TOKEN              # optional, same idea as CLIENT_TOKEN
 ```
 
 Local dev: `npm run dev` (runs `wrangler dev`). `npm run typecheck` runs
@@ -96,6 +111,51 @@ scraping of the endpoint, not access control. The actual brakes are:
 - **A spend limit on the Anthropic account itself.** This is the one that
   actually caps a worst-case bill, and it isn't in this repo — set it on
   the account.
+
+## `POST /v1/vet-source`
+
+Request — at most 20 sources:
+
+```json
+{
+  "sources": [
+    { "id": "nebraska:journalstar.com", "name": "Lincoln Journal Star",
+      "host": "journalstar.com", "url": "https://journalstar.com/...",
+      "owner": "lee", "format": "rss", "items": 50 }
+  ]
+}
+```
+
+Response: one assessment per source, in input order — a `tier`
+(`"0"`–`"4"` or `"excluded"`), a `scope` (`"team"` / `"broad"`), one
+sentence against each of the seven criteria in
+`docs/source-reliability.md`, a `summary`, and `uncertain`.
+
+`uncertain: true` means the answer rests on recognising the outlet rather
+than on anything in the input, and the prompt asks for tier `"0"` — *not
+assessed* — over a confident guess. That mirrors what tier 0 means in the
+doc: an admission, not a politer tier 3.
+
+### Why it shares nothing with `/v1/classify`
+
+Separate model (`VET_MODEL`), separate daily cap
+(`VET_DAILY_CALL_CAP`, currently 10), separate KV counter (`vet-calls:`
+rather than `calls:`), separate bearer token, and — the important one —
+a separate `VET_ANTHROPIC_API_KEY` **with no fallback to
+`ANTHROPIC_API_KEY`**. Unset, the route answers 503.
+
+The app's feed is a live dependency and this is a tool somebody runs while
+watching it. If they shared a budget, vetting a conference's worth of
+candidates could exhaust the app's daily cap, and the only symptom would be
+verdicts silently degrading to local rules for everyone. Two keys is the
+only version of this that can't happen.
+
+Nothing here is cached, which is the opposite of the rule below and
+deliberate: a verdict about a headline can't go stale because the headline
+never changes, while an outlet's ownership and business model are exactly
+what the doc says to re-check. Nothing here is written anywhere either —
+the response is a proposal for a worksheet, and a tier is recorded when a
+person puts it in `community-sources.ts` beside their reasoning.
 
 ## How it works
 

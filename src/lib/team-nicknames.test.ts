@@ -36,40 +36,25 @@ describe('teamNicknamesFor', () => {
 
 /**
  * The rule the table is built on: an entry has to survive being read in a
- * metro sports section that also covers pro teams. These are the words
- * that don't, and adding one would quietly pull NFL and NHL coverage into
- * a college football feed.
+ * metro sports section that also covers pro teams.
+ *
+ * Which words fail that is no longer asserted here. It used to be nine
+ * hand-written words checked against a hardcoded 34-team roster, and both
+ * halves stopped scaling at the same moment — see team-review.test.ts,
+ * which asks the question the right way round: not "is this word bad" but
+ * "is this word bad against the sources it will be matched against".
+ * RESERVED_NICKNAMES in team-nicknames.ts is where the words themselves
+ * now live, with the reason each one is out.
+ *
+ * What stays here is the consequence for a single team, which is what this
+ * file is about.
  */
 describe('the ambiguity rule', () => {
-  const MUST_NOT_APPEAR = [
-    'Lions', // Detroit — PennLive covers both them and Penn State
-    'Knights', // UCF
-    'Cardinals',
-    'Eagles',
-    'Tigers',
-    'Giants',
-    'Panthers',
-    'Bears',
-    'Jets',
-  ];
-
-  const everyNickname = new Set(
-    ['Illinois', 'Indiana', 'Iowa', 'Maryland', 'Michigan', 'Michigan St', 'Minnesota',
-     'Nebraska', 'Northwestern', 'Ohio St', 'Oregon', 'Penn St', 'Purdue', 'Rutgers',
-     'UCLA', 'USC', 'Washington', 'Wisconsin',
-     // The SEC is held to the same list. "Tigers" is the one that bites
-     // here — Auburn, LSU and Missouri all answer to it, so none of them
-     // claims it.
-     'Alabama', 'Arkansas', 'Auburn', 'Florida', 'Georgia', 'Kentucky', 'LSU',
-     'Mississippi St', 'Missouri', 'Ole Miss', 'Oklahoma', 'South Carolina',
-     'Tennessee', 'Texas', 'Texas A&M', 'Vanderbilt'].flatMap(teamNicknamesFor),
-  );
-
-  for (const word of MUST_NOT_APPEAR) {
-    it(`does not claim "${word}"`, () => {
-      expect(everyNickname.has(word)).toBe(false);
-    });
-  }
+  it('does not claim the bare last word of a two-word nickname', () => {
+    expect(teamNicknamesFor('Penn St')).toContain('Nittany Lions');
+    expect(teamNicknamesFor('Penn St')).not.toContain('Lions');
+    expect(teamNicknamesFor('Rutgers')).not.toContain('Knights');
+  });
 
   // A nickname is only trusted because the source is that team's own
   // paper. If a team has nicknames but no local source, the entry is

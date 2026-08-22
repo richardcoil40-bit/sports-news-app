@@ -1,4 +1,4 @@
-import { createTeamReview, ReviewState } from '@/lib/team-review';
+import { createTeamReview, type ReviewState } from '@/lib/team-review';
 import { teamSlug } from '@/lib/team-slug';
 
 /**
@@ -125,6 +125,49 @@ const NO_NICKNAME_REASONS: Record<string, string> = {
     'against LSU\'s own papers. Unreachable either way: both LSU sources ' +
     'are scope: team, so the local-newsroom filter these names feed never ' +
     'runs on them.',
+};
+
+/**
+ * The table as data, for the review gate and scripts/review/propose.mjs.
+ *
+ * `teamNicknamesFor` answers one team at a time, which is all the app ever
+ * needs. Deciding whether a *new* nickname is safe is a question about the
+ * whole table — who else already claims that word — so the reviewer needs
+ * to read across it. Read-only: the research is edited above, in the entry
+ * that carries its reasoning, never through this handle.
+ */
+export const CURATED_NICKNAMES: Readonly<Record<string, readonly string[]>> = NICKNAMES_BY_SLUG;
+
+/**
+ * Words no team may claim, whatever its mascot is, and why.
+ *
+ * These are the failures of the metro-sports-section rule stated at the top
+ * of this file: a word that a paper covering this team also prints about
+ * somebody else. Almost all of them are professional teams, and that is not
+ * a coincidence — it is the one collision a *region* cannot resolve. Two
+ * schools can share "Bulldogs" safely as long as each is matched only
+ * against its own city's paper, because no Starkville paper is covering
+ * Georgia. Every metro sports section in the country covers the NFL.
+ *
+ * That asymmetry is the whole rule: **a college mascot collision is decided
+ * by the sources, a professional one is decided by the word.** See
+ * nickname-safety.ts, which is where both halves are enforced.
+ *
+ * Moved here from team-nicknames.test.ts, which is where it was first
+ * written. A test can only say a bad word already got in; the reviewer
+ * choosing between candidates needs to be told before they paste it, and
+ * the list is research either way.
+ */
+export const RESERVED_NICKNAMES: Readonly<Record<string, string>> = {
+  Lions: 'Detroit — PennLive covers both them and Penn State',
+  Knights: 'UCF, and what Rutgers\' "Scarlet Knights" shortens to',
+  Cardinals: 'Arizona and St. Louis, before any of the three colleges',
+  Eagles: 'Philadelphia, and a mascot roughly seventy schools share',
+  Tigers: 'Detroit, plus Auburn, LSU, Missouri and Clemson',
+  Giants: 'New York and San Francisco',
+  Panthers: 'Carolina and Florida, plus Pitt',
+  Bears: 'Chicago — and Baylor, in a state with two SEC programs',
+  Jets: 'New York, and a word a sports section uses literally',
 };
 
 const nicknameReview = createTeamReview(NICKNAMES_BY_SLUG, NO_NICKNAME_REASONS);
