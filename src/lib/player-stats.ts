@@ -1,6 +1,5 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
-import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import { espnCacheKey, espnSitePath, League } from '@/lib/leagues';
 
 /**
@@ -78,7 +77,7 @@ async function fetchUncached(athleteId: string, league: League): Promise<PlayerS
  */
 export async function fetchPlayerSeasonStats(
   athleteId: string,
-  league: League = DEFAULT_LEAGUE,
+  league: League,
 ): Promise<PlayerStatCategory[]> {
   // Failures degrade to (and are cached as) empty — a player screen without a
   // stats card is fine; one that fails to load isn't.

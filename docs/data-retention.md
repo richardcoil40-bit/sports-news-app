@@ -20,25 +20,25 @@ hand-rolled per module:
 
 | Cache | File | Bound | TTL |
 |---|---|---|---|
-| National feed pool | `lib/source-catalog.ts` | Keyed by league — 2 entries (Big Ten, SEC) | 3 minutes |
-| Per-team news pool | `lib/team-news-pool.ts` | Keyed by sport + league path + team ID — max 34 entries (18 Big Ten, 16 SEC) | 3 minutes |
-| Team list | `lib/teams.ts` | Keyed by league — 2 entries today | 30 minutes |
-| Rosters | `lib/roster.ts` | Keyed by sport + league path + team ID — max 34 entries | None (process lifetime) |
-| Stat leaders | `lib/team-leaders.ts` | Keyed by sport + league path + team ID — max 34 entries | None (process lifetime) |
-| Team colors | `lib/team-color.ts` | Keyed by sport + league path + team ID — max 34 entries | None (process lifetime) |
+| National feed pool | `lib/source-catalog.ts` | Keyed by league — one entry per league that has curated feeds, 2 today (Big Ten, SEC). The NFL has none yet, and `fetchLeagueFeeds` returns without caching in that case, so it takes no slot | 3 minutes |
+| Per-team news pool | `lib/team-news-pool.ts` | Keyed by sport + league path + team ID — max 66 entries (18 Big Ten, 16 SEC, 32 NFL) | 3 minutes |
+| Team list | `lib/teams.ts` | Keyed by league — 3 entries today | 30 minutes |
+| Rosters | `lib/roster.ts` | Keyed by sport + league path + team ID — max 66 entries | None (process lifetime) |
+| Stat leaders | `lib/team-leaders.ts` | Keyed by sport + league path + team ID — max 66 entries | None (process lifetime) |
+| Team colors | `lib/team-color.ts` | Keyed by sport + league path + team ID — max 66 entries | None (process lifetime) |
 | Player season stats | `lib/player-stats.ts` | Keyed by athlete ID — one per player screen opened | None (process lifetime) |
 | Verdict classifications | `lib/verdicts.ts` | Keyed by headline title — one per unique headline seen; empty only if `EXPO_PUBLIC_VERDICT_URL` is cleared | None (process lifetime) |
 
 Force-quitting the app clears all of it. None of these can grow without
 limit, but they aren't all bounded the same way. The team-keyed caches are
-capped by the number of teams that exist — 18 entries no matter how long the
+capped by the number of teams that exist — 66 entries no matter how long the
 app has been open or how much you've browsed — and the national pool is
 overwritten rather than accumulated. **Player season stats are the one cache
 that does grow with use**: it gains an entry per player detail screen opened,
-so its ceiling is the number of athletes across all 18 rosters (order of
-1,800 entries of a few stat lines each) rather than 18. Still bounded, still
+so its ceiling is the number of athletes across all 66 rosters (order of
+5,000 entries of a few stat lines each) rather than 66. Still bounded, still
 cleared on quit, but worth stating precisely rather than filing it under
-"capped at 18" with the others. **Verdict classifications are the other
+"capped at 66" with the others. **Verdict classifications are the other
 one**, for the same reason (an entry per unique headline the app has ever
 asked about, not per team). That one is live as of 2026-08-20 — the
 service is deployed and the tracked `.env` points at it. Clear

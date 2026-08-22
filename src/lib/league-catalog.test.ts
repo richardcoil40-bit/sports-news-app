@@ -50,14 +50,18 @@ describe('parseLeagues — picker taxonomy', () => {
 });
 
 describe('the bundled catalog', () => {
-  it('offers only leagues the app can actually serve', () => {
-    expect(getLeagues().every((league) => league.status !== 'planned')).toBe(true);
-  });
-
-  it('shows planned leagues to the picker', () => {
-    const planned = getCatalogLeagues().filter((league) => league.status === 'planned');
-    expect(planned.length).toBeGreaterThan(0);
-    expect(getLeagues()).not.toEqual(getCatalogLeagues());
+  // The picker's list is the catalog whole, and the app's list is that
+  // minus the planned entries. One assertion covers both halves — the app
+  // never serves a planned league, and the picker never loses one.
+  //
+  // This replaced a pair that asserted "the shipped catalog contains a
+  // planned league", which was true while the NFL was planned and stopped
+  // being true the moment it shipped: a fact about the data, not about
+  // this code. parseLeagues' own status test above is what covers reading
+  // the field.
+  it('shows the picker everything and the app only what it can serve', () => {
+    const catalog = getCatalogLeagues();
+    expect(getLeagues()).toEqual(catalog.filter((league) => league.status !== 'planned'));
   });
 
   it('never defaults to a planned league', () => {

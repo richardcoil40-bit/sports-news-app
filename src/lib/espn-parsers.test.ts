@@ -8,6 +8,7 @@ import teamFixture from '@/lib/__fixtures__/espn-team.json';
 import teamLeadersFixture from '@/lib/__fixtures__/espn-team-leaders.json';
 import teamNewsFixture from '@/lib/__fixtures__/espn-team-news.json';
 import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
+import { League } from '@/lib/leagues';
 import { fetchPlayerSeasonStats } from '@/lib/player-stats';
 import { fetchTeamRoster } from '@/lib/roster';
 import { fetchGameOdds, fetchTeamSchedule } from '@/lib/schedule';
@@ -62,7 +63,7 @@ afterEach(() => {
 });
 
 describe('ESPN parsers degrade to empty on a malformed response', () => {
-  const emptyArrayParsers: [string, (id: string) => Promise<unknown[]>][] = [
+  const emptyArrayParsers: [string, (id: string, league: League) => Promise<unknown[]>][] = [
     ['fetchTeamRoster', fetchTeamRoster],
     ['fetchTeamSchedule', fetchTeamSchedule],
     ['fetchTeamArticles', fetchTeamArticles],
@@ -75,7 +76,7 @@ describe('ESPN parsers degrade to empty on a malformed response', () => {
       for (const [label, body] of MALFORMED_SHAPES) {
         it(`returns [] for ${label}`, async () => {
           respondWith(body);
-          await expect(parser(freshId())).resolves.toEqual([]);
+          await expect(parser(freshId(), DEFAULT_LEAGUE)).resolves.toEqual([]);
         });
       }
     });
@@ -85,7 +86,7 @@ describe('ESPN parsers degrade to empty on a malformed response', () => {
     for (const [label, body] of MALFORMED_SHAPES) {
       it(`returns null for ${label}`, async () => {
         respondWith(body);
-        await expect(fetchTeamColor(freshId())).resolves.toBeNull();
+        await expect(fetchTeamColor(freshId(), DEFAULT_LEAGUE)).resolves.toBeNull();
       });
     }
   });
@@ -94,7 +95,7 @@ describe('ESPN parsers degrade to empty on a malformed response', () => {
     for (const [label, body] of MALFORMED_SHAPES) {
       it(`returns null for ${label}`, async () => {
         respondWith(body);
-        await expect(fetchGameOdds(freshId())).resolves.toBeNull();
+        await expect(fetchGameOdds(freshId(), DEFAULT_LEAGUE)).resolves.toBeNull();
       });
     }
   });
@@ -133,7 +134,7 @@ describe('ESPN parsers on a well-formed response', () => {
   it('fetchTeamRoster keeps only real position groups', async () => {
     respondWith(rosterFixture);
 
-    const players = await fetchTeamRoster(freshId());
+    const players = await fetchTeamRoster(freshId(), DEFAULT_LEAGUE);
 
     // The "coaches" group is filtered out; offense and defense are kept.
     expect(players.map((p) => p.fullName)).toEqual([
@@ -152,7 +153,7 @@ describe('ESPN parsers on a well-formed response', () => {
   it('fetchTeamStatLeaders extracts athlete ids out of $ref urls', async () => {
     respondWith(teamLeadersFixture);
 
-    const leaders = await fetchTeamStatLeaders(freshId());
+    const leaders = await fetchTeamStatLeaders(freshId(), DEFAULT_LEAGUE);
 
     expect(leaders).toHaveLength(3);
     expect(leaders[0]).toEqual({
@@ -169,7 +170,7 @@ describe('ESPN parsers on a well-formed response', () => {
   it('fetchPlayerSeasonStats keeps only the pinned season, and only categories with signal', async () => {
     respondWith(playerStatsFixture);
 
-    const categories = await fetchPlayerSeasonStats(freshId());
+    const categories = await fetchPlayerSeasonStats(freshId(), DEFAULT_LEAGUE);
 
     // receiving (2025, has signal) is kept. puntReturns is 2025 but all
     // zeroes; rushing has signal but is 2023.
@@ -198,7 +199,7 @@ describe('ESPN parsers on a well-formed response', () => {
       ],
     });
 
-    const categories = await fetchPlayerSeasonStats(freshId());
+    const categories = await fetchPlayerSeasonStats(freshId(), DEFAULT_LEAGUE);
 
     expect(categories.map((c) => c.name)).toEqual(['puntReturns']);
   });
@@ -206,7 +207,7 @@ describe('ESPN parsers on a well-formed response', () => {
   it('fetchTeamSchedule resolves opponents and skips events without one', async () => {
     respondWith(scheduleFixture);
 
-    const games = await fetchTeamSchedule('194');
+    const games = await fetchTeamSchedule('194', DEFAULT_LEAGUE);
 
     expect(games).toHaveLength(2);
     expect(games[0]).toMatchObject({
@@ -227,7 +228,7 @@ describe('ESPN parsers on a well-formed response', () => {
   it('fetchTeamArticles drops articles with no web link and normalises dates', async () => {
     respondWith(teamNewsFixture);
 
-    const articles = await fetchTeamArticles(freshId());
+    const articles = await fetchTeamArticles(freshId(), DEFAULT_LEAGUE);
 
     expect(articles).toHaveLength(2);
     expect(articles[0].publishedAt).toBe('2025-11-29T22:14:00.000Z');
@@ -240,17 +241,17 @@ describe('ESPN parsers on a well-formed response', () => {
 
   it('fetchTeamColor prefixes the hex and rejects white', async () => {
     respondWith(teamFixture);
-    await expect(fetchTeamColor(freshId())).resolves.toBe('#bb0000');
+    await expect(fetchTeamColor(freshId(), DEFAULT_LEAGUE)).resolves.toBe('#bb0000');
 
     respondWith({ team: { color: 'FFFFFF' } });
-    await expect(fetchTeamColor(freshId())).resolves.toBeNull();
+    await expect(fetchTeamColor(freshId(), DEFAULT_LEAGUE)).resolves.toBeNull();
   });
 });
 
 describe('ESPN parsers on a non-OK response', () => {
   it.each([
-    ['fetchTeamStatLeaders', () => fetchTeamStatLeaders(freshId()), []],
-    ['fetchPlayerSeasonStats', () => fetchPlayerSeasonStats(freshId()), []],
+    ['fetchTeamStatLeaders', () => fetchTeamStatLeaders(freshId(), DEFAULT_LEAGUE), []],
+    ['fetchPlayerSeasonStats', () => fetchPlayerSeasonStats(freshId(), DEFAULT_LEAGUE), []],
   ])('%s degrades to empty', async (_name, call, expected) => {
     respondWith(null, { ok: false, status: 503 });
     await expect(call()).resolves.toEqual(expected);
@@ -258,8 +259,8 @@ describe('ESPN parsers on a non-OK response', () => {
 
   it('fetchTeamColor and fetchGameOdds degrade to null', async () => {
     respondWith(null, { ok: false, status: 503 });
-    await expect(fetchTeamColor(freshId())).resolves.toBeNull();
-    await expect(fetchGameOdds(freshId())).resolves.toBeNull();
+    await expect(fetchTeamColor(freshId(), DEFAULT_LEAGUE)).resolves.toBeNull();
+    await expect(fetchGameOdds(freshId(), DEFAULT_LEAGUE)).resolves.toBeNull();
   });
 
   /**
@@ -273,9 +274,9 @@ describe('ESPN parsers on a non-OK response', () => {
   });
 
   it.each([
-    ['fetchTeamRoster', () => fetchTeamRoster(freshId())],
-    ['fetchTeamSchedule', () => fetchTeamSchedule(freshId())],
-    ['fetchTeamArticles', () => fetchTeamArticles(freshId())],
+    ['fetchTeamRoster', () => fetchTeamRoster(freshId(), DEFAULT_LEAGUE)],
+    ['fetchTeamSchedule', () => fetchTeamSchedule(freshId(), DEFAULT_LEAGUE)],
+    ['fetchTeamArticles', () => fetchTeamArticles(freshId(), DEFAULT_LEAGUE)],
   ])('%s throws so the caller can show an error state', async (_name, call) => {
     respondWith(null, { ok: false, status: 503 });
     await expect(call()).rejects.toThrow(/responded 503/);

@@ -15,6 +15,7 @@ import { useAsync } from '@/hooks/use-async';
 import { useTheme } from '@/hooks/use-theme';
 import { ClaimType, withClaimTypes } from '@/lib/claim-type';
 import { Article } from '@/lib/feeds';
+import { DEFAULT_LEAGUE, getLeague } from '@/lib/league-catalog';
 import { matchArticlesForPlayer } from '@/lib/player-match';
 import { fetchPlayerSeasonStats, PlayerStatCategory } from '@/lib/player-stats';
 import { fetchTeamNewsPool } from '@/lib/team-news-pool';
@@ -40,7 +41,15 @@ export default function PlayerScreen() {
     teamId: string;
     teamName: string;
     teamShortName: string;
+    /** Which league the team screen resolved — see the note on `league`. */
+    leagueId?: string;
   }>();
+
+  // Same reason the team screen resolves one: an ESPN athlete or team id is
+  // only unique within a sport, so a stats URL or a pool cache key built
+  // without the league is wrong for every league but the default's. Forwarded
+  // by the team screen; the fallback covers a deep link that carries none.
+  const league = useMemo(() => getLeague(params.leagueId ?? '') ?? DEFAULT_LEAGUE, [params.leagueId]);
 
   const [tab, setTab] = useState<TabKey>('stats');
 
@@ -48,7 +57,7 @@ export default function PlayerScreen() {
     // Same pool the team's News tab uses (ESPN + community sites + local
     // newsroom + national feeds), and cached there, so this is usually
     // instant rather than a fresh fetch of everything.
-    const pool = await fetchTeamNewsPool(params.teamId, params.teamShortName || params.teamName);
+    const pool = await fetchTeamNewsPool(params.teamId, params.teamShortName || params.teamName, league);
     // The same matcher, with the same inputs, that produced the article
     // count on the card you tapped — see notable-players.ts. Surname
     // matching is opt-*out*: '0' is the Players tab saying a teammate
@@ -64,7 +73,7 @@ export default function PlayerScreen() {
   // team screen passes its own news tab.
   const classifiedMatches = useMemo(() => withClaimTypes(news.data ?? []), [news.data]);
 
-  const stats = useAsync<PlayerStatCategory[]>(() => fetchPlayerSeasonStats(params.id));
+  const stats = useAsync<PlayerStatCategory[]>(() => fetchPlayerSeasonStats(params.id, league));
 
   // Both tabs load on mount rather than lazily when their tab is opened (the
   // team screen's pattern): there are only two of them, the news pool is
@@ -98,12 +107,13 @@ export default function PlayerScreen() {
     params.firstName,
     params.lastName,
     params.surnameMatch,
+    league,
   ]);
 
   useEffect(() => {
     stats.reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id]);
+  }, [params.id, league]);
 
   const openArticle = (article: Article & { claimType?: ClaimType }) => {
     router.push({

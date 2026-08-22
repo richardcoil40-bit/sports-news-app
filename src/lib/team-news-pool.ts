@@ -3,7 +3,6 @@ import { filterArticlesForTeams } from '@/lib/conference-filter';
 import { filterOffTopic } from '@/lib/off-topic';
 import { filterOtherSports } from '@/lib/off-sport';
 import { Article, fetchFeeds } from '@/lib/feeds';
-import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import { espnCacheKey, League } from '@/lib/leagues';
 import { fetchLeagueFeeds, teamSourcesFor } from '@/lib/source-catalog';
 import { fetchTeamArticles } from '@/lib/team-news';
@@ -204,10 +203,18 @@ async function fetchTeamNewsPoolUncached(
 // load), rather than leaving the caller waiting indefinitely.
 const HARD_CAP_MS = 15000;
 
-function withHardCap(teamId: string, teamShortName: string, work: Promise<TeamNewsPool>): Promise<TeamNewsPool> {
+function withHardCap(
+  teamId: string,
+  teamShortName: string,
+  league: League,
+  work: Promise<TeamNewsPool>,
+): Promise<TeamNewsPool> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      const stale = poolCache.peek(teamId);
+      // The same key the pool is written under below — `league` is threaded
+      // in for this one line. Peeking on the bare team id silently missed
+      // every time, so this fallback could only ever return empty.
+      const stale = poolCache.peek(espnCacheKey(league, teamId));
       // warn, not log: unlike the DEBUG_TIMING lines above, this one is
       // always on, because reaching it means a fetch outlived its own
       // timeout — a real anomaly worth seeing without flipping a flag.
@@ -244,13 +251,18 @@ function withHardCap(teamId: string, teamShortName: string, work: Promise<TeamNe
 export async function fetchTeamNewsPool(
   teamId: string,
   teamShortName: string,
-  league: League = DEFAULT_LEAGUE,
+  league: League,
   options?: { force?: boolean },
 ): Promise<TeamNewsPool> {
   return poolCache.get(
     espnCacheKey(league, teamId),
     () =>
-      withHardCap(teamId, teamShortName, fetchTeamNewsPoolUncached(teamId, teamShortName, league)),
+      withHardCap(
+        teamId,
+        teamShortName,
+        league,
+        fetchTeamNewsPoolUncached(teamId, teamShortName, league),
+      ),
     { force: options?.force },
   );
 }

@@ -1,6 +1,6 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
-import { DEFAULT_LEAGUE, getLeagues } from '@/lib/league-catalog';
+import { getLeagues } from '@/lib/league-catalog';
 import { espnSitePath, League } from '@/lib/leagues';
 
 /**
@@ -131,9 +131,9 @@ async function fetchTeamsUncached(league: League): Promise<Team[]> {
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const teamsCache = createEntityCache<string, Team[]>({ ttlMs: CACHE_TTL_MS });
 
-/** One league's teams. Defaults to the catalog's first available league. */
+/** One league's teams. */
 export async function fetchTeams(
-  league: League = DEFAULT_LEAGUE,
+  league: League,
   options?: { force?: boolean },
 ): Promise<Team[]> {
   return teamsCache.get(league.id, () => fetchTeamsUncached(league), { force: options?.force });

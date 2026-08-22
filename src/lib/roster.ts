@@ -1,6 +1,5 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
-import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import { espnCacheKey, espnSitePath, League } from '@/lib/leagues';
 
 export type PositionGroup = 'offense' | 'defense' | 'specialTeam';
@@ -68,6 +67,6 @@ async function fetchTeamRosterUncached(teamId: string, league: League): Promise<
   return players;
 }
 
-export async function fetchTeamRoster(teamId: string, league: League = DEFAULT_LEAGUE): Promise<Player[]> {
+export async function fetchTeamRoster(teamId: string, league: League): Promise<Player[]> {
   return rosterCache.get(espnCacheKey(league, teamId), () => fetchTeamRosterUncached(teamId, league));
 }
