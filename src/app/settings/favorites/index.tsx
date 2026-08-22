@@ -1,12 +1,12 @@
 import { Stack, router } from 'expo-router';
 import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PickerRow } from '@/components/picker-row';
 import { ThemedView } from '@/components/themed-view';
+import { useLeagueCatalog } from '@/hooks/use-league-catalog';
 import { useTheme } from '@/hooks/use-theme';
-import { getCatalogLeagues } from '@/lib/league-catalog';
 import { allPlanned, leaguesIn, levelsIn, sportsIn } from '@/lib/league-taxonomy';
 
 /**
@@ -19,34 +19,50 @@ import { allPlanned, leaguesIn, levelsIn, sportsIn } from '@/lib/league-taxonomy
  * visible. Showing it is what makes the shape of the app legible: this
  * is a football app today, and it is built to not stay one.
  *
- * Everything here is derived from `__data__/leagues.json`. Adding a
- * sport, a level, or a league is an edit to that file.
+ * Everything here is derived from the league catalog, which is no longer
+ * bundled — `useLeagueCatalog` is what re-renders these three screens if a
+ * remote list lands while one of them is open. A `.map()` into a plain View
+ * was fine while the catalog shipped inside the app and its length was a
+ * fact about this build; a hosted catalog can grow without one, so all
+ * three are FlatLists.
  */
 export default function FavoritesSportsScreen() {
   const theme = useTheme();
-  const catalog = getCatalogLeagues();
-  const sports = useMemo(() => sportsIn(catalog), [catalog]);
+  const catalog = useLeagueCatalog();
+  const sports = useMemo(
+    () =>
+      sportsIn(catalog).map((sport) => {
+        const levels = levelsIn(catalog, sport);
+        return {
+          sport,
+          levels,
+          under: levels.flatMap((level) => leaguesIn(catalog, sport, level)),
+        };
+      }),
+    [catalog],
+  );
 
   return (
     <ThemedView style={styles.flex}>
       <Stack.Screen options={{ title: 'Favorites', headerBackTitle: 'Back' }} />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
-        <View style={[styles.rule, { backgroundColor: theme.text }]} />
-        {sports.map((sport) => {
-          const levels = levelsIn(catalog, sport);
-          const under = levels.flatMap((level) => leaguesIn(catalog, sport, level));
-          return (
+        <FlatList
+          data={sports}
+          keyExtractor={(item) => item.sport}
+          renderItem={({ item }) => (
             <PickerRow
-              key={sport}
-              label={sport}
-              detail={levels.join(' · ')}
-              disabled={allPlanned(under)}
+              label={item.sport}
+              detail={item.levels.join(' · ')}
+              disabled={allPlanned(item.under)}
               onPress={() =>
-                router.push({ pathname: '/settings/favorites/levels', params: { sport } })
+                router.push({ pathname: '/settings/favorites/levels', params: { sport: item.sport } })
               }
             />
-          );
-        })}
+          )}
+          // PickerRow rules its own bottom edge, so the first row needs the
+          // top one drawn for it.
+          ListHeaderComponent={<View style={[styles.rule, { backgroundColor: theme.text }]} />}
+        />
       </SafeAreaView>
     </ThemedView>
   );

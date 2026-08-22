@@ -4,12 +4,14 @@ The one backend service NoFrills needs — see `docs/deferred-work.md` in the
 main repo for why it exists and what it unlocks. This file is about running
 and deploying it; that one is about the decision.
 
-One route. It classifies a batch of headline titles and returns a
-league-agnostic verdict for each: what sport it's about, which teams are
-named, whether it's a report/rumor/take, and whether it's news, promo, or
-institutional filler. The client (`src/lib/verdicts.ts` in the main app)
-applies its own policy to the verdict fields — this service never sees a
-team, a league, or a user.
+Two routes. `POST /v1/classify` classifies a batch of headline titles and
+returns a league-agnostic verdict for each: what sport it's about, which
+teams are named, whether it's a report/rumor/take, and whether it's news,
+promo, or institutional filler. The client (`src/lib/verdicts.ts` in the main
+app) applies its own policy to the verdict fields — that route never sees a
+team, a league, or a user. `GET /v1/leagues` serves the league catalog, so
+that adding a league is a deploy of this Worker rather than an App Store
+release.
 
 ## Deploy
 
@@ -78,14 +80,64 @@ Response:
 - `kind` is `"news"` / `"promo"` / `"institutional"` — the off-topic axis;
   this is the field that answers "is this actually sports coverage."
 
+## `GET /v1/leagues`
+
+The league catalog, as the bare JSON array the app's `parseLeagues` expects:
+
+```json
+[
+  {
+    "id": "big-ten",
+    "displayName": "Big Ten",
+    "sport": "Football",
+    "level": "College",
+    "espnSport": "football",
+    "espnLeaguePath": "college-football",
+    "espnGroup": 5,
+    "seasonStartMonth": 8
+  }
+]
+```
+
+- **The payload is `src/lib/__data__/leagues.json` from the app repo,
+  imported directly** (`src/index.ts` line 1-ish) rather than copied into
+  this directory. The same file is bundled into the app as its offline
+  fallback, so the served copy and the shipped default cannot disagree at
+  deploy time. **Adding a league is: edit that JSON, `wrangler deploy`.**
+  Nobody has to update their app.
+- **A bare array, not an envelope.** The wire shape is deliberately identical
+  to the bundled file's, so the remote copy and the fallback are
+  interchangeable and neither side needs an unwrapping step the other could
+  disagree with.
+- **Unauthenticated**, unlike `/v1/classify`, and that difference is the rule
+  rather than an oversight: `CLIENT_TOKEN` guards the endpoint that spends
+  money at Anthropic. This one is a static public list served without a KV
+  read or a model call. Gating it would mean a build with
+  `EXPO_PUBLIC_CATALOG_URL` set but no token silently running on its bundled
+  catalog — a worse failure than anyone reading a list of league names.
+- `cache-control: public, max-age=300`. Leagues are added on the order of
+  days; the header is there to keep this from being a per-launch origin hit
+  for every install, not to bound staleness.
+
+The client is `src/lib/league-catalog.ts`, pointed here by
+`EXPO_PUBLIC_CATALOG_URL` (the base URL, same as the verdicts one — kept as
+its own variable so the two can be switched independently). It takes
+`teams.ts`'s throw-on-failure posture rather than the usual degrade-to-empty:
+anything it can't turn into at least one available league is a throw, caught
+one level up, leaving the app on its bundled list. **An empty league list is
+an empty app that looks like it loaded correctly**, which is the whole reason
+that route exists in that shape.
+
 `GET /health` returns `{"ok": true}` — nothing else to it, just a
 liveness check for `wrangler dev` / uptime monitoring.
 
 ## Auth
 
-`CLIENT_TOKEN` is optional. If set, every request needs
-`Authorization: Bearer <token>` or gets a 401. Be honest with yourself about
-what this buys: a token baked into an app bundle is extractable by anyone
+`CLIENT_TOKEN` is optional. If set, `POST /v1/classify` needs
+`Authorization: Bearer <token>` or gets a 401. It guards that route and only
+that route — `GET /health` and `GET /v1/leagues` are open, because the thing
+being guarded is spend at Anthropic and neither of those costs any. Be honest
+with yourself about what this buys: a token baked into an app bundle is extractable by anyone
 who wants it, same as an API key would be. It's a speed bump against casual
 scraping of the endpoint, not access control. The actual brakes are:
 
@@ -136,6 +188,8 @@ scraping of the endpoint, not access control. The actual brakes are:
 
 Team names, league identity, user identity, and article links never reach
 this Worker — only the headline text and an opaque id the caller invented.
+`/v1/leagues` sends nothing at all: it's a GET with no body and no query, so
+the only thing it reveals is that some device launched the app.
 The request pattern (which teams a user's client asks about, and when)
 still reveals something about who's using the app, which is why
 `docs/data-retention.md` was updated in the same change that shipped this

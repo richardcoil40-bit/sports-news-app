@@ -58,3 +58,8 @@ example
 # verified alive. Root-only pattern so scripts/check-feeds.sh output lands in
 # version control where it's useful.
 /feed-status*.txt
+
+# Wrangler's local dev state (the .wrangler/ cache and miniflare's simulated
+# KV), created by the `worker` entry in .claude/launch.json. Build output, not
+# config — wrangler.toml is the tracked part.
+worker/.wrangler/

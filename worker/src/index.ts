@@ -1,9 +1,11 @@
 /**
  * NoFrills verdicts service.
  *
- * One route: POST /v1/classify. Takes a batch of headline titles, returns a
- * sport/team/claim/kind verdict for each — see docs/deferred-work.md in the
+ * Two routes. POST /v1/classify takes a batch of headline titles and returns
+ * a sport/team/claim/kind verdict for each — see docs/deferred-work.md in the
  * main repo for why this exists and README.md here for the wire contract.
+ * GET /v1/leagues serves the league catalog, so that adding a league is a
+ * deploy of this Worker rather than an App Store release.
  *
  * Design points worth knowing before touching this file:
  *
@@ -23,6 +25,23 @@
  *   do nothing.
  */
 import Anthropic from '@anthropic-ai/sdk';
+
+/**
+ * The league catalog, imported straight out of the app repo rather than
+ * copied into this directory.
+ *
+ * That is deliberate and it is the one place this Worker shares source with
+ * the app. The same file is bundled into the app as its offline fallback and
+ * served from here as the live copy, so the two can't disagree at deploy
+ * time — which is the failure a second copy in `worker/src/` would invite,
+ * silently, on the day someone edits one and not the other. Note this is
+ * unlike the SPORTS list below, which really is duplicated: that one mirrors
+ * a *type* in the app, and a type can't cross a bundler boundary as data.
+ *
+ * Adding a league is therefore: edit that JSON, `wrangler deploy`. Nobody
+ * updates their app.
+ */
+import leagueCatalog from '../../src/lib/__data__/leagues.json';
 
 export interface Env {
   VERDICTS: KVNamespace;
@@ -300,12 +319,56 @@ async function handleClassify(request: Request, env: Env, ctx: ExecutionContext)
   });
 }
 
+/**
+ * How long a client or an edge cache may hold the catalog. Leagues are added
+ * on the order of days, so five minutes is already far tighter than the thing
+ * it describes — it exists to keep this route from being a per-launch origin
+ * hit for every install, not to bound staleness.
+ */
+const CATALOG_MAX_AGE_SECONDS = 300;
+
+/**
+ * The league catalog, served as the bare array the app's `parseLeagues`
+ * expects — not wrapped in an envelope. The wire shape is deliberately the
+ * *same shape as the bundled file*, so the remote copy and the offline
+ * fallback are interchangeable and neither side needs an unwrapping step
+ * that could disagree with the other.
+ *
+ * Unauthenticated, unlike /v1/classify, and that difference is the rule
+ * rather than an oversight: `CLIENT_TOKEN` guards the endpoint that spends
+ * money at Anthropic. This one is a static public list that costs a KV-free,
+ * model-free response, and gating it would mean a build with the catalog URL
+ * set but no token silently falling back to its bundled copy — a worse
+ * failure than anyone reading a list of league names.
+ */
+function handleLeagues(): Response {
+  return new Response(JSON.stringify(leagueCatalog), {
+    headers: {
+      'content-type': 'application/json',
+      'cache-control': `public, max-age=${CATALOG_MAX_AGE_SECONDS}`,
+      // CORS-open, which /v1/classify is deliberately not. React Native
+      // ignores CORS entirely, so this is for `expo start --web` — a
+      // supported way to run this app (see .claude/launch.json), and without
+      // the header the browser blocks the request and the web build silently
+      // runs on its bundled catalog forever. Safe on this route precisely
+      // because it is the unauthenticated one: no credentials, no cookies,
+      // and the payload is a public list of league names. Don't copy it onto
+      // the classify route, which is token-gated for a reason.
+      'access-control-allow-origin': '*',
+    },
+  });
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === 'GET' && url.pathname === '/health') {
       return json({ ok: true });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/v1/leagues') {
+      return handleLeagues();
     }
 
     if (request.method === 'POST' && url.pathname === '/v1/classify') {

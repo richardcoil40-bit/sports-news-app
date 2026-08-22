@@ -5,7 +5,7 @@ Kept here rather than in a chat log or an issue tracker so that the reasoning
 survives — the point of this file is that someone (or some future session)
 can resume this without re-deriving the decision.
 
-Last reviewed 2026-08-20.
+Last reviewed 2026-08-22.
 
 ---
 
@@ -71,8 +71,13 @@ each numbered section below for which half of it actually landed:
   already found. The *discovery* half (asking a news-search service what's
   being published about a team) is still unbuilt; nothing here finds a new
   outlet on its own.
-- **Adding a league without an app release (§2)** is entirely unbuilt —
-  the league catalog is still bundled JSON, untouched by this work.
+- **Adding a league without an app release (§2)** is **done**, as of
+  2026-08-22, and it turned out to need the Worker after all — not for the
+  API key, but because it was already deployed and a static JSON route on it
+  was cheaper than a second thing to operate. `GET /v1/leagues` serves
+  `src/lib/__data__/leagues.json` (the Worker imports the app's copy, so the
+  two can't drift), and `refreshLeagueCatalog` installs it over the bundled
+  list at launch. Adding a league is now: edit that JSON, `wrangler deploy`.
 
 The rest of this file's original reasoning is left as written below, marked
 up with what's since landed.
@@ -147,10 +152,25 @@ already validates the list as if it came from a stranger, drops bad entries
 individually, and falls back to the bundled copy. Switching the source from
 bundled to fetched is a change of one input, not a rewrite.
 
-**Untouched by the backend work.** Nothing about `worker/` or
-`src/lib/verdicts.ts` changes where the league catalog lives; this is still
-entirely deferred, and the remaining step above is still exactly what it
-takes.
+**Done, 2026-08-22, and the estimate above held exactly.** It was a change
+of one input: `parseLeagues` did not change a line. What was added around it
+is the fetch (`fetchLeagueCatalog`), the install-or-keep wrapper
+(`refreshLeagueCatalog`), and a `GET /v1/leagues` route on the Worker that
+serves the very same `__data__/leagues.json` the app bundles — imported
+across, not copied, so the served copy and the offline fallback cannot
+disagree at deploy time.
+
+The one thing worth reading the code for is the failure posture, because it
+is the opposite of the rest of `src/lib/`. Every other remote source degrades
+to empty; this one **throws**, per `teams.ts`'s exception, and the caller
+catches and keeps the list already in force. A league catalog that degrades
+to empty is an app with no tabs, no filters and no favorites that renders as
+though it loaded fine.
+
+Note what this does *not* unlock on its own: a league in the catalog with no
+source table and no nicknames is a league whose teams have no local coverage.
+The catalog is the cheap half. See the review gate in the scaling plan for
+the half that isn't.
 
 ### 3. Better claim tagging
 
@@ -301,6 +321,14 @@ follows, and that residual is exactly what `data-retention.md` now
 documents rather than glosses over. The service is configured not to log
 request bodies, per the plan.
 
-Nothing about this changes until a build actually sets
-`EXPO_PUBLIC_VERDICT_URL` — the door was built, but it's still standing
-open onto an empty room until that happens.
+That door is open and walked through: the tracked `.env` has set
+`EXPO_PUBLIC_VERDICT_URL` since 2026-08-20, so every build from this repo
+sends headline titles to the Worker. This closing line used to say the room
+was still empty and needed replacing the moment it stopped being true — the
+same failure the status note at the top of this file records.
+
+`EXPO_PUBLIC_CATALOG_URL` (2026-08-22) points at the same Worker for the
+league catalog and does **not** widen that door. It is a GET with no body and
+no query string: it sends nothing, and the only thing it reveals is that some
+device launched the app. Unset it and the app runs on its bundled catalog
+without touching the network, the same escape hatch the verdicts URL has.
