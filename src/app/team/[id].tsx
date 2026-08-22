@@ -16,6 +16,7 @@ import { useAsync } from '@/hooks/use-async';
 import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
 import { Article } from '@/lib/feeds';
+import { DEFAULT_LEAGUE, getLeague } from '@/lib/league-catalog';
 import { RankedPlayer, rankNotablePlayers } from '@/lib/notable-players';
 import {
   ClaimFilter,
@@ -53,9 +54,23 @@ export default function TeamScreen() {
     name: string;
     shortName: string;
     logoUrl: string;
+    /** Which league this team came from — see the note on `league` below. */
+    leagueId?: string;
     /** The color the Teams grid already resolved, when arriving from it. */
     accent?: string;
   }>();
+
+  // Every fetch on this screen keys off an ESPN team id, and those are only
+  // unique within a sport — team 13 is a different team in each one. So the
+  // league has to come from the caller rather than from a default: with one,
+  // an NFL team id quietly builds football/college-football URLs and caches
+  // under a college-football key, which is a wrong screen that looks like a
+  // working one.
+  //
+  // Falls back for the case the params can't cover — a deep link, or a
+  // process restart on this route — matching what team-badge-row.tsx and
+  // multi-team-feed.ts do with the same question.
+  const league = useMemo(() => getLeague(params.leagueId ?? '') ?? DEFAULT_LEAGUE, [params.leagueId]);
 
   const [tab, setTab] = useState<TabKey>('news');
   // The whole league: this team's pool carries stories about its
@@ -70,12 +85,12 @@ export default function TeamScreen() {
   const [teamColor, setTeamColor] = useState<string | null>(params.accent || null);
 
   const news = useAsync<Article[]>(async () => {
-    const pool = await fetchTeamNewsPool(params.id, params.shortName || params.name);
+    const pool = await fetchTeamNewsPool(params.id, params.shortName || params.name, league);
     return pool.articles;
   });
 
   const schedule = useAsync<ScheduledGame[]>(async (publish) => {
-    const games = await fetchTeamSchedule(params.id);
+    const games = await fetchTeamSchedule(params.id, league);
     publish(games);
 
     // Odds for just the next few upcoming games — fetching every game
@@ -84,7 +99,7 @@ export default function TeamScreen() {
     const upcoming = games.filter((g) => !g.completed).slice(0, 5);
     const oddsByGameId = new Map(
       await Promise.all(
-        upcoming.map(async (game) => [game.id, await fetchGameOdds(game.id).catch(() => null)] as const),
+        upcoming.map(async (game) => [game.id, await fetchGameOdds(game.id, league).catch(() => null)] as const),
       ),
     );
     return games.map((g) => (oddsByGameId.has(g.id) ? { ...g, odds: oddsByGameId.get(g.id)! } : g));
@@ -92,21 +107,21 @@ export default function TeamScreen() {
 
   const roster = useAsync<RosterData>(async () => {
     const [players, leaders] = await Promise.all([
-      fetchTeamRoster(params.id),
-      fetchTeamStatLeaders(params.id),
+      fetchTeamRoster(params.id, league),
+      fetchTeamStatLeaders(params.id, league),
     ]);
     return { players, leaders };
   });
 
   useEffect(() => {
     let cancelled = false;
-    fetchTeamColor(params.id).then((color) => {
+    fetchTeamColor(params.id, league).then((color) => {
       if (!cancelled) setTeamColor(color);
     });
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [params.id, league]);
 
   // Each tab's data loads only the first time that tab is opened, not all
   // three up front — the schedule tab in particular fires one odds request
@@ -123,7 +138,7 @@ export default function TeamScreen() {
       news.load();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, params.id, params.shortName, params.name]);
+  }, [tab, params.id, params.shortName, params.name, league]);
 
   // Classified and tagged once here, so every card has its badges
   // whether or not a filter is active. Tagged against the whole league
@@ -189,6 +204,10 @@ export default function TeamScreen() {
         teamId: params.id,
         teamName: params.name,
         teamShortName: params.shortName,
+        // The league this screen resolved, not the raw param: if that was
+        // absent and this screen fell back, the player screen should land on
+        // the same league rather than re-deriving it from nothing.
+        leagueId: league.id,
       },
     });
   };

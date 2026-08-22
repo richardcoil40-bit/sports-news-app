@@ -1,6 +1,5 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
-import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import { espnCacheKey, espnSitePath, League } from '@/lib/leagues';
 
 // `null` is a real cached answer here ("no usable color"), not a miss.
@@ -17,6 +16,6 @@ async function fetchTeamColorUncached(teamId: string, league: League): Promise<s
 }
 
 /** Each team's real primary color, straight from ESPN — used as the one flat accent per team screen. */
-export async function fetchTeamColor(teamId: string, league: League = DEFAULT_LEAGUE): Promise<string | null> {
+export async function fetchTeamColor(teamId: string, league: League): Promise<string | null> {
   return colorCache.get(espnCacheKey(league, teamId), () => fetchTeamColorUncached(teamId, league));
 }

@@ -343,7 +343,7 @@ running locally with full access:
 
 ## Scope
 
-Built for college football today — the Big Ten and the SEC — with an
+Built for football today — the Big Ten, the SEC and the NFL — with an
 explicit intent to expand to other sports and leagues. Favor
 sport-agnostic naming and structure where it doesn't cost real effort
 now, so that expansion is additive later rather than a rewrite.
@@ -371,6 +371,22 @@ shouldn't gain any.
   a roster cache entry. It intentionally keys on sport + league path
   rather than league id, so two conferences of the same sport still
   share one cached roster.
+  - **Read the cache with the same key you wrote it with.** The one
+    place that didn't — `team-news-pool.ts`'s 15s hard-cap fallback
+    peeked on the bare team id while the write used `espnCacheKey` — so
+    the fallback never found anything and always served empty. It looked
+    correct on the page; the two lines are 40 apart.
+- **A fetcher that takes a `League` takes it as a required argument.**
+  Nine of them used to default to `DEFAULT_LEAGUE`, and neither detail
+  screen passed one, so an NFL team id silently built
+  `football/college-football` URLs and cached under a college-football
+  key — a wrong screen that looks like a working one. `DEFAULT_LEAGUE`
+  still exists for resolving an *absent* league id (`favorites.ts`,
+  `multi-team-feed.ts`, the two detail screens' deep-link fallback), but
+  never as a parameter default: a required argument is what turns the
+  next occurrence of this into a type error. Screens get theirs from a
+  `leagueId` route param — `Team.leagueId` is in scope at every push
+  site.
 - **Anything calendar-shaped belongs on the descriptor.**
   `seasonStartMonth` exists because college football's August-to-January
   season is wrong for nearly every other sport. Note it means "the month

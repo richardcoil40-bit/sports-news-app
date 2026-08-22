@@ -1,6 +1,5 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
-import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import { espnCacheKey, espnCorePath, espnSitePath, League } from '@/lib/leagues';
 
 export interface Odds {
@@ -143,7 +142,7 @@ const scheduleCache = createEntityCache<string, ScheduledGame[]>({ ttlMs: SCHEDU
  */
 export async function fetchTeamSchedule(
   teamId: string,
-  league: League = DEFAULT_LEAGUE,
+  league: League,
   options?: { force?: boolean },
 ): Promise<ScheduledGame[]> {
   return scheduleCache.get(espnCacheKey(league, teamId), () => fetchTeamScheduleUncached(teamId, league), {
@@ -159,7 +158,7 @@ export async function fetchTeamSchedule(
  */
 export async function fetchGameOdds(
   eventId: string,
-  league: League = DEFAULT_LEAGUE,
+  league: League,
 ): Promise<Odds | null> {
   const url = `https://sports.core.api.espn.com/v2/sports/${espnCorePath(league)}/events/${eventId}/competitions/${eventId}/odds`;
   const response = await fetchWithTimeout(url);

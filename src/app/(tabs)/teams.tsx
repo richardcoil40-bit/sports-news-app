@@ -65,6 +65,12 @@ export default function TeamsScreen() {
         name: team.name,
         shortName: team.shortName,
         logoUrl: team.logoUrl ?? '',
+        // An ESPN team id is only unique within a sport, so the screen on
+        // the other side can't build a single correct URL without knowing
+        // which league this row came from. Carried on the Team already —
+        // passing it is what keeps an NFL team off college-football
+        // endpoints.
+        leagueId: team.leagueId,
         // Handed over so the team screen's header is already the right
         // color on its first frame. It would otherwise fetch the same
         // (cached) value a tick later and visibly change under the
