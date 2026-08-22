@@ -7,12 +7,32 @@ node_modules/
 .expo/
 dist/
 web-build/
-# expo-env.d.ts is deliberately NOT ignored, despite the note inside it.
-# It is generated, but it is also the only thing declaring expo's ambient
-# module types — CSS imports especially. Ignored, `tsc --noEmit` passes on
-# any machine that has run the dev server and fails on a fresh clone, which
-# is exactly what CI is. Tracking it makes the typecheck reproducible; it
-# regenerates to identical content, so it doesn't churn.
+# expo-env.d.ts is TRACKED, despite the line below and the note inside the
+# file itself. It is generated, but it is also the only thing declaring
+# expo's ambient module types — CSS imports especially. Untracked,
+# `tsc --noEmit` passes on any machine that has run the dev server and fails
+# on a fresh clone, which is exactly what CI is. Tracking it makes the
+# typecheck reproducible; it regenerates to identical content, so it
+# doesn't churn.
+#
+# The pattern is listed anyway, and listing it costs nothing: **.gitignore
+# has no effect on a file git already tracks.** What it does buy is silence
+# from expo-cli. Every `expo lint` and `expo start` runs
+# `upsertGitIgnoreContents(".gitignore", "expo-env.d.ts")`, which returns
+# early and writes nothing if the file already contains a line matching
+# /^expo-env.d.ts$/ — and otherwise appends a `# @generated expo-cli` block
+# to the bottom of this file. Without the line below, every lint run dirties
+# .gitignore with a block that contradicts this comment, and someone has to
+# notice and strip it before committing. Twice in one session, in practice.
+#
+# So: the line satisfies expo-cli, and the file stays tracked. To prove that
+# to yourself, `git ls-files expo-env.d.ts` still lists it and editing it
+# still shows up in `git status`. Note plain
+# `git check-ignore -v expo-env.d.ts` exits 1 and prints nothing here — not
+# because the rule is missing, but because check-ignore skips tracked files.
+# `git check-ignore -v --no-index expo-env.d.ts` is the one that names it,
+# and that difference is the whole point restated: tracked beats ignored.
+expo-env.d.ts
 
 # Native
 .kotlin/
@@ -58,3 +78,8 @@ example
 # verified alive. Root-only pattern so scripts/check-feeds.sh output lands in
 # version control where it's useful.
 /feed-status*.txt
+
+# Wrangler's local dev state (the .wrangler/ cache and miniflare's simulated
+# KV), created by the `worker` entry in .claude/launch.json. Build output, not
+# config — wrangler.toml is the tracked part.
+worker/.wrangler/
