@@ -41,7 +41,11 @@ function hasSignal(values: string[]): boolean {
   return values.some((v) => v && v !== '0' && v !== '0.0' && v !== '-');
 }
 
-const cache = createEntityCache<string, PlayerStatCategory[]>();
+// The one cache keyed by *player* rather than by team, so its ceiling is
+// every athlete across every roster rather than every team — a far larger
+// number, and the reason its bound is larger too. Entries are a handful of
+// stat lines each.
+const cache = createEntityCache<string, PlayerStatCategory[]>({ maxEntries: 500 });
 
 async function fetchUncached(athleteId: string, league: League): Promise<PlayerStatCategory[]> {
   const url = `https://site.web.api.espn.com/apis/common/v3/sports/${espnSitePath(league)}/athletes/${athleteId}/stats`;

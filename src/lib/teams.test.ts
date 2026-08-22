@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getLeagues } from '@/lib/league-catalog';
-import { fetchAllTeams } from '@/lib/teams';
+import { fetchAllTeams, fetchTeamsForLeagues } from '@/lib/teams';
 
 /**
  * The contract worth protecting here is the one that only exists once
@@ -119,5 +119,98 @@ describe('fetchAllTeams', () => {
     await fetchAllTeams({ force: true });
 
     expect(fetchMock).toHaveBeenCalledTimes(getLeagues().length);
+  });
+});
+
+/**
+ * The narrower path, and the one nearly every screen takes. What it exists to
+ * prevent is a cold launch opening one standings request per league in the
+ * catalog when the user follows teams in one or two of them — a cost that
+ * scales with what *exists* rather than with what the user chose, which is
+ * the thing the whole catalog-growth effort is trying to keep out of hot
+ * paths.
+ */
+describe('fetchTeamsForLeagues', () => {
+  it('asks only for the leagues named', async () => {
+    const fetchMock = standingsFor({
+      [BIG_TEN_GROUP]: { teams: ['Michigan'] },
+      [SEC_GROUP]: { teams: ['Alabama'] },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const teams = await fetchTeamsForLeagues(['sec'], { force: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(teams.map((t) => t.shortName)).toEqual(['Alabama']);
+  });
+
+  // A first launch, and the one case that must not look like a failure: there
+  // is nothing to ask for and nothing wrong.
+  it('resolves empty for no leagues without touching the network', async () => {
+    const fetchMock = standingsFor({});
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchTeamsForLeagues([], { force: true })).resolves.toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // A favorite can outlive its league — one moved to `planned`, or dropped
+  // from the catalog. That is a normal thing to find on a device, not an
+  // error, and it can't resolve to a team either way.
+  it('ignores an id the catalog does not serve', async () => {
+    const fetchMock = standingsFor({ [SEC_GROUP]: { teams: ['Alabama'] } });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const teams = await fetchTeamsForLeagues(['sec', 'league-that-left'], { force: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(teams.map((t) => t.shortName)).toEqual(['Alabama']);
+  });
+
+  it('still spans the leagues it was given, sorted together', async () => {
+    vi.stubGlobal(
+      'fetch',
+      standingsFor({
+        [BIG_TEN_GROUP]: { teams: ['Michigan'] },
+        [SEC_GROUP]: { teams: ['Alabama'] },
+      }),
+    );
+
+    const teams = await fetchTeamsForLeagues(['big-ten', 'sec'], { force: true });
+
+    expect(teams.map((t) => t.shortName)).toEqual(['Alabama', 'Michigan']);
+  });
+
+  // Same softening fetchAllTeams makes, for the same reason: one conference
+  // being down should cost that conference, not every team you follow.
+  it('keeps the leagues that worked when one fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      standingsFor({
+        [BIG_TEN_GROUP]: { ok: false, teams: [] },
+        [SEC_GROUP]: { teams: ['Alabama'] },
+      }),
+    );
+
+    const teams = await fetchTeamsForLeagues(['big-ten', 'sec'], { force: true });
+
+    expect(teams.map((t) => t.shortName)).toEqual(['Alabama']);
+  });
+
+  // And the same hard line when nothing resolves. Note this is *not* the
+  // empty-input case above: leagues were asked for and none answered, which
+  // is the "empty app that looks like it loaded fine" failure.
+  it('throws when every named league fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      standingsFor({
+        [BIG_TEN_GROUP]: { ok: false, teams: [] },
+        [SEC_GROUP]: { ok: false, teams: [] },
+      }),
+    );
+
+    await expect(fetchTeamsForLeagues(['big-ten', 'sec'], { force: true })).rejects.toThrow(
+      /No league team list/,
+    );
   });
 });

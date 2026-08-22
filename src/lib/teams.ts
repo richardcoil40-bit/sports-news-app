@@ -1,5 +1,5 @@
 import { createEntityCache } from '@/lib/cache';
-import { fetchWithTimeout } from '@/lib/http';
+import { DEFAULT_CONCURRENCY, fetchWithTimeout, mapWithConcurrency } from '@/lib/http';
 import { getLeagues } from '@/lib/league-catalog';
 import { espnSitePath, League } from '@/lib/leagues';
 
@@ -140,33 +140,71 @@ export async function fetchTeams(
 }
 
 /**
- * Every team the app can serve, across every available league.
+ * Several leagues' teams as one list.
  *
- * This is what anything resolving *followed* teams needs, and the reason
- * is the whole point of league-qualified favorites: a favorite is stored
- * as `"sec:333"`, so a screen holding only the Big Ten's team list can
- * never resolve it. Before a second league existed the two were the same
- * list, and the Teams tab and home feed both quietly assumed so — with
- * the SEC added, that assumption drops every SEC team the user follows.
- *
- * `Promise.allSettled`, not `Promise.all`, and deliberately at odds with
- * the throw-on-failure rule `fetchTeamsUncached` follows: one conference's
+ * Settled rather than awaited as a group, and deliberately at odds with the
+ * throw-on-failure rule `fetchTeamsUncached` follows: one conference's
  * standings endpoint being down should cost the user that conference, not
  * every team they follow. The throw still stands when *nothing* resolves,
  * which is the case that rule exists for — an empty list that looks like a
  * successful load.
+ *
+ * No leagues asked for is not that case. It is the honest answer for a user
+ * who follows nobody yet, and it happens on every first launch, so it
+ * resolves empty rather than throwing.
  */
-export async function fetchAllTeams(options?: { force?: boolean }): Promise<Team[]> {
-  const leagues = getLeagues();
-  const results = await Promise.allSettled(leagues.map((league) => fetchTeams(league, options)));
+async function fetchTeamsAcross(leagues: League[], options?: { force?: boolean }): Promise<Team[]> {
+  if (leagues.length === 0) return [];
+
+  const results = await mapWithConcurrency(leagues, DEFAULT_CONCURRENCY, (league) =>
+    fetchTeams(league, options),
+  );
 
   const teams = results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
-  if (teams.length === 0 && leagues.length > 0) {
-    throw new Error('No league team list could be loaded');
-  }
+  if (teams.length === 0) throw new Error('No league team list could be loaded');
 
   // Sorted across leagues rather than concatenated league by league, so a
   // list spanning conferences still reads alphabetically. Callers that
   // want them grouped have the leagueId to group on.
   return teams.sort((a, b) => a.shortName.localeCompare(b.shortName));
+}
+
+/**
+ * The teams belonging to a named set of leagues — in practice, the leagues
+ * the user actually follows something in.
+ *
+ * This is what anything resolving *followed* teams should call, and the
+ * reason is the whole point of league-qualified favorites: a favorite is
+ * stored as `"sec:333"`, so the league ids are readable off the stored keys
+ * with no fetch at all (see `leagueIdsFrom`), and every league the user has
+ * nothing in is a request that never has to happen. With two leagues that
+ * saved one call; with a catalog of forty-five it is the difference between
+ * a cold launch opening two standings requests and opening forty-five.
+ *
+ * Ids naming a league the catalog doesn't serve — one gone to `planned`, or
+ * removed outright — are dropped rather than errored on. A stale favorite
+ * outliving its league is a normal thing to find on a device, and it can't
+ * be resolved to a team either way.
+ */
+export async function fetchTeamsForLeagues(
+  leagueIds: readonly string[],
+  options?: { force?: boolean },
+): Promise<Team[]> {
+  const wanted = new Set(leagueIds);
+  return fetchTeamsAcross(
+    getLeagues().filter((league) => wanted.has(league.id)),
+    options,
+  );
+}
+
+/**
+ * Every team the app can serve, across every available league.
+ *
+ * Breadth is the point here and it costs a request per league, so this is
+ * for the pickers only — onboarding and Settings → Favorites, which are
+ * showing you what you *could* follow and so can't be scoped by what you
+ * already do. Everything else wants `fetchTeamsForLeagues`.
+ */
+export async function fetchAllTeams(options?: { force?: boolean }): Promise<Team[]> {
+  return fetchTeamsAcross(getLeagues(), options);
 }

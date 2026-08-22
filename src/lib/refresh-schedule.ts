@@ -1,4 +1,8 @@
+import { leagueIdsFrom } from '@/lib/favorite-keys';
+import { getFavoriteIds, hydrateFavorites } from '@/lib/favorites';
+import { mapWithConcurrency } from '@/lib/http';
 import { fetchLeagueFeeds, leaguesWithNationalFeeds } from '@/lib/source-catalog';
+import { readValue, writeValue } from '@/lib/storage';
 
 /**
  * "3x a day" is a content-freshness target, not a network scheduler — the
@@ -11,10 +15,14 @@ import { fetchLeagueFeeds, leaguesWithNationalFeeds } from '@/lib/source-catalog
  * handle the shared national pool that the News tab and every player
  * screen build on.
  *
- * Tracked in memory only (no persisted storage) — a cold relaunch always
- * counts as a new check, which in practice means "reopening the app after
- * it's been closed for a while shows fresh content," a reasonable behavior
- * on its own even before the period logic kicks in.
+ * The window marker is persisted. It used to be memory-only, which made a
+ * cold launch *always* read `null` and *always* force a full cache-bypassing
+ * pull — so the real cadence was "every cold start", not "3x a day". That was
+ * defensible as behaviour on its own (reopening the app after a while does
+ * show fresh content), and it stops being defensible on cost: this is the
+ * largest fan-out in the app, and it grows with the number of leagues rather
+ * than with anything the user did. Persisted, a relaunch inside the same
+ * window costs nothing and the caches serve it.
  */
 
 type Period = 'morning' | 'noon' | 'night';
@@ -45,7 +53,41 @@ function periodKey(now: Date): string {
   return `${dateStr}-${periodFor(now.getHours())}`;
 }
 
+const LAST_REFRESHED_STORAGE_KEY = 'nofrills.lastRefreshedPeriod';
+
 let lastRefreshedKey: string | null = null;
+let diskRead: Promise<string | null> | null = null;
+
+/**
+ * The persisted marker, read once per process and held in memory after.
+ *
+ * Two things this has to survive, because launch and an AppState event can
+ * fire in the same tick and both land here: the read is shared rather than
+ * issued twice, and a value coming back from disk never overwrites a window
+ * some other caller has already claimed in the meantime. Without the second
+ * guard the later read resets the marker and a second full refresh runs.
+ *
+ * A read failure is indistinguishable from "never written" and is handled
+ * the same way — as a missed window, costing one extra refresh. That is the
+ * right direction to fail in: stale content is worse than a redundant fetch.
+ */
+async function loadLastRefreshedKey(): Promise<string | null> {
+  if (lastRefreshedKey !== null) return lastRefreshedKey;
+
+  diskRead ??= readValue(LAST_REFRESHED_STORAGE_KEY);
+  const stored = await diskRead;
+  if (lastRefreshedKey === null) lastRefreshedKey = stored;
+
+  return lastRefreshedKey;
+}
+
+/**
+ * How many leagues' national pools may be refreshed at once. Lower than the
+ * app-wide default because this is prefetch — it runs before the user has
+ * looked at anything, so nothing on screen is waiting on it, and each league
+ * expands to a handful of parallel RSS fetches underneath.
+ */
+const REFRESH_CONCURRENCY = 3;
 
 /**
  * When the current morning/noon/night window began.
@@ -86,23 +128,53 @@ export function currentPeriodLabel(now: Date = new Date()): string {
 }
 
 /**
+ * Only the leagues the user actually follows a team in.
+ *
+ * This used to be every league with a national pool, which was two, and is
+ * heading for forty-five. Nothing else reads those pools: a national feed
+ * reaches the screen only through a followed team's news pool, so a league
+ * you follow nobody in is five parallel cache-bypassing RSS fetches whose
+ * results are never read by anything.
+ *
+ * A user following nobody prefetches nothing, which is correct rather than a
+ * gap — there is no screen for it to warm.
+ */
+function followedLeaguesWithNationalFeeds() {
+  const followed = new Set(leagueIdsFrom(getFavoriteIds()));
+  return leaguesWithNationalFeeds().filter((league) => followed.has(league.id));
+}
+
+/**
  * Call on app launch and whenever the app returns to the foreground. Cheap
  * to call often — it's a no-op unless the period actually changed.
  */
 export async function refreshIfNewPeriod(): Promise<boolean> {
   const key = periodKey(new Date());
-  if (key === lastRefreshedKey) return false;
+  // Checked against the persisted marker, not just the in-memory one — the
+  // whole point of persisting it is that a relaunch inside the same window
+  // is a no-op rather than a full cache-bypassing pull.
+  if (key === (await loadLastRefreshedKey())) return false;
 
-  // Set eagerly so overlapping calls (e.g. mount + an AppState event firing
-  // in the same tick) don't both kick off a refresh.
+  // Set eagerly so overlapping callers (mount plus an AppState event in the
+  // same tick) don't both kick off a refresh: whichever gets here first
+  // claims the window, and the check above is what the second one hits.
   lastRefreshedKey = key;
+  // Not awaited, and safe to lose: a write that fails costs one redundant
+  // refresh next launch, which is the same direction the read fails in.
+  writeValue(LAST_REFRESHED_STORAGE_KEY, key);
 
-  // Every league that has one, not a named league: this runs before the
-  // user has looked at anything, so it has no team or league context to
-  // work from. Settled rather than awaited as a group, so one league's
-  // outage can't leave the others stale.
-  await Promise.allSettled(
-    leaguesWithNationalFeeds().map((league) => fetchLeagueFeeds(league, { force: true })),
+  // Which leagues to warm is a question about the persisted favorites, and
+  // this runs from app launch — early enough that the store may not have
+  // been read yet. hydrateFavorites is idempotent, so this is a no-op
+  // whenever the UI got there first.
+  await hydrateFavorites();
+
+  // Settled rather than awaited as a group, so one league's outage can't
+  // leave the others stale, and rate-limited because this is the largest
+  // fan-out in the app: each league here expands to every national feed it
+  // has, all of them bypassing cache by definition.
+  await mapWithConcurrency(followedLeaguesWithNationalFeeds(), REFRESH_CONCURRENCY, (league) =>
+    fetchLeagueFeeds(league, { force: true }),
   );
   return true;
 }

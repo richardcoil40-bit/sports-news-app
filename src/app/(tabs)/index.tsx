@@ -15,7 +15,6 @@ import { BRIEF_MODE } from '@/constants/flags';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useBrief } from '@/hooks/use-brief';
 import { useFeed } from '@/hooks/use-feed';
-import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
 import {
   ClaimFilter,
@@ -38,13 +37,24 @@ import { filterToTeams, withTeamMentions } from '@/lib/team-mentions';
  */
 export default function FeedScreen() {
   const theme = useTheme();
-  const { articles, loading, refreshing, error, refresh, followedTeams, hasFollowedTeams, ready } =
-    useFeed();
-  // The whole league, not just followed teams. A Michigan follower's pool
-  // legitimately contains Michigan State stories, and recognising them as
-  // such is the point: it's what lets the feed tag them honestly and then
-  // drop them, rather than tagging them MICHIGAN or showing them bare.
-  const { teams } = useTeams();
+  // `teams` comes from useFeed rather than a second useTeams() here: the
+  // feed already holds that list to resolve who you follow, and it's the
+  // same list this screen needs. It is wider than the followed teams on
+  // purpose — a Michigan follower's pool legitimately contains Michigan
+  // State stories, and recognising them as such is what lets the feed tag
+  // them honestly and then drop them, rather than tagging them MICHIGAN or
+  // showing them bare.
+  const {
+    articles,
+    loading,
+    refreshing,
+    error,
+    refresh,
+    teams,
+    followedTeams,
+    hasFollowedTeams,
+    ready,
+  } = useFeed();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
   // `null` is "all teams" — the default, and deliberately a different
   // value from an explicit empty selection. The two look identical as a

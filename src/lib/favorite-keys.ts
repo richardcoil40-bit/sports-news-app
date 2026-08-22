@@ -45,6 +45,26 @@ export function parseFavoriteKey(key: string): FavoriteRef | null {
 }
 
 /**
+ * Which leagues a set of favorites spans, deduped and sorted.
+ *
+ * This is what makes "cost scales with what you follow" cheap: a favorite is
+ * already stored league-qualified, so the set of leagues worth fetching is
+ * readable straight off the stored keys with no network call to find out.
+ *
+ * Sorted so the result is a stable identity for a given set — callers key
+ * effects and caches on it, and an order that varied with insertion would
+ * re-fire them for no reason.
+ */
+export function leagueIdsFrom(keys: readonly string[]): string[] {
+  const ids = new Set<string>();
+  for (const key of keys) {
+    const ref = parseFavoriteKey(key);
+    if (ref) ids.add(ref.leagueId);
+  }
+  return [...ids].sort();
+}
+
+/**
  * Brings persisted favorites up to the qualified format.
  *
  * This has to keep working indefinitely, not just for one release. The value

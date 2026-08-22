@@ -73,9 +73,14 @@ export default function TeamScreen() {
   const league = useMemo(() => getLeague(params.leagueId ?? '') ?? DEFAULT_LEAGUE, [params.leagueId]);
 
   const [tab, setTab] = useState<TabKey>('news');
-  // The whole league: this team's pool carries stories about its
-  // opponents and neighbours, and those should be tagged as such.
-  const { teams } = useTeams();
+  // This team's own league, named rather than left to the default. The
+  // whole league is what's wanted — the pool carries stories about this
+  // team's opponents and neighbours, and those should be tagged as such —
+  // but scoping it by *this* league rather than by what the user follows is
+  // what keeps a deep link into an unfollowed league from arriving with no
+  // team list at all, which would leave every story on the screen untagged.
+  // It is also one standings request instead of one per followed league.
+  const { teams } = useTeams(league);
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
   // Seeded from the caller when it has already resolved this team's
   // color. The fetch below still runs and returns the same cached value;

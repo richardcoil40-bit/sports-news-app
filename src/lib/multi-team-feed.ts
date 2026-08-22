@@ -1,4 +1,5 @@
 import { Article } from '@/lib/feeds';
+import { DEFAULT_CONCURRENCY, mapWithConcurrency } from '@/lib/http';
 import { DEFAULT_LEAGUE, getLeague } from '@/lib/league-catalog';
 import { balanceBySource } from '@/lib/source-balance';
 import { fetchTeamNewsPool } from '@/lib/team-news-pool';
@@ -41,22 +42,25 @@ export async function fetchMultiTeamFeed(
 ): Promise<MultiTeamFeed> {
   if (teams.length === 0) return { articles: [], failedSources: [] };
 
-  const results = await Promise.allSettled(
-    teams.map(async (team) => {
-      // Each team carries the league it came from, so a merged feed across
-      // leagues resolves each team's own sources rather than assuming one.
-      const league = getLeague(team.leagueId) ?? DEFAULT_LEAGUE;
-      const pool = await fetchTeamNewsPool(team.id, team.shortName || team.name, league, options);
-      return pool.articles.map(
-        (article): FeedArticle => ({
-          ...article,
-          teamId: team.id,
-          teamName: team.shortName,
-          leagueId: team.leagueId,
-        }),
-      );
-    }),
-  );
+  // Rate-limited because each team here expands into its own four source
+  // groups, each of which expands again — the outermost of three nested
+  // fan-outs, so this is where the multiplication starts. The limit is above
+  // any realistic number of followed teams, so in practice it only bites for
+  // someone following a great many at once.
+  const results = await mapWithConcurrency(teams, DEFAULT_CONCURRENCY, async (team) => {
+    // Each team carries the league it came from, so a merged feed across
+    // leagues resolves each team's own sources rather than assuming one.
+    const league = getLeague(team.leagueId) ?? DEFAULT_LEAGUE;
+    const pool = await fetchTeamNewsPool(team.id, team.shortName || team.name, league, options);
+    return pool.articles.map(
+      (article): FeedArticle => ({
+        ...article,
+        teamId: team.id,
+        teamName: team.shortName,
+        leagueId: team.leagueId,
+      }),
+    );
+  });
 
   const failedSources: string[] = [];
   const articles: FeedArticle[] = [];

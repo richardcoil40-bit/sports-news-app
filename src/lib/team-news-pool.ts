@@ -22,7 +22,11 @@ export interface TeamNewsPool {
 // few minutes, with in-flight requests shared so rapid navigation (team →
 // player, tab → tab) doesn't fire duplicate fetches of the same sources.
 const CACHE_TTL_MS = 3 * 60 * 1000;
-const poolCache = createEntityCache<string, TeamNewsPool>({ ttlMs: CACHE_TTL_MS });
+// Bounded as well as timed: the TTL marks an entry stale but never reclaims
+// it — that residency is exactly what the hard-cap fallback's peek() reads —
+// so without a size bound a long session accumulates a full article pool per
+// team ever opened.
+const poolCache = createEntityCache<string, TeamNewsPool>({ ttlMs: CACHE_TTL_MS, maxEntries: 50 });
 
 // Debug: logs how long the four fetch groups take. Every underlying request
 // already has its own 10s timeout, so this pool should never take much more
@@ -99,6 +103,14 @@ async function fetchTeamNewsPoolUncached(
       });
   };
 
+  // Deliberately *not* routed through mapWithConcurrency, unlike the other
+  // fan-outs in this directory. This one is a fixed four groups rather than
+  // a list that grows with the catalog, and its width is not where the
+  // sockets come from — each group's own expansion is, and fetchFeeds
+  // already bounds that. Limiting here to fewer than four would serialize
+  // whole groups against a pool that already runs ~10-11s against the 15s
+  // hard cap below, so it would trade a bound it doesn't need for a cap it
+  // can't afford to trip.
   const [espnResult, teamSiteResult, localResult, generalResult] = await Promise.allSettled([
     timeGroup('espn team news', fetchTeamArticles(teamId, league)),
     timeGroup('community/team sites', teamScoped.length > 0 ? fetchFeeds(teamScoped) : Promise.resolve(empty)),

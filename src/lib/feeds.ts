@@ -1,6 +1,6 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 
-import { FETCH_TIMEOUT_MS } from '@/lib/http';
+import { DEFAULT_CONCURRENCY, FETCH_TIMEOUT_MS, mapWithConcurrency } from '@/lib/http';
 
 /**
  * How far a source is trusted. Assigned by the criteria in
@@ -495,9 +495,17 @@ function dedupeAndSort(articleLists: Article[][]): Article[] {
   return articles;
 }
 
-/** Fetches an arbitrary list of RSS sources, tolerating individual failures. */
+/**
+ * Fetches an arbitrary list of RSS sources, tolerating individual failures.
+ *
+ * Rate-limited rather than fired all at once: this is the innermost of three
+ * nested fan-outs (followed teams → source groups → these feeds), so it is
+ * the level where an unbounded `map` multiplies into hundreds of open
+ * sockets. `DEFAULT_CONCURRENCY` is above the width of every group the app
+ * actually has today, so this costs no latency until one of them grows.
+ */
 export async function fetchFeeds(sources: FeedSource[]): Promise<FetchAllResult> {
-  const results = await Promise.allSettled(sources.map(fetchFeed));
+  const results = await mapWithConcurrency(sources, DEFAULT_CONCURRENCY, fetchFeed);
 
   const failedSources: string[] = [];
   const fulfilled: Article[][] = [];

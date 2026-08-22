@@ -24,6 +24,23 @@ inventing a new one:
   site needs its own fetch logic (see `feeds.ts`, which times each feed
   for debugging), still import `FETCH_TIMEOUT_MS` rather than
   redeclaring the number.
+- **Bound every fan-out.** `mapWithConcurrency(items, limit, fn)` in
+  `src/lib/http.ts` is a drop-in for `Promise.allSettled(items.map(fn))`
+  — same result shape, same order, same tolerate-partial-failure posture
+  — with a ceiling on how many run at once. Use it wherever the list
+  being mapped grows with the catalog or with what the user follows
+  (`feeds.ts`, `multi-team-feed.ts`, `teams.ts`, `refresh-schedule.ts`).
+  These limits **multiply**: followed teams → source groups → feeds is
+  three levels deep, so an unbounded `map` at any one of them is
+  hundreds of sockets on one phone. `DEFAULT_CONCURRENCY` (6) is above
+  the width of every list the app has today, so it costs no latency
+  until one of them actually grows.
+  - **The exception is a fixed, heterogeneous fan-out.**
+    `team-news-pool.ts`'s four source groups stay on plain
+    `Promise.allSettled`: four is not a number that grows, the sockets
+    come from each group's own expansion (which `fetchFeeds` already
+    bounds), and serializing groups would trip that file's 15s hard cap.
+    The comment there says so — don't "finish the job" by routing it.
 - **Cache with `createEntityCache` from `src/lib/cache.ts`.** Don't
   hand-roll another resolved-`Map`-plus-in-flight-`Map` pair; the helper
   encapsulates that, so concurrent callers for the same key share a
@@ -38,6 +55,17 @@ inventing a new one:
   hard cap). There is no singleton variant: the national feed pool is the
   one caller that ever looked like one, and it's keyed per league in
   `source-catalog.ts`, so every cache here is an entity cache.
+  - **`ttlMs` bounds staleness; `maxEntries` bounds size. They are not
+    the same knob.** An expired entry keeps its payload resident until
+    something overwrites it — that residency is exactly what `peek()`
+    serves from — so a TTL alone never reclaims a byte. Any cache keyed
+    by something that grows with *use* rather than with the catalog
+    (teams visited, players opened, headlines seen) needs a
+    `maxEntries` too; it evicts least-recently-used on insert, and a
+    cache *hit* counts as a use. The current bounds and the reasoning
+    behind each are the table in `docs/data-retention.md` — add a row
+    there in the same change, since that doc is the one that has to
+    answer "how long do you keep X".
   - **Error policy stays at the call site.** The helper caches whatever
     the loader resolves to and caches nothing when it rejects. If a
     source should degrade to empty *and* remember that, catch inside
@@ -76,6 +104,33 @@ inventing a new one:
     correctly. Throwing surfaces a retryable error instead. Don't
     "fix" this to match the rule; if you add another source the app
     genuinely can't function without, it belongs in this exception too.
+
+## Cost scales with follows, not with the catalog
+
+The catalog is heading from 3 leagues to roughly 45. **Catalog size must
+not appear in a hot path** — a cold launch should cost what the user
+follows, not what exists. This is a per-device cost, so it is exactly as
+bad with fifty users as with a million, and it is the reason for
+`fetchTeamsForLeagues`, the followed-league filter in
+`refresh-schedule.ts`, `mapWithConcurrency`, and the `maxEntries` bounds
+above.
+
+Two habits keep it true:
+
+- **Derive the scope from favorites, don't fetch to discover it.**
+  Favorites are stored league-qualified precisely so the set of leagues
+  worth asking about is known before any network call. `leagueIdsFrom`
+  is the one place that derivation lives.
+- **A per-league `map()` over `getLeagues()` is the smell.** It reads
+  as free at two leagues and is forty-five requests at forty-five. If
+  something genuinely needs breadth, it should be a picker — see the
+  Scope section's note on `useTeams('all')`.
+
+`use-feed.ts` hands `teams` back rather than leaving the home screen to
+call `useTeams()` for itself. The underlying fetch was always shared
+(`createEntityCache`'s in-flight map saw to that), but a second copy of
+the hook is a second state tree and a second render pass over the same
+list on every change. One instance, passed down.
 
 ## React effect safety
 
@@ -428,12 +483,26 @@ than re-deriving slugs:
   paper is in Starkville) but not to Georgia. `team-nicknames.test.ts`
   holds the list of words that must never appear.
 
-**Anything resolving *followed* teams must span every league.** A
-favorite is stored league-qualified (`"sec:333"`), so a screen holding
-one league's team list silently drops every favorite outside it. That is
-what `fetchAllTeams` is for, and what `useTeams()` with no argument
-returns; naming a league scopes it, which only the Favorites picker
-wants. This was invisible while the Big Ten was the only league.
+**Anything resolving *followed* teams must span every league the user
+follows — and stop there.** A favorite is stored league-qualified
+(`"sec:333"`), so a screen holding one league's team list silently drops
+every favorite outside it; that was invisible while the Big Ten was the
+only league. But the fix is not "fetch everything": the league ids are
+readable straight off the stored keys (`leagueIdsFrom` in
+`favorite-keys.ts`), so the right width is exactly the leagues the user
+follows something in. `useTeams()` with no argument is that, via
+`fetchTeamsForLeagues`. The two deliberate widenings:
+
+- **Naming a league** (`useTeams(league)`) scopes to one. The Favorites
+  picker wants it because it walks Sport → Level → League; the team
+  screen wants it because a deep link can land on a league the user
+  doesn't follow, and arriving with no team list means every story on
+  the screen renders untagged.
+- **`useTeams('all')`** fetches every available league, and costs a
+  standings request per league to do it. Onboarding is the honest case:
+  on a first launch there are no favorites to scope by, so scoping would
+  offer an empty list to pick from. Reach for it only when the screen is
+  showing what you *could* follow rather than what you do.
 
 Basketball appears only as a test descriptor in `leagues.test.ts` plus a
 fixture trimmed from ESPN's live NBA standings. Those exercise the two

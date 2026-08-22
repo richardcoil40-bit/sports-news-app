@@ -94,6 +94,17 @@ export function useFeed() {
     refreshing,
     error,
     refresh,
+    /**
+     * Every team from the leagues you follow something in — not just the
+     * followed ones. Handed back rather than left for the home screen to
+     * call `useTeams()` for itself: the underlying fetch was always shared
+     * (createEntityCache's in-flight map saw to that), but a second copy of
+     * the hook is a second state tree and a second render cycle over the
+     * same list on every change. A Michigan follower's pool legitimately
+     * contains Michigan State stories, and recognising them as such is what
+     * lets the feed tag them honestly and then drop them.
+     */
+    teams,
     followedTeams,
     hasFollowedTeams: followedTeams.length > 0,
     ready: hydrated && !teamsLoading,

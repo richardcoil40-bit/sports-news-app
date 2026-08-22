@@ -4,52 +4,72 @@ What this app keeps, where, and for how long. Written so the answer to "how
 long do you retain X" is something you can point to rather than reconstruct
 from the code each time someone asks.
 
-## Current state: three small persisted values, everything else in memory
+## Current state: four small persisted values, everything else in memory
 
-The app persists three things: which teams you follow, whether you've
-completed onboarding, and when you last reached the end of a brief. Nothing
-else. No analytics SDK, no user accounts, no article content, no usage or
-behavioral history. See "Persisted stores" below for the detail, including
-why the third one is a single overwritten timestamp rather than a log.
+The app persists four things: which teams you follow, whether you've
+completed onboarding, when you last reached the end of a brief, and which
+refresh window it last pulled fresh news for. Nothing else. No analytics SDK,
+no user accounts, no article content, no usage or behavioral history. See
+"Persisted stores" below for the detail, including why the last two are each
+a single overwritten value rather than a log.
 
 Every other cache in the codebase is in-memory only and exists for the
 lifetime of the running app process. They're all created through
 `createEntityCache` in `lib/cache.ts` — one helper,
 so what's cached and for how long is visible in one place rather than
-hand-rolled per module:
+hand-rolled per module.
 
-| Cache | File | Bound | TTL |
-|---|---|---|---|
-| National feed pool | `lib/source-catalog.ts` | Keyed by league — one entry per league that has curated feeds, 2 today (Big Ten, SEC). The NFL has none yet, and `fetchLeagueFeeds` returns without caching in that case, so it takes no slot | 3 minutes |
-| Per-team news pool | `lib/team-news-pool.ts` | Keyed by sport + league path + team ID — max 66 entries (18 Big Ten, 16 SEC, 32 NFL) | 3 minutes |
-| Team list | `lib/teams.ts` | Keyed by league — 3 entries today | 30 minutes |
-| Rosters | `lib/roster.ts` | Keyed by sport + league path + team ID — max 66 entries | None (process lifetime) |
-| Stat leaders | `lib/team-leaders.ts` | Keyed by sport + league path + team ID — max 66 entries | None (process lifetime) |
-| Team colors | `lib/team-color.ts` | Keyed by sport + league path + team ID — max 66 entries | None (process lifetime) |
-| Player season stats | `lib/player-stats.ts` | Keyed by athlete ID — one per player screen opened | None (process lifetime) |
-| Verdict classifications | `lib/verdicts.ts` | Keyed by headline title — one per unique headline seen; empty only if `EXPO_PUBLIC_VERDICT_URL` is cleared | None (process lifetime) |
+Two independent limits apply, and the distinction matters: **`ttlMs` bounds
+staleness, `maxEntries` bounds size.** An expired entry keeps its payload
+resident until something overwrites it — that residency is what `peek()`
+serves stale reads from — so a TTL alone never reclaims a byte. Caches keyed
+by something that grows with *use* rather than with the catalog (teams
+visited, players opened, headlines seen) carry a `maxEntries` and evict
+least-recently-used on insert.
 
-Force-quitting the app clears all of it. None of these can grow without
-limit, but they aren't all bounded the same way. The team-keyed caches are
-capped by the number of teams that exist — 66 entries no matter how long the
-app has been open or how much you've browsed — and the national pool is
-overwritten rather than accumulated. **Player season stats are the one cache
-that does grow with use**: it gains an entry per player detail screen opened,
-so its ceiling is the number of athletes across all 66 rosters (order of
-5,000 entries of a few stat lines each) rather than 66. Still bounded, still
-cleared on quit, but worth stating precisely rather than filing it under
-"capped at 66" with the others. **Verdict classifications are the other
-one**, for the same reason (an entry per unique headline the app has ever
-asked about, not per team). That one is live as of 2026-08-20 — the
-service is deployed and the tracked `.env` points at it. Clear
-`EXPO_PUBLIC_VERDICT_URL` and the cache never gains an entry, since
+| Cache | File | Key | `maxEntries` | TTL |
+|---|---|---|---|---|
+| National feed pool | `lib/source-catalog.ts` | League — one entry per league that has curated feeds, 2 today (Big Ten, SEC). The NFL has none yet, and `fetchLeagueFeeds` returns without caching in that case, so it takes no slot | 50 | 3 minutes |
+| Per-team news pool | `lib/team-news-pool.ts` | Sport + league path + team ID | 50 | 3 minutes |
+| Team schedules | `lib/schedule.ts` | Sport + league path + team ID | 100 | 3 minutes |
+| Team list | `lib/teams.ts` | League — 3 entries today | None needed (see below) | 30 minutes |
+| Rosters | `lib/roster.ts` | Sport + league path + team ID | 100 | None (process lifetime) |
+| Stat leaders | `lib/team-leaders.ts` | Sport + league path + team ID | 100 | None (process lifetime) |
+| Team colors | `lib/team-color.ts` | Sport + league path + team ID | 100 | None (process lifetime) |
+| Player season stats | `lib/player-stats.ts` | Athlete ID — one per player screen opened | 500 | None (process lifetime) |
+| Verdict classifications | `lib/verdicts.ts` | Headline title — one per unique headline seen; empty only if `EXPO_PUBLIC_VERDICT_URL` is cleared | 2000 | None (process lifetime) |
+
+Force-quitting the app clears all of it. **The team list is the one cache
+with no size bound, and deliberately: its key is a league, so the catalog
+itself is the ceiling.** Every other key above is something the user reaches
+for — a team visited, a player opened, a headline seen — which is exactly the
+class that grows with a session rather than with the catalog. Those all carry
+an explicit cap.
+
+The caps used to be implicit, and that was fine while every one of them was
+"the number of teams that exist" (66 across the Big Ten, SEC and NFL). Two
+things broke that. Player season stats and verdict classifications never had
+it in the first place: the first has a ceiling of every athlete across every
+roster and the second has no natural ceiling at all, one entry per unique
+headline the app has ever asked about. And the catalog is on its way from 3
+leagues to roughly 45, which turns "capped by the number of teams that exist"
+from a small number into a large one. An explicit `maxEntries` says what the
+ceiling is instead of leaving it to be inferred from the league list.
+
+Note the verdict cap is not the one that matters for cost. The cross-user
+cache is the worker's KV store, keyed by a hash of the normalized title;
+evicting locally only means re-asking the worker, which answers from KV
+without spending a model call. That service is live as of 2026-08-20 — it is
+deployed and the tracked `.env` points at it. Clear
+`EXPO_PUBLIC_VERDICT_URL` and the local cache never gains an entry, since
 `lib/verdicts.ts` then never makes the network call that would populate
 it.
 
-The auto-refresh added for the morning/noon/night cycle (`lib/refresh-
-schedule.ts`) doesn't change this: it just forces one of these same bounded
-caches to re-fetch on a schedule. It doesn't create a new store or a
-history of past pulls.
+The auto-refresh for the morning/noon/night cycle (`lib/refresh-schedule.ts`)
+doesn't change this: it just forces one of these same bounded caches to
+re-fetch on a schedule. It persists a single value — which window it last
+pulled for — and that is a marker, overwritten in place, not a history of
+past pulls. See "Persisted stores" below.
 
 Article content itself is never stored beyond what's needed to render a
 list and link out: title, description, source, byline, publish date, image
@@ -60,7 +80,7 @@ model with publishers whose content is being aggregated.
 
 No personal data is collected in the sense that matters here: there's no
 login, no user profile, no tracking identifiers, no crash/analytics
-reporting. None of the three persisted values ever leaves the device —
+reporting. None of the four persisted values ever leaves the device —
 they're read by the app to decide what to fetch and what to show, and
 that's all.
 Network calls out are to ESPN's public endpoints, the RSS feeds listed in
@@ -166,16 +186,19 @@ it, decided at the same time as the feature, not bolted on later:
 | Followed teams (`nofrills.favoriteTeamIds`) | AsyncStorage, via `lib/storage.ts` | An array of short `"<leagueId>:<teamId>"` strings — bounded by the number of teams in the leagues the app ships, a few hundred bytes at most | No eviction policy needed: a user can only follow teams that exist, so this grows with the league catalog, never with use. Revisit if the catalog ever spans many sports |
 | Onboarding-complete flag (`nofrills.hasOnboarded`) | AsyncStorage, via `lib/storage.ts` | A single boolean | Nothing to cap |
 | Last caught-up mark (`nofrills.lastCaughtUpAt`) | AsyncStorage, via `lib/storage.ts` | A single ISO-8601 timestamp, overwritten in place | Deliberately **not** a history. Only the most recent mark is kept, so this can't accumulate into a log of when you read. It has to persist at all because a brief that means "since you last looked" would otherwise reset to a fixed window on every relaunch — see `lib/caught-up.ts` |
+| Last refreshed window (`nofrills.lastRefreshedPeriod`) | AsyncStorage, via `lib/storage.ts` | A single `"<date>-<morning\|noon\|night>"` string, overwritten in place | Same shape and the same rule as the row above: a marker, not a log. Only the current window is kept, so it can't accumulate into a record of when you opened the app. It persists because it was memory-only, which meant every cold launch read `null` and forced a full cache-bypassing pull of every national feed — the real cadence was "every cold start", not "3x a day". See `lib/refresh-schedule.ts` |
 
-All three are written and read only through `lib/storage.ts`, which is the
+All four are written and read only through `lib/storage.ts`, which is the
 single chokepoint for anything touching disk — deliberately, so this
 table can't silently drift from reality. If a future feature needs
 persistence, it goes through that module, and it gets a row here at the
 same time it gets written, per the rule above.
 
-None of the three is transmitted off the device, and none contains
+None of the four is transmitted off the device, and none contains
 anything identifying — team IDs are ESPN's public identifiers, the same
-for every user who follows that team.
+for every user who follows that team, and the refresh marker is a
+time-of-day bucket the app derives for itself rather than a record of
+anything the user did.
 
 The caught-up mark is the one persisted value that is *behavioral* rather
 than a preference: it records something about when the app was used, not
