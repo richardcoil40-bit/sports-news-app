@@ -303,6 +303,26 @@ Established and intentional — don't drift from it without discussing:
 - Each team's real color (from `fetchTeamColor`) is the only per-screen
   accent, applied as a left-edge bar via `AccentRow` rather than
   reskinning components.
+  - **It goes through `visibleOn` from `src/lib/color.ts` before it is
+    painted, against the ground it is painted on.** ESPN picks these
+    colors to sit on white: measured across the shipping catalog, 55 of
+    82 teams fall below 3:1 on the dark ground and 24 below 1.5:1, so
+    Penn State navy or Kansas State purple is a mark nobody can see. The
+    function raises lightness in OKLCH — hue preserved, so a lifted navy
+    still reads as that team's navy — by the *smallest* amount that
+    clears 3:1, and returns a color that already clears it untouched.
+    It is symmetric rather than dark-mode-only, which is what also
+    catches Arizona State's gold on cream. `fetchTeamColor`'s existing
+    rejection of pure white is the same rule, from before there was a
+    second ground to worry about.
+  - The adjustment belongs at **render** time, never at fetch time: the
+    color cache is process-lifetime, so a scheme baked in at fetch would
+    outlive the user switching themes — and `src/lib/` can't read the
+    scheme anyway. Callers pass `theme.background`.
+  - The team screen's header band is adjusted too, even though a large
+    field reads at any lightness. The bars on the same screen are the
+    same color, and lifting only those puts two shades of one team's
+    color on one screen.
 - No gradients, no shadows-as-decoration. Flat surfaces only.
 
 ## Source reliability and data retention

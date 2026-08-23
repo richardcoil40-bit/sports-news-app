@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
+import { visibleOn } from '@/lib/color';
 import { DEFAULT_LEAGUE, getLeague } from '@/lib/league-catalog';
 import { fetchTeamColor } from '@/lib/team-color';
 import { Team } from '@/lib/teams';
@@ -67,20 +68,30 @@ export function TeamBadgeRow({
     };
   }, [team.id, team.leagueId]);
 
+  // Adjusted to the page it sits on before it is painted — a 38pt disc in
+  // a color ESPN chose for white paper can vanish entirely on the dark
+  // ground (Kansas State's purple measures 1.19:1 there). See
+  // `lib/color.ts`; a color that already clears the floor is untouched.
+  const shown = visibleOn(color, theme.background);
+
   // White on the team's color, ink on the placeholder — the same choice
   // the team screen's header makes for the same reason.
-  const ink = color ? '#FFFFFF' : theme.text;
+  const ink = shown ? '#FFFFFF' : theme.text;
 
   // measureInWindow is asynchronous, and a press that somehow resolves
   // without a mounted node still has to navigate — the frame is what the
   // animation wants, not what the navigation needs.
   const handlePress = () => {
     const node = badge.current;
+    // `shown`, not `color`: the caller grows this disc into a full screen,
+    // so it has to start on the color the badge is actually wearing or the
+    // overlay pops at t=0. `visibleOn` is idempotent, so the team screen
+    // re-applying it to what arrives is a no-op.
     if (!node) {
-      onPress(null, color);
+      onPress(null, shown);
       return;
     }
-    node.measureInWindow((x, y, width, height) => onPress({ x, y, width, height }, color));
+    node.measureInWindow((x, y, width, height) => onPress({ x, y, width, height }, shown));
   };
 
   return (
@@ -92,7 +103,7 @@ export function TeamBadgeRow({
       accessibilityLabel={team.name}>
       <View
         ref={badge}
-        style={[styles.badge, { backgroundColor: color ?? theme.backgroundElement }]}>
+        style={[styles.badge, { backgroundColor: shown ?? theme.backgroundElement }]}>
         <ThemedText font="mono" style={[styles.abbreviation, { color: ink }]}>
           {team.abbreviation}
         </ThemedText>

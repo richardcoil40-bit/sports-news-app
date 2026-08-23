@@ -29,6 +29,7 @@ import { fetchGameOdds, fetchTeamSchedule, ScheduledGame } from '@/lib/schedule'
 import { clusterArticles, leadsWithDuplicates } from '@/lib/cluster';
 import { balanceBySource } from '@/lib/source-balance';
 import { withTeamMentions } from '@/lib/team-mentions';
+import { visibleOn } from '@/lib/color';
 import { fetchTeamColor } from '@/lib/team-color';
 import { StatLeader, fetchTeamStatLeaders } from '@/lib/team-leaders';
 import { fetchTeamNewsPool } from '@/lib/team-news-pool';
@@ -110,6 +111,14 @@ export default function TeamScreen() {
   // then snapping to the team's color a tick later — visible on every
   // entry, and directly against the point of the grid's expand animation.
   const [teamColor, setTeamColor] = useState<string | null>(params.accent || null);
+
+  // The header is a large field rather than a small mark, so it reads at
+  // any lightness — but the accent bars on the rows below it are the same
+  // color, and lifting only those would put two shades of one team's
+  // color on a single screen. Adjusting here keeps them the same color.
+  // A seeded `params.accent` has already been through this on the way out
+  // of the badge; `visibleOn` is idempotent, so that costs nothing.
+  const shownColor = visibleOn(teamColor, theme.background);
 
   const news = useAsync<Article[]>(async () => {
     const pool = await fetchTeamNewsPool(params.id, poolName, league);
@@ -257,7 +266,7 @@ export default function TeamScreen() {
         }}
       />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
-        <View style={[styles.header, { backgroundColor: teamColor ?? theme.backgroundElement }]}>
+        <View style={[styles.header, { backgroundColor: shownColor ?? theme.backgroundElement }]}>
           {logoUrl ? (
             <View style={styles.logoChip}>
               <Image source={{ uri: logoUrl }} style={styles.logo} contentFit="contain" />
@@ -265,7 +274,7 @@ export default function TeamScreen() {
           ) : null}
           <ThemedText
             type="title"
-            style={[styles.teamName, { color: teamColor ? '#FFFFFF' : theme.text }]}>
+            style={[styles.teamName, { color: shownColor ? '#FFFFFF' : theme.text }]}>
             {name}
           </ThemedText>
         </View>

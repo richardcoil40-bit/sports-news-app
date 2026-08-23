@@ -48,6 +48,7 @@ least-recently-used on insert.
 | Diagnostics: verdict disagreements | `lib/diagnostics.ts` | Not keyed — a flat log, oldest entries spliced off once full | 200 | None (process lifetime) |
 | Diagnostics: source-group yield | `lib/diagnostics.ts` | Not keyed — a flat log, oldest entries spliced off once full | 300 | None (process lifetime) |
 | Diagnostics: nickname usefulness | `lib/diagnostics.ts` | Team + nickname — one entry per curated nickname that has ever rescued an article this session | Bounded by the curated nickname table itself, a few hundred entries at most | None (process lifetime) |
+| Legible-colour memo | `lib/color.ts` | Team colour + the ground it was solved against. Holds no fetched data — only the hex string the OKLCH solve produced, so the same accent isn't re-solved for every row on a screen. Cleared wholesale on overflow rather than evicted | 512 | None (process lifetime) |
 
 The three diagnostics rows exist for a dev-gated screen
 (`src/app/settings/diagnostics.tsx`, reachable only when `__DEV__` is true)
