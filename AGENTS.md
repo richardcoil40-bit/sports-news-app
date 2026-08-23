@@ -380,23 +380,49 @@ running locally with full access:
   folders are generated once and reused. Regenerate with
   `npx expo prebuild --clean` before rebuilding, or the change silently
   won't show up and will look like a bug.
-- **`prebuild --clean` deletes your code signing setup.** `ios/` and
-  `android/` are gitignored, so the Apple Development Team that Xcode
-  writes into `ios/*.xcodeproj/project.pbxproj` as `DEVELOPMENT_TEAM`
-  exists in exactly one place — a folder `--clean` removes. Nothing in
-  any tracked config can restore it, and there is no `app.json` field
-  that survives the round trip. The next build then fails on signing,
-  pointing at a certificate problem rather than at the prebuild that
-  actually caused it. Read the value out before regenerating:
+- **`prebuild` deletes your code signing setup — with or without
+  `--clean`.** This entry used to say `--clean`, and dropping the flag to
+  stay safe was tried on 2026-08-23: `npx expo prebuild --platform ios`
+  printed `Clearing ios` / `✔ Cleared ios code` and wiped signing exactly
+  the same way. Under SDK 57 there is no "gentle" prebuild for this
+  purpose. Treat every prebuild as destructive to `ios/`.
+
+  `ios/` and `android/` are gitignored, so the Apple Development Team
+  that Xcode writes into `ios/*.xcodeproj/project.pbxproj` as
+  `DEVELOPMENT_TEAM` exists in exactly one place — the folder prebuild
+  removes. Nothing in any tracked config can restore it, and there is no
+  `app.json` field that survives the round trip. The next build then
+  fails on signing, pointing at a certificate problem rather than at the
+  prebuild that actually caused it.
+
+  **Copy the whole file out first**, not just the team id — four keys go
+  missing from *both* the Debug and Release configs of the app target,
+  and only the first is the one people remember:
 
   ```
+  cp ios/NoFrills.xcodeproj/project.pbxproj /tmp/pbxproj.before
   grep -o 'DEVELOPMENT_TEAM = [^;]*' ios/*.xcodeproj/project.pbxproj | sort -u
   ```
 
-  Then set it again afterwards in Xcode (project → Signing &
-  Capabilities → Team). The entitlements file and `PrivacyInfo.xcprivacy`
+  | key | value here |
+  |---|---|
+  | `DEVELOPMENT_TEAM` | `3CR7KR8AX5` |
+  | `CODE_SIGN_IDENTITY` | `"Apple Development"` |
+  | `CODE_SIGN_STYLE` | `Automatic` |
+  | `PROVISIONING_PROFILE_SPECIFIER` | `""` |
+
+  Restore them in Xcode (project → Signing & Capabilities → Team), which
+  writes all four. The entitlements file and `PrivacyInfo.xcprivacy`
   regenerate correctly on their own; signing is the only thing that
   doesn't.
+
+  **If Xcode is open, it will ask about the vanished workspace.** The
+  dialog says `NoFrills.xcworkspace` "has disappeared" and offers
+  *Re-save* or *Close*. **Close.** Re-save writes Xcode's stale in-memory
+  copy back over the one prebuild just generated, putting the project out
+  of sync with the freshly installed Pods. Archives are unaffected either
+  way — they live in `~/Library/Developer/Xcode/Archives`, outside the
+  project.
 - **CocoaPods needs a UTF-8 locale, and fails obscurely without one.**
   If `pod install` dies with `Unicode Normalization not appropriate for
   ASCII-8BIT (Encoding::CompatibilityError)`, Ruby's default external
