@@ -50,16 +50,23 @@ would not.
 ## Donations
 
 There is a "Tip the developer" section on the Developer Info screen in
-Settings, with a Venmo link. **As of 2026-08-20 it is live** — the URL
-is set in `src/app/settings/developer.tsx` and the section renders, and
-as of 2026-08-23 it is deliberately staying that way for internal
-TestFlight (see "Which one we are actually doing" below).
+Settings, with a Venmo link behind it. **It went live 2026-08-20**, was
+confirmed staying that way for internal TestFlight on 2026-08-23 (see
+"Which one we are actually doing" below) and shipped live in 1.0.0 (1)
+and 1.0.1 (2) — and **later the same day it was emptied for 1.0.1 (3)
+onward**, ahead of the first external TestFlight submission. That is
+option two of the decision list below, taken to buy a clean first Beta
+App Review rather than spend it on the coin flip described under "What
+review would actually make of the link". With `DONATION_URL` at `''`
+the section doesn't render at all, so external builds carry no ask,
+live or dead.
 
 An earlier version of this paragraph said the URL was deliberately unset
 and that what existed was "the surface, not a live ask." That was true
-when written and stopped being true the same day. Anyone reading this
-file to decide whether the app solicits money needs the current answer,
-so: it does, via an external link, today.
+when written, stopped being true the same day, and is true again as of
+1.0.1 (3). Anyone reading this file to decide whether the app solicits
+money needs the current answer, so: in any build an external tester can
+receive, it does not.
 
 The mechanism, when it is switched on, is a plain external link handed
 to `WebBrowser.openBrowserAsync`, the same hand-off the Article screen
@@ -192,6 +199,13 @@ So the pre-flight before any upload is a question about the *audience*,
 not about the code: if the answer isn't "team members only", the link
 question gets decided for that build first — with the odds above in
 front of whoever decides.
+
+**Updated later on 2026-08-23: the decision ran, and option two won.**
+External TestFlight is now the plan, so `DONATION_URL` is `''` as of
+1.0.1 (3) — the build intended for Beta App Review and external
+testers. The two builds that carried the live link, 1.0.0 (1) and
+1.0.1 (2), were internal-only and never reviewed, so nothing outside
+the team ever saw the ask.
 
 Worth reading alongside the team-name/logo question above if this ever
 gets a real legal review before a public launch. A donation link is a

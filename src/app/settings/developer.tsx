@@ -17,17 +17,19 @@ import { useTheme } from '@/hooks/use-theme';
  * payment SDK, no card details, nothing new collected. That keeps
  * `docs/data-retention.md` true as written.
  *
- * **Before any external TestFlight build or App Store submission, this
- * has to go back to '' or become an Apple in-app purchase** — see the
- * donation note in `docs/legal-notes.md`. Sideloading and *internal*
- * TestFlight (App Store Connect team members only) don't go through
- * review; anything else does, and "external" includes a build emailed to
- * a dozen friends. That is the specific trap here: this constant and the
- * tester invite are two harmless-looking changes that are only a problem
- * together, and they'd be made weeks apart by someone not thinking about
- * the other one.
+ * **Empty since 1.0.1 (3), decided 2026-08-23 ahead of the first external
+ * TestFlight submission.** External testing means Beta App Review, and
+ * under the current rules a personal donation link surviving review is a
+ * coin flip, not a right — the odds and the four options are in
+ * `docs/legal-notes.md` ("What review would actually make of the link").
+ * Pulling it buys a clean first review; revisiting later is cheap. The
+ * live value was 'https://venmo.com/code?user_id=2013094037422080726' —
+ * restore it only alongside that doc's decision list, not on its own:
+ * this constant and the tester audience are two harmless-looking changes
+ * that are only a problem together, and they'd be made weeks apart by
+ * someone not thinking about the other one.
  */
-const DONATION_URL = 'https://venmo.com/code?user_id=2013094037422080726';
+const DONATION_URL = '';
 
 const PARAGRAPHS = [
   "I'm a GRC consultant and former IT auditor. Building software isn't my day job — understanding how systems get built, secured, and governed is. Fieldwork started as a way to close that gap: real hands-on depth to go alongside a career that's mostly been policy, compliance, and audit, rather than just reading about how software gets made.",

@@ -10,7 +10,7 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.rico1440.nofrills",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "CFBundleDisplayName": "Fieldwork"
       },
@@ -27,7 +27,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.rico1440.nofrills",
-      "versionCode": 2
+      "versionCode": 3
     },
     "web": {
       "output": "static",
