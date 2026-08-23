@@ -614,8 +614,11 @@ export const CURATED_SOURCE_TABLES: Readonly<Record<string, CuratedSourceTable>>
 
 /**
  * Whether a team's sources have been ruled on, and what was ruled out.
- * One function per table for the reason there are two tables: a slug is
- * unique per school, not per league, and realignment moves schools.
+ * Accessors are per table, for the reason the tables are separate at all: a
+ * slug is unique per school, not per league, and realignment moves schools.
+ * Only the tables something asks about by name have one — every table is
+ * covered wholesale by `communitySourceReviewIssues` below, which is what the
+ * review gate reads.
  */
 export function bigTenSourceReviewFor(teamShortName: string): ReviewState {
   return bigTenReview.reviewFor(teamShortName);
@@ -623,10 +626,6 @@ export function bigTenSourceReviewFor(teamShortName: string): ReviewState {
 
 export function secSourceReviewFor(teamShortName: string): ReviewState {
   return secReview.reviewFor(teamShortName);
-}
-
-export function big12SourceReviewFor(teamShortName: string): ReviewState {
-  return big12Review.reviewFor(teamShortName);
 }
 
 /** Empty in healthy tables — see TeamReview.issues. */

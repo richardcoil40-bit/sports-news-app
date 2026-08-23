@@ -53,10 +53,6 @@ export function isHydrated(): boolean {
   return hydrated;
 }
 
-export function isFavorite(team: Pick<Team, 'id' | 'leagueId'>): boolean {
-  return favoriteIds.includes(favoriteKey(team.leagueId, team.id));
-}
-
 /**
  * Loads persisted favorites into memory. Safe to call more than once —
  * later calls are no-ops, so screens don't have to coordinate over who
