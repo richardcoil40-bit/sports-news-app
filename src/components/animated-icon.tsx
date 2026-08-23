@@ -5,11 +5,33 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+
 const DURATION = 600;
 
+/**
+ * The JS half of the launch sequence: it re-draws the native splash so it
+ * can be animated out, since the native one can only be hidden abruptly.
+ *
+ * Both halves have to agree or the seam shows. This used to paint
+ * `#208AEF` — the colour the Expo template ships with, never updated
+ * through either rebrand — so every cold launch went white (the native
+ * splash), then bright blue, then the app. Reading the same tokens
+ * `app.json`'s splash config is set to makes the handoff invisible in
+ * both themes; if you retune `Colors.light.background` or
+ * `Colors.dark.background`, update the `expo-splash-screen` plugin block
+ * to match, because nothing enforces it.
+ *
+ * The mark is a separate asset per theme rather than a tinted one: it's
+ * a solid glyph on transparency, so the dark variant is the same shape
+ * repainted in `Colors.dark.text`.
+ */
 export function AnimatedSplashOverlay() {
   const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
+  const scheme = useColorScheme();
+  const dark = scheme === 'dark';
 
   if (!visible) return null;
 
@@ -32,7 +54,17 @@ export function AnimatedSplashOverlay() {
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/splash-icon.png')} />;
+  const ground = { backgroundColor: dark ? Colors.dark.background : Colors.light.background };
+  const image = (
+    <Image
+      style={styles.image}
+      source={
+        dark
+          ? require('@/assets/images/splash-icon-dark.png')
+          : require('@/assets/images/splash-icon.png')
+      }
+    />
+  );
 
   return animate ? (
     <Animated.View
@@ -42,7 +74,7 @@ export function AnimatedSplashOverlay() {
           scheduleOnRN(setVisible, false);
         }
       })}
-      style={styles.splashOverlay}>
+      style={[styles.splashOverlay, ground]}>
       {image}
     </Animated.View>
   ) : (
@@ -52,7 +84,7 @@ export function AnimatedSplashOverlay() {
           setAnimate(true);
         });
       }}
-      style={styles.splashOverlay}>
+      style={[styles.splashOverlay, ground]}>
       {image}
     </View>
   );
@@ -65,7 +97,6 @@ const styles = StyleSheet.create({
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
