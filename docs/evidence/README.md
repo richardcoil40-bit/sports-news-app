@@ -58,6 +58,7 @@ before adding a source, and periodically otherwise.
 | `feed-status-20260821-011451.txt` | 2026-08-21, the run that cleared the SEC's 24 new sources before they went in. 59 of 60 returning items; the one failure is ESPN's long-standing 202. |
 | `feed-status-20260822-232959.txt` | 2026-08-22, the run confirming the script still sees the whole catalog after the extractor stopped parsing `community-sources.ts` and started importing it. Same 60 sources, same 59/1. |
 | `feed-status-20260823-015042.txt` | 2026-08-23, the first run of the parallelized script. Same 60 sources, same 59/1 as the two runs before it — which is the point of it: grouping by operator and running the groups concurrently changed the runtime from ~3min to ~35s and changed nothing else. First run with a `.json` sidecar. |
+| `feed-status-20260823-022754.txt` | 2026-08-23, the same script against the catalog the NFL and the Big 12 left behind: **83 sources, 82/1**, in ~61s. Identical line for line to the serial run earlier that day. The runtime is now the largest operator group rather than the list — SB Nation is 36 of the 83, and 36 paced requests is what the minute is. |
 
 The two 2026-08-11 files predate the timestamping in the current script — those
 timestamps come from the files' modification times, which is exactly the

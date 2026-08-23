@@ -1,0 +1,93 @@
+Feed liveness report
+  generated  2026-08-23 02:27:54 UTC
+  commit     a86bd3b
+  script     scripts/check-feeds.sh
+
+In-app sources (read from src/lib/source-catalog.ts + src/lib/community-sources.ts)
+  ESPN                       HTTP 202  https://www.espn.com/espn/rss/ncf/news
+  CBS Sports                 OK        rss   36 items
+  Yahoo Sports               OK        rss   50 items
+  Extra Points               OK        rss   20 items
+  Off Tackle Empire          OK        atom  10 items
+  Saturday Down South        OK        rss   50 items
+  CBS Sports                 OK        rss   36 items
+  Yahoo Sports               OK        rss   50 items
+  ProFootballTalk            OK        rss   30 items
+  The Champaign Room         OK        atom  10 items
+  The News-Gazette           OK        rss   50 items
+  The Crimson Quarry         OK        atom  10 items
+  Black Heart Gold Pants     OK        atom  10 items
+  Testudo Times              OK        atom  10 items
+  Maize n Brew               OK        atom  10 items
+  MLive                      OK        rss   50 items
+  The Only Colors            OK        atom  10 items
+  The Daily Gopher           OK        atom  10 items
+  Star Tribune               OK        rss   10 items
+  Corn Nation                OK        atom  10 items
+  Lincoln Journal Star       OK        rss   50 items
+  Omaha World-Herald         OK        rss   50 items
+  Daily Nebraskan            OK        rss   50 items
+  Inside NU                  OK        atom  10 items
+  Land-Grant Holy Land       OK        atom  10 items
+  Eleven Warriors            OK        rss   10 items
+  Cleveland.com              OK        rss   50 items
+  Addicted To Quack          OK        atom  10 items
+  OregonLive                 OK        rss   50 items
+  Black Shoe Diaries         OK        atom  10 items
+  PennLive                   OK        rss   50 items
+  Hammer and Rails           OK        atom  10 items
+  On the Banks               OK        atom  10 items
+  NJ.com                     OK        rss   50 items
+  Los Angeles Times          OK        rss   98 items
+  UW Dawg Pound              OK        atom  10 items
+  The Seattle Times          OK        rss   33 items
+  Bucky's 5th Quarter        OK        atom  10 items
+  Wisconsin State Journal    OK        rss   50 items
+  Roll Bama Roll             OK        atom  10 items
+  AL.com                     OK        rss   50 items
+  Arkansas Democrat-Gazette  OK        rss   150 items
+  The Arkansas Traveler      OK        rss   50 items
+  Opelika-Auburn News        OK        rss   50 items
+  Gator Country              OK        rss   20 items
+  Dawg Sports                OK        atom  10 items
+  The Red & Black            OK        rss   50 items
+  A Sea of Blue              OK        atom  10 items
+  And The Valley Shook       OK        atom  10 items
+  The Advocate               OK        rss   50 items
+  Starkville Daily News      OK        rss   50 items
+  Rock M Nation              OK        atom  10 items
+  St. Louis Post-Dispatch    OK        rss   50 items
+  Columbia Missourian        OK        rss   50 items
+  Red Cup Rebellion          OK        atom  10 items
+  Tulsa World                OK        rss   50 items
+  The OU Daily               OK        rss   50 items
+  The Post and Courier       OK        rss   50 items
+  Rocky Top Talk             OK        atom  10 items
+  Burnt Orange Nation        OK        atom  10 items
+  Good Bull Hunting          OK        atom  10 items
+  The Eagle                  OK        rss   50 items
+  Anchor Of Gold             OK        atom  10 items
+  AZ Desert Swarm            OK        atom  10 items
+  Arizona Daily Star         OK        rss   50 items
+  Waco Tribune-Herald        OK        rss   50 items
+  Vanquish The Foe           OK        atom  10 items
+  The News Record            OK        rss   50 items
+  The Ralphie Report         OK        atom  10 items
+  CU Independent             OK        rss   10 items
+  The Daily Cougar           OK        rss   40 items
+  Wide Right & Natty Lite    OK        atom  10 items
+  Rock Chalk Talk            OK        atom  10 items
+  The University Daily Kansan OK        rss   50 items
+  Bring On The Cats          OK        atom  10 items
+  The Manhattan Mercury      OK        rss   50 items
+  Stillwater News Press      OK        rss   50 items
+  Frogs O' War               OK        atom  10 items
+  Black And Gold Banneret    OK        atom  10 items
+  Daily Utah Chronicle       OK        rss   10 items
+  The Smoking Musket         OK        atom  10 items
+  Charleston Gazette-Mail    OK        rss   50 items
+  WV MetroNews               OK        rss   30 items
+
+----------------------------------------
+  82 passing, 1 failing
+----------------------------------------
