@@ -11,6 +11,9 @@
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.rico1440.nofrills",
       "buildNumber": "1",
+      "infoPlist": {
+        "CFBundleDisplayName": "Fieldwork"
+      },
       "config": {
         "usesNonExemptEncryption": false
       }

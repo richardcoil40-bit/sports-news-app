@@ -375,7 +375,7 @@ export default function FeedScreen() {
               accessibilityLabel="Settings"
             />
             <ThemedText type="title" style={styles.headerTitle}>
-              NOFRILLS
+              FIELDWORK
             </ThemedText>
             <View style={styles.headerSpacer} />
             <SettingsButton />
@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.2,
     // iOS measures a tracked run without its trailing letter-space and
-    // clips whatever overhangs, which sliced the final S off NOFRILLS.
+    // clips whatever overhangs, which sliced the final letter off the masthead.
     // Tracking is already at the 0.2 the design system allows, so the
     // remaining fix is to give the glyph somewhere to overhang into.
     //

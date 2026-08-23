@@ -30,7 +30,7 @@ import { useTheme } from '@/hooks/use-theme';
 const DONATION_URL = 'https://venmo.com/code?user_id=2013094037422080726';
 
 const PARAGRAPHS = [
-  "I'm a GRC consultant and former IT auditor. Building software isn't my day job — understanding how systems get built, secured, and governed is. NoFrills started as a way to close that gap: real hands-on depth to go alongside a career that's mostly been policy, compliance, and audit, rather than just reading about how software gets made.",
+  "I'm a GRC consultant and former IT auditor. Building software isn't my day job — understanding how systems get built, secured, and governed is. Fieldwork started as a way to close that gap: real hands-on depth to go alongside a career that's mostly been policy, compliance, and audit, rather than just reading about how software gets made.",
   "It also exists because the sports app I wanted didn't. I wanted headlines about the teams I follow — not what an algorithm decided was a top story. No ads, no subscription, and nothing quietly collecting my data to sell on later.",
   "That's the whole thing. Plain on purpose, small on purpose, built for one job: find out what's happening with your teams, and get out.",
 ];

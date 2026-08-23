@@ -124,7 +124,7 @@ export default function OnboardingScreen() {
           <View style={styles.headerRow}>
             <Logo size={22} />
             <ThemedText type="title" style={styles.headerTitle}>
-              NoFrills
+              Fieldwork
             </ThemedText>
           </View>
           <ThemedText style={styles.lede}>Pick the teams you actually follow.</ThemedText>
