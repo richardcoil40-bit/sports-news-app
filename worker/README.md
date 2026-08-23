@@ -33,11 +33,15 @@ npx wrangler secret put CLIENT_TOKEN           # optional — see Auth below
 npx wrangler deploy
 ```
 
-Source vetting stays off unless you also set its key:
+Source vetting stays off unless you set **both** of its secrets — unlike
+`CLIENT_TOKEN`, `VET_TOKEN` is required. That route spends against the
+expensive model and has no degraded mode, so it fails closed: a key set
+without a token answers 503 rather than becoming a paid endpoint open to
+anyone who finds the URL.
 
 ```bash
-npx wrangler secret put VET_ANTHROPIC_API_KEY  # enables POST /v1/vet-source
-npx wrangler secret put VET_TOKEN              # optional, same idea as CLIENT_TOKEN
+npx wrangler secret put VET_ANTHROPIC_API_KEY  # POST /v1/vet-source needs both
+npx wrangler secret put VET_TOKEN
 ```
 
 Local dev: `npm run dev` (runs `wrangler dev`). `npm run typecheck` runs

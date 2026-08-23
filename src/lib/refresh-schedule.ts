@@ -49,7 +49,18 @@ function periodKey(now: Date): string {
   if (now.getHours() < MORNING_STARTS_AT) {
     effectiveDate.setDate(effectiveDate.getDate() - 1);
   }
-  const dateStr = effectiveDate.toISOString().slice(0, 10);
+  // The LOCAL date, matching the local hours the windows are defined in.
+  // This used to be toISOString()'s UTC date, which rolls over mid-window
+  // in every timezone but UTC itself — 7pm Central, mid-evening — and a
+  // key that changes mid-window forces a second full cache-bypassing pull
+  // of a window that was already refreshed. Persisting the marker is what
+  // made that waste worth fixing: the whole point of the persisted key is
+  // that a window already refreshed stays refreshed.
+  const dateStr = [
+    effectiveDate.getFullYear(),
+    String(effectiveDate.getMonth() + 1).padStart(2, '0'),
+    String(effectiveDate.getDate()).padStart(2, '0'),
+  ].join('-');
   return `${dateStr}-${periodFor(now.getHours())}`;
 }
 
