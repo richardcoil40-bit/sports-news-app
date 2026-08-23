@@ -51,7 +51,9 @@ would not.
 
 There is a "Tip the developer" section on the Developer Info screen in
 Settings, with a Venmo link. **As of 2026-08-20 it is live** — the URL
-is set in `src/app/settings/developer.tsx` and the section renders.
+is set in `src/app/settings/developer.tsx` and the section renders, and
+as of 2026-08-23 it is deliberately staying that way for internal
+TestFlight (see "Which one we are actually doing" below).
 
 An earlier version of this paragraph said the URL was deliberately unset
 and that what existed was "the surface, not a live ask." That was true
@@ -116,6 +118,29 @@ Connect team member, one of these has to happen:
 Sideloading to your own devices and internal TestFlight are unaffected;
 the link can stay for both. The checkpoint is the first external
 invite, not the first upload.
+
+### Which one we are actually doing — answered 2026-08-23
+
+**Every current tester is an App Store Connect team member, so this is
+internal testing and the trigger has not fired.** The link stays for
+1.0.0 (1) and for 1.0.1 (2). Richard confirmed the tester list; it is
+not derivable from anything in this repo, which is why it is recorded
+here rather than re-asked each time.
+
+That is a statement about *today's tester list*, not a clearance. The
+determination expires the moment either of these happens, and neither
+produces a warning:
+
+- **Anyone is invited by email or public link.** That is external
+  testing, it needs Beta App Review, and the link must be `''` or an IAP
+  in the build they receive. Adding one person to a build that already
+  has 99 team members is enough.
+- **The app is submitted to the App Store**, whatever the TestFlight
+  history. Full review applies and internal-vs-external stops mattering.
+
+So the pre-flight before any upload is a question about the *audience*,
+not about the code: if the answer isn't "team members only", the link
+comes out of that build first.
 
 Worth reading alongside the team-name/logo question above if this ever
 gets a real legal review before a public launch. A donation link is a
