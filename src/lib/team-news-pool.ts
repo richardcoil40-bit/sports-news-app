@@ -1,12 +1,14 @@
 import { createEntityCache } from '@/lib/cache';
 import { filterArticlesForTeams } from '@/lib/conference-filter';
+import { recordNicknameRescue, recordVerdictDisagreement, recordYield } from '@/lib/diagnostics';
 import { filterOffTopic } from '@/lib/off-topic';
 import { filterOtherSports } from '@/lib/off-sport';
 import { Article, fetchFeeds } from '@/lib/feeds';
 import { espnCacheKey, League } from '@/lib/leagues';
 import { fetchLeagueFeeds, teamSourcesFor } from '@/lib/source-catalog';
 import { fetchTeamArticles } from '@/lib/team-news';
-import { localNamesFor, schoolNamesFor } from '@/lib/team-nicknames';
+import { localNamesFor, schoolNamesFor, teamNicknamesFor } from '@/lib/team-nicknames';
+import { wordBoundaryMatch } from '@/lib/text-match';
 import { classifyHeadlines, isRelevantVerdict } from '@/lib/verdicts';
 
 export interface TeamNewsPool {
@@ -47,7 +49,62 @@ const DEBUG_TIMING = false;
 // the worker's own cross-user cache) for the *next* refresh to use.
 const VERDICT_RACE_MS = 3000;
 
-async function withVerdictRefinement(articles: Article[], league: League): Promise<Article[]> {
+/**
+ * Sample rate and cap for the false-negative half of verdict disagreement
+ * (diagnostics.ts): classifying a slice of the articles the local-newsroom
+ * filter *rejected*, to see if the model thinks one actually names the
+ * team — a nickname the table is missing, or a school-name match that was
+ * too strict. This is the one mechanism in this file that costs an extra
+ * classify call beyond what the pool already makes (see
+ * withVerdictRefinement below, which piggybacks on a call it makes
+ * anyway) — dev builds only, gated at the one call site in
+ * fetchTeamNewsPoolUncached.
+ */
+const FALSE_NEGATIVE_SAMPLE_RATE = 0.1;
+const FALSE_NEGATIVE_SAMPLE_MAX = 5;
+
+/**
+ * Fire-and-forget: not awaited by its caller, and doesn't touch the
+ * pool's own timing (HARD_CAP_MS) or its returned value. A failed or slow
+ * sample just means no diagnostics data for this fetch, not a broken pool.
+ * Not a statistical sample — the first N rejects is enough for a dev
+ * signal, and keeps a run reproducible while poking at it.
+ */
+function sampleRejectsForFalseNegatives(teamShortName: string, rejected: Article[]): void {
+  const classifiable = rejected.filter((a) => a.title?.trim());
+  if (classifiable.length === 0) return;
+
+  const sampleSize = Math.min(FALSE_NEGATIVE_SAMPLE_MAX, Math.ceil(classifiable.length * FALSE_NEGATIVE_SAMPLE_RATE));
+  if (sampleSize === 0) return;
+  const sample = classifiable.slice(0, sampleSize);
+
+  classifyHeadlines(sample.map((a) => ({ id: a.link, title: a.title })))
+    .then((verdicts) => {
+      for (const article of sample) {
+        recordVerdictDisagreement(
+          teamShortName,
+          // The reject sample isn't scoped to a single nickname the way a
+          // rescue is — it's whatever the local filter as a whole turned
+          // down — so there's no one word to credit or blame. "the local
+          // filter" names the mechanism plainly rather than picking one.
+          'the local filter',
+          article,
+          verdicts.get(article.link) ?? null,
+          'false-negative-candidate',
+        );
+      }
+    })
+    .catch(() => {
+      // Best-effort dev signal — see the function comment above.
+    });
+}
+
+async function withVerdictRefinement(
+  articles: Article[],
+  league: League,
+  teamShortName: string,
+  nicknameRescuedByLink: Map<string, string>,
+): Promise<Article[]> {
   // Articles with no title can't be classified — the worker rejects a
   // batch containing one rather than silently skipping it (see
   // worker/src/index.ts's parseItems) — and shouldn't be able to invalidate
@@ -72,7 +129,57 @@ async function withVerdictRefinement(articles: Article[], league: League): Promi
   // so this filter is a no-op in that case, not this early return.
   if (!verdicts) return articles;
 
+  // Diagnostics: the false-positive half of verdict disagreement
+  // (diagnostics.ts). This is the classify call the pool was already
+  // making for filtering — checking a nickname-rescued article's team
+  // against the same verdict costs nothing extra, unlike the
+  // false-negative sampling above.
+  if (nicknameRescuedByLink.size > 0) {
+    for (const article of classifiable) {
+      const nickname = nicknameRescuedByLink.get(article.link);
+      if (nickname) {
+        recordVerdictDisagreement(
+          teamShortName,
+          nickname,
+          article,
+          verdicts.get(article.link) ?? null,
+          'false-positive-candidate',
+        );
+      }
+    }
+  }
+
   return articles.filter((a) => isRelevantVerdict(verdicts.get(a.link) ?? null, league));
+}
+
+/**
+ * Diagnostics only: of the articles the local-newsroom filter just kept
+ * (already matched against `localNamesFor`, school name plus nicknames),
+ * which ones matched on a nickname with the school name itself absent —
+ * the case a nickname table exists to catch, and the same case a
+ * word-for-word disagreement with the classifier ("Wildcats" hazard)
+ * matters most for. Records each into diagnostics.ts's per-nickname
+ * usefulness count as a side effect, and returns the link → nickname map
+ * `withVerdictRefinement` needs to run the classifier cross-check on
+ * exactly these articles.
+ */
+function trackNicknameRescues(teamShortName: string, keptArticles: Article[]): Map<string, string> {
+  const rescuedByLink = new Map<string, string>();
+  const nicknames = teamNicknamesFor(teamShortName);
+  if (nicknames.length === 0) return rescuedByLink;
+
+  const schoolNames = schoolNamesFor(teamShortName);
+  for (const article of keptArticles) {
+    const text = `${article.title} ${article.description}`;
+    if (schoolNames.some((name) => wordBoundaryMatch(text, name))) continue;
+
+    const nickname = nicknames.find((n) => wordBoundaryMatch(text, n));
+    if (nickname) {
+      recordNicknameRescue(teamShortName, nickname);
+      rescuedByLink.set(article.link, nickname);
+    }
+  }
+  return rescuedByLink;
 }
 
 async function fetchTeamNewsPoolUncached(
@@ -131,7 +238,9 @@ async function fetchTeamNewsPoolUncached(
   // padded the pool enough to crowd out the smaller sources this app
   // exists to surface.
   if (espnResult.status === 'fulfilled') {
-    lists.push(filterArticlesForTeams(espnResult.value, schoolNamesFor(teamShortName)));
+    const filtered = filterArticlesForTeams(espnResult.value, schoolNamesFor(teamShortName));
+    recordYield('espn team news', teamShortName, espnResult.value.length, filtered.length);
+    lists.push(filtered);
   } else {
     failedSources.push('ESPN team news');
   }
@@ -151,15 +260,33 @@ async function fetchTeamNewsPoolUncached(
   // the local paper does: "Huskers" is unambiguous in the Lincoln Journal
   // Star and "Wildcats" is four different schools in a national feed. See
   // team-nicknames.ts, which is where that restriction is argued.
+  let nicknameRescuedByLink = new Map<string, string>();
   if (localResult.status === 'fulfilled') {
-    lists.push(filterArticlesForTeams(localResult.value.articles, localNamesFor(teamShortName)));
+    const filtered = filterArticlesForTeams(localResult.value.articles, localNamesFor(teamShortName));
+    recordYield('local newsroom', teamShortName, localResult.value.articles.length, filtered.length);
+
+    // Diagnostics: mechanism 3 (per-nickname usefulness) is pure
+    // arithmetic on names already matched above, so it runs unconditionally.
+    // The extra classify call it sets up for (mechanism 1's false-positive
+    // half) is free too — see withVerdictRefinement — but the false-negative
+    // sample just below is not, so that one stays __DEV__-gated.
+    nicknameRescuedByLink = trackNicknameRescues(teamShortName, filtered);
+    if (__DEV__) {
+      const keptLinks = new Set(filtered.map((a) => a.link));
+      const rejected = localResult.value.articles.filter((a) => !keptLinks.has(a.link));
+      sampleRejectsForFalseNegatives(teamShortName, rejected);
+    }
+
+    lists.push(filtered);
     failedSources.push(...localResult.value.failedSources);
   } else {
     failedSources.push(...broadScoped.map((s) => s.name));
   }
 
   if (generalResult.status === 'fulfilled') {
-    lists.push(filterArticlesForTeams(generalResult.value.articles, schoolNamesFor(teamShortName)));
+    const filtered = filterArticlesForTeams(generalResult.value.articles, schoolNamesFor(teamShortName));
+    recordYield('national pool', teamShortName, generalResult.value.articles.length, filtered.length);
+    lists.push(filtered);
     failedSources.push(...generalResult.value.failedSources);
   } else {
     failedSources.push('National college football feeds');
@@ -190,7 +317,7 @@ async function fetchTeamNewsPoolUncached(
   // configured yet), classifyHeadlines resolves immediately with no
   // network call and isRelevantVerdict keeps everything, so this is a
   // no-op for every build that hasn't set up the service.
-  const articles = await withVerdictRefinement(localFiltered, league);
+  const articles = await withVerdictRefinement(localFiltered, league, teamShortName, nicknameRescuedByLink);
 
   articles.sort((a, b) => {
     if (!a.publishedAt) return 1;

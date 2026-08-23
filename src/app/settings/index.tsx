@@ -29,6 +29,20 @@ const ITEMS = [
     label: 'Developer Info',
     detail: 'Why this app exists',
   },
+  // Dev builds only — a runtime-detection screen for the review gate
+  // (AGENTS.md's Scope section, "the gate catches unreviewed teams; this
+  // catches reviewed-but-wrong ones"). Gated at the row rather than only
+  // in the screen so it doesn't even show up as a dead end in a shipped
+  // build.
+  ...(__DEV__
+    ? [
+        {
+          href: '/settings/diagnostics' as const,
+          label: 'Diagnostics',
+          detail: 'Nickname and verdict signals, this session',
+        },
+      ]
+    : []),
 ];
 
 export default function SettingsScreen() {
