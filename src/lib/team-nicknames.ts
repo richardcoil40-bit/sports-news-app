@@ -111,7 +111,84 @@ const NICKNAMES_BY_SLUG: Record<string, string[]> = {
   vanderbilt: ['Commodore', 'Commodores', 'Vandy'],
   washington: ['Husky', 'Huskies'],
   wisconsin: ['Badger', 'Badgers'],
+
+  /**
+   * ## Professional teams, keyed by franchise
+   *
+   * The same table as the schools above, for the reason argued there: the
+   * key is the thing that owns the names, and a franchise keeps its mascot
+   * across a relocation the way a school keeps its across realignment.
+   *
+   * What differs is that nearly every entry here is deliberately empty, for
+   * one reason rather than twenty-nine. ESPN's short name for a pro
+   * franchise *is* the mascot — "Chiefs", not "Kansas City" — so
+   * `schoolNamesFor` already matches the word a headline prints, and the
+   * gap this table exists to close has nothing to close. The three
+   * exceptions are contractions a word-boundary match on the short name
+   * cannot reach: `\bJaguars\b` never fires on "Jags".
+   *
+   * None of these can fire yet. Nicknames are only matched against a team's
+   * own `scope: 'broad'` sources and the NFL has no table in
+   * community-sources.ts, so every entry here is unreachable — which is
+   * why what was *rejected* is recorded in NO_NICKNAME_REASONS rather than
+   * argued once here. The day a metro paper is added for one of these
+   * teams, that reasoning is what the reviewer needs and cannot re-derive.
+   *
+   * **A pro slug is a mascot, and mascots repeat across sports.** These 32
+   * are unique among themselves and collide with no school, but 'cardinals'
+   * is Arizona here and St. Louis in baseball, and 'giants', 'jets',
+   * 'panthers', 'kings' and 'rangers' all split the same way. So one table
+   * holds one professional league and cannot hold two: a second needs the
+   * key qualified by league. That is off-sport.ts's "a school is not a
+   * team" arriving from the other end — there one source covers a school
+   * across many sports, here one word covers many teams — and it is the
+   * decision to make before a second pro league, not during.
+   */
+  '49ers': ['Niners'],
+  bears: [],
+  bengals: [],
+  bills: [],
+  broncos: [],
+  browns: [],
+  buccaneers: [],
+  cardinals: [],
+  chargers: [],
+  chiefs: [],
+  colts: [],
+  commanders: [],
+  cowboys: [],
+  dolphins: [],
+  eagles: [],
+  falcons: [],
+  giants: [],
+  jaguars: ['Jags'],
+  jets: [],
+  lions: [],
+  packers: [],
+  panthers: [],
+  patriots: ['Pats'],
+  raiders: [],
+  rams: [],
+  ravens: [],
+  saints: [],
+  seahawks: [],
+  steelers: [],
+  texans: [],
+  titans: [],
+  vikings: [],
 };
+
+/**
+ * The finding that covers a whole professional league, named once and
+ * composed into each entry rather than restated twenty-nine times. The same
+ * shape community-sources.ts uses for a dead newspaper chain, and for the
+ * same reason: the next pro league should read the finding rather than
+ * spend an afternoon rediscovering it.
+ */
+const PRO_MASCOT_IS_THE_SHORT_NAME =
+  "ESPN's short name for a pro franchise is the mascot itself, so " +
+  'schoolNamesFor already matches the word a headline prints — there is no ' +
+  'second form the way "Huskers" is a second form of "Cornhuskers".';
 
 /**
  * Why a reviewed team has no nicknames. Required for every `[]` above —
@@ -125,6 +202,88 @@ const NO_NICKNAME_REASONS: Record<string, string> = {
     'against LSU\'s own papers. Unreachable either way: both LSU sources ' +
     'are scope: team, so the local-newsroom filter these names feed never ' +
     'runs on them.',
+
+  bears:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Bears" is this team\'s own short name, and already reserved to ' +
+    'Chicago.',
+  bengals: PRO_MASCOT_IS_THE_SHORT_NAME,
+  bills:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Bills" doubles as an ordinary noun. That costs nothing while ' +
+    'the name only runs against ESPN\'s own team feed, and wants ' +
+    're-reading the day a broad source is added here.',
+  broncos: PRO_MASCOT_IS_THE_SHORT_NAME,
+  browns:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Browns" doubles as a surname — the same caveat as Buffalo.',
+  buccaneers:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Bucs" rejected: Pittsburgh\'s baseball team has answered to it ' +
+    'longer.',
+  cardinals:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Cards" rejected: St. Louis and Louisville both claim it, ' +
+    'which is also why "Cardinals" is reserved.',
+  chargers:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Bolts" rejected: Tampa Bay\'s hockey team.',
+  chiefs: PRO_MASCOT_IS_THE_SHORT_NAME,
+  colts: PRO_MASCOT_IS_THE_SHORT_NAME,
+  commanders:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' The franchise\'s retired name is deliberately not carried. It ' +
+    'is a slur, and matching on it would surface what is written ' +
+    'about the name rather than coverage of the team.',
+  cowboys:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "\'Boys" rejected: a sports section prints "boys" literally, ' +
+    'and Oklahoma State is also the Cowboys.',
+  dolphins:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Fins" rejected: too thin to carry a word-boundary match on ' +
+    'its own.',
+  eagles:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Birds" rejected: Baltimore and Philadelphia are both the ' +
+    'Birds in their own papers. "Eagles" is already reserved.',
+  falcons: PRO_MASCOT_IS_THE_SHORT_NAME,
+  giants:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "G-Men" rejected: it reads as federal agents anywhere but a ' +
+    'sports page. "Giants" is already reserved to New York and San ' +
+    'Francisco both.',
+  jets:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Jets" is already reserved — Winnipeg\'s hockey team, and a ' +
+    'word a sports section uses literally.',
+  lions:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Lions" is already reserved, which is what keeps it out of ' +
+    'Penn State\'s entry. Here it is Detroit\'s own short name.',
+  packers:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Pack" rejected: NC State\'s Wolfpack, and an ordinary noun ' +
+    'besides.',
+  panthers:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Panthers" is already reserved — Florida\'s hockey team, and ' +
+    'Pitt.',
+  raiders: PRO_MASCOT_IS_THE_SHORT_NAME,
+  rams: PRO_MASCOT_IS_THE_SHORT_NAME,
+  ravens: PRO_MASCOT_IS_THE_SHORT_NAME,
+  saints: PRO_MASCOT_IS_THE_SHORT_NAME,
+  seahawks:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Hawks" rejected: Atlanta, Chicago\'s hockey team, and Iowa\'s ' +
+    'Hawkeyes.',
+  steelers: PRO_MASCOT_IS_THE_SHORT_NAME,
+  texans: PRO_MASCOT_IS_THE_SHORT_NAME,
+  titans: PRO_MASCOT_IS_THE_SHORT_NAME,
+  vikings:
+    PRO_MASCOT_IS_THE_SHORT_NAME +
+    ' "Vikes" rejected: too thin to carry a word-boundary match on ' +
+    'its own.',
 };
 
 /**

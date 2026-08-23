@@ -48,6 +48,37 @@ const NATIONAL_CFB_FEEDS: FeedSource[] = [
 const OFF_TACKLE_EMPIRE: FeedSource = { id: 'off-tackle-empire', name: 'Off Tackle Empire', url: 'https://www.offtackleempire.com/rss/index.xml', tier: 3, scope: 'broad', reach: 'national' };
 const SATURDAY_DOWN_SOUTH: FeedSource = { id: 'saturday-down-south', name: 'Saturday Down South', url: 'https://www.saturdaydownsouth.com/feed/', tier: 3, scope: 'broad', reach: 'national' };
 
+/**
+ * The NFL's pool. Not the list above with a different path, and not a copy
+ * of it either — the two lists share no URL, because every one of these
+ * publishers splits college and pro into separate feeds.
+ *
+ * ESPN is the conspicuous absence. `espn.com/espn/rss/nfl/news` answers
+ * 202 with an empty body, which is the failure feeds.ts was taught to
+ * treat as a failure rather than a quiet day — so adding it would
+ * contribute nothing and report a dead source on every fetch. (Its college
+ * equivalent above has answered the same way in every report in
+ * docs/evidence/ since 2026-08-11 — this is the 202 case feeds.ts was
+ * taught about, still sitting in a shipped league. Removing it is a
+ * curation decision with its own evidence trail, not something to do in
+ * passing while adding a different league.)
+ *
+ * ProFootballTalk stands where Extra Points does for the college list — a
+ * vertical wider than any one team — except that it is NBC Sports' own
+ * newsroom rather than an independent, so it is tier 1 on the criteria in
+ * docs/source-reliability.md rather than tier 2.
+ *
+ * There is no per-team table for the NFL yet, and that is a normal state:
+ * teamSourcesFor answers `[]`, the pool runs on ESPN's team feed plus
+ * these, and curated local papers are backfilled by the same worksheet
+ * every other league goes through.
+ */
+const NATIONAL_NFL_FEEDS: FeedSource[] = [
+  { id: 'cbs-nfl', name: 'CBS Sports', url: 'https://www.cbssports.com/rss/headlines/nfl/', tier: 1, scope: 'broad', reach: 'national' },
+  { id: 'yahoo-nfl', name: 'Yahoo Sports', url: 'https://sports.yahoo.com/nfl/rss.xml', tier: 1, scope: 'broad', reach: 'national' },
+  { id: 'pro-football-talk', name: 'ProFootballTalk', url: 'https://profootballtalk.nbcsports.com/feed/', tier: 1, scope: 'broad', reach: 'national' },
+];
+
 interface LeagueSources {
   /** Feeds covering the whole sport, fetched once and shared across teams. */
   nationalFeeds?: FeedSource[];
@@ -70,6 +101,9 @@ const CATALOG: Record<string, LeagueSources> = {
     nationalFeeds: [...NATIONAL_CFB_FEEDS, SATURDAY_DOWN_SOUTH],
     teamSources: secSourcesForTeam,
   },
+  // No teamSources: see NATIONAL_NFL_FEEDS. A league with no per-team table
+  // is the graceful path, not a gap to fill before shipping.
+  'nfl': { nationalFeeds: NATIONAL_NFL_FEEDS },
 };
 
 export function nationalFeedsFor(league: League): FeedSource[] {

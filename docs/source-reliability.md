@@ -392,6 +392,16 @@ Plus ESPN, CBS Sports, and Yahoo (Tier 1) and Extra Points (Tier 2) across
 college football, and one conference-wide blog each: Off Tackle Empire
 (Tier 3) for the Big Ten, Saturday Down South (Tier 3) for the SEC.
 
+The NFL has no per-team table at all yet and runs on ESPN's team feed plus
+CBS Sports, Yahoo Sports and ProFootballTalk (all Tier 1). ESPN's own NFL
+RSS is deliberately not among them — it answers 202 with an empty body.
+So does its college equivalent, in every report in `../evidence/` since
+2026-08-11; that one is still in the catalog and is worth a decision of its
+own.
+Backfilling the 32 local newsrooms is the largest single piece of source
+research outstanding, and none of it blocks the league: names were reviewed,
+sources were not, and only the first of those is a gate.
+
 Weakest coverage: Iowa, Indiana, Purdue, Northwestern, and Maryland run on a
 single Tier 3 source each, as do Kentucky, Ole Miss, Tennessee and Texas.
 Mississippi State and South Carolina run on a single Tier 1 newsroom each,
