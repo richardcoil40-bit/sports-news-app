@@ -67,11 +67,14 @@ jobs:
         id: check
         run: |
           bash scripts/check-feeds.sh | tee run.log
-          # The script writes a fresh timestamped file and prints its path.
-          # Capture that one specifically, so the upload below doesn't also
-          # sweep up the reports already committed under docs/evidence/.
-          report="$(sed -n 's/^Wrote //p' run.log | tail -1)"
+          # The script writes two fresh timestamped files and prints both
+          # paths. Capture them by extension rather than by position, so the
+          # upload below doesn't sweep up the reports already committed under
+          # docs/evidence/ and neither one depends on which is printed last.
+          report="$(sed -n 's|^Wrote \(.*\.txt\)$|\1|p' run.log | tail -1)"
+          report_json="$(sed -n 's|^Wrote \(.*\.json\)$|\1|p' run.log | tail -1)"
           echo "report=$report" >> "$GITHUB_OUTPUT"
+          echo "report_json=$report_json" >> "$GITHUB_OUTPUT"
 
       # Downloadable under the run's "Artifacts" section, kept 90 days.
       # Note that means CI runs do not maintain the docs/evidence/ record
@@ -82,12 +85,15 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: feed-status-report
-          path: ${{ steps.check.outputs.report }}
+          path: |
+            ${{ steps.check.outputs.report }}
+            ${{ steps.check.outputs.report_json }}
           if-no-files-found: warn
 
       - name: Compare failures against the known-unreachable baseline
         env:
           REPORT: ${{ steps.check.outputs.report }}
+          REPORT_JSON: ${{ steps.check.outputs.report_json }}
           BASELINE: docs/evidence/ci-unreachable.txt
         run: |
           if [ -z "$REPORT" ] || [ ! -f "$REPORT" ]; then
@@ -108,27 +114,30 @@ jobs:
             exit 1
           fi
 
-          summary="$(grep -oE '[0-9]+ passing, [0-9]+ failing' "$REPORT" | tail -1)"
-          if [ -z "$summary" ]; then
-            echo "::error::Could not find the summary line in $REPORT."
+          if [ -z "$REPORT_JSON" ] || [ ! -f "$REPORT_JSON" ]; then
+            echo "::error::No JSON sidecar was produced alongside $REPORT."
             exit 1
           fi
-          passing="${summary%% passing*}"
+
+          # Names and counts come from the JSON sidecar, not the text columns.
+          # The text report pads the name field to 26 characters, so a longer
+          # name overflows it and shifts every column after it — the parser
+          # that used to live here matched on the status token to survive
+          # that, and was one long publisher name away from misreading a
+          # report. The sidecar has no columns to shift.
+          node -e '
+            const fs = require("fs");
+            const rows = JSON.parse(fs.readFileSync(process.env.REPORT_JSON, "utf8"));
+            const failing = rows.filter((r) => r.status !== "OK");
+            fs.writeFileSync("failing.txt", [...new Set(failing.map((r) => r.name))].sort().join("\n") + "\n");
+            fs.writeFileSync("counts.txt", `${rows.length - failing.length} ${failing.length}\n`);
+          '
+          read -r passing failing_count < counts.txt
+          summary="$passing passing, $failing_count failing"
           if [ "$passing" -eq 0 ]; then
             echo "::error::Zero sources passed. That is far more likely to be the runner's network than every publisher dying at once — check the artifact before touching the catalog."
             exit 1
           fi
-
-          # Pull the name column off every failing line. Matching on the
-          # status token rather than fixed columns on purpose: the name field
-          # is padded to 26, and a longer name would overflow it and shift
-          # every column after it.
-          awk '{
-            line = substr($0, 3)
-            if (match(line, /[ ]+(HTTP [0-9][0-9][0-9]|EMPTY)([ ]|$)/)) {
-              print substr(line, 1, RSTART - 1)
-            }
-          }' "$REPORT" | sort -u > failing.txt
 
           # Two views of the baseline. Everything on it is allowed to fail;
           # only the entries NOT marked "~" (intermittent) are expected to

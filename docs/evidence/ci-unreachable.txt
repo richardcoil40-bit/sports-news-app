@@ -55,3 +55,18 @@ The Seattle Times
 ~ The OU Daily
 ~ The Post and Courier
 ~ The Eagle
+
+# --- Not yet measured from CI ---
+# The NFL and the Big 12 added 23 sources after the four runs above,
+# seven of them on TownNews/BLOX (Arizona Daily Star, Waco
+# Tribune-Herald, The News Record, the Kansan, the Manhattan Mercury,
+# Stillwater News Press, Charleston Gazette-Mail). Every TownNews site
+# already on this list refuses a datacenter IP, so those seven will
+# very likely fail the next dispatch and be reported as new.
+#
+# They are deliberately NOT listed yet. This file is measured, not
+# predicted: an entry here is an excuse, and an excuse written before
+# anyone checked is how the list rots into the blanket exemption the
+# header warns about. Dispatch the workflow, read what it reports as
+# new, and add those names — the run tells you which, and whether
+# they need the intermittent "~".

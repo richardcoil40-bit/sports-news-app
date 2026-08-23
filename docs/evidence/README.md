@@ -16,7 +16,21 @@ bash scripts/check-feeds.sh              # in-app sources only
 bash scripts/check-feeds.sh --candidates # also re-probe the rejected candidates
 ```
 
-Each run writes `feed-status-<UTC timestamp>.txt` here and echoes to stdout.
+Each run writes two files here and echoes the text one to stdout:
+`feed-status-<UTC timestamp>.txt` to read, and `.json` beside it to diff and
+to parse. The table below stops being scannable somewhere around 450 lines,
+which is where this catalog is heading, and "diff against the last one" only
+survives that if something other than a pair of eyes can do the diffing. The
+CI workflow already reads the JSON rather than the text columns — the text
+report pads the name field to 26 characters, so a long enough publisher name
+would shift every column after it.
+
+Requests run **grouped by operator**: concurrent across operators, sequential
+and paced within one. That is a 5x speedup (60 sources in ~35s rather than
+~3min) and nobody receives requests any faster than before — see the long
+comment in the script for why the unit is the operator and not the host, and
+for the measured runs that say not to touch the pacing itself.
+
 The in-app list is read out of `src/lib/source-catalog.ts` and
 `src/lib/community-sources.ts` rather than duplicated in the script, so it
 can't drift from what the app actually fetches. The per-team half is
@@ -43,6 +57,8 @@ before adding a source, and periodically otherwise.
 | `feed-status-20260818-130515.txt` | 2026-08-18, first run printing the detected feed format. The run that made the Atom problem visible: **17 of 35 sources are `atom`**, and the app could only read `rss`. |
 | `feed-status-20260821-011451.txt` | 2026-08-21, the run that cleared the SEC's 24 new sources before they went in. 59 of 60 returning items; the one failure is ESPN's long-standing 202. |
 | `feed-status-20260822-232959.txt` | 2026-08-22, the run confirming the script still sees the whole catalog after the extractor stopped parsing `community-sources.ts` and started importing it. Same 60 sources, same 59/1. |
+| `feed-status-20260823-015042.txt` | 2026-08-23, the first run of the parallelized script. Same 60 sources, same 59/1 as the two runs before it — which is the point of it: grouping by operator and running the groups concurrently changed the runtime from ~3min to ~35s and changed nothing else. First run with a `.json` sidecar. |
+| `feed-status-20260823-022754.txt` | 2026-08-23, the same script against the catalog the NFL and the Big 12 left behind: **83 sources, 82/1**, in ~61s. Identical line for line to the serial run earlier that day. The runtime is now the largest operator group rather than the list — SB Nation is 36 of the 83, and 36 paced requests is what the minute is. |
 
 The two 2026-08-11 files predate the timestamping in the current script — those
 timestamps come from the files' modification times, which is exactly the
