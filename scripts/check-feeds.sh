@@ -74,44 +74,136 @@ UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, l
 # Both are env-overridable: PACE_SECONDS=0 restores the old fast behavior
 # for an impatient local run, where none of this matters — a home IP never
 # sees these 429s at all.
+#
+# ## Parallelism, added later, on the axis that comment never tested
+#
+# Everything above is about how far apart two requests to the SAME operator
+# should be. It says nothing about running DIFFERENT operators at once,
+# which is the axis that actually costs three minutes: the script was
+# strictly serial, so 60 sources meant 60 sequential one-second waits
+# against 60 unrelated servers, none of which were waiting on each other.
+#
+# So requests are now grouped by operator and the groups run concurrently,
+# while each group stays sequential and paced exactly as before. Nobody
+# receives requests any faster than they did; the waiting just happens in
+# parallel. The measured 13-17 CI baseline is a property of who answers a
+# datacenter IP, not of dispatch order, and is expected to be unchanged.
+#
+# **The unit is the operator, not the host, and that distinction is the
+# whole thing.** All 60 in-app sources are on 60 different hosts, so
+# grouping by host would put every one of them in its own group and fire
+# all sixteen TownNews/BLOX papers simultaneously — which is the "single IP
+# inside two seconds, reads as a scrape" pattern the runs above were
+# investigating. Grouped by operator the catalog is 14 groups: 27 SB
+# Nation, 16 TownNews/BLOX, 6 Arc, and 11 papers standing alone. Those
+# three patterns are the same ones OWNER_FEED_URL names in
+# community-sources.ts, for the same reason: these papers live and die as a
+# chain.
+#
+# The critical path is now the largest group rather than the whole list, so
+# the ceiling is ~27 paced requests instead of 60. If a future catalog puts
+# 200 sources behind one operator, that group is the cost and splitting it
+# is not something to do without re-reading the runs above.
+#
+# MAX_PARALLEL bounds how many groups are in flight; 1 restores the old
+# fully-serial behaviour if a run ever needs to be compared like-for-like.
 PACE_SECONDS="${PACE_SECONDS:-1}"
 RETRY_SECONDS="${RETRY_SECONDS:-10}"
-TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
+MAX_PARALLEL="${MAX_PARALLEL:-8}"
+
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
 
 EVIDENCE_DIR="docs/evidence"
 mkdir -p "$EVIDENCE_DIR"
 STAMP="$(date -u +%Y%m%d-%H%M%S)"
 OUT="$EVIDENCE_DIR/feed-status-$STAMP.txt"
+OUT_JSON="$EVIDENCE_DIR/feed-status-$STAMP.json"
 
-pass=0
-fail=0
+# The job list, built before anything is fetched. Every entry is one line:
+#   S<TAB><heading>              a section break
+#   C<TAB><name><TAB><url>       a source to check
+#
+# Building it first is what allows the fetches to be reordered without the
+# report being reordered: the sequence number here is the line number, and
+# render() walks this file, not the order results came back in. That matters
+# more than it sounds — docs/evidence/README.md's whole premise is diffing a
+# report against the last one, and a report whose line order depends on which
+# server answered first would diff against itself.
+JOBS="$WORK/jobs"
+: > "$JOBS"
+
+section() {
+  printf 'S\t%s\n' "$1" >> "$JOBS"
+}
+
+enqueue() {
+  printf 'C\t%s\t%s\t%s\n' "$1" "$2" "$(operator_of "$2")" >> "$JOBS"
+}
+
+# A literal line in the report. Only one thing uses it, and that thing is the
+# reason it exists rather than a printf: the extractor-drift warning has to
+# appear IN the report, because .github/workflows/feed-check.yml greps the
+# report for it and fails the run. Printed beside the report instead, it would
+# scroll past in a log nobody reads and the check would go green.
+note() {
+  printf 'N\t%s\n' "$1" >> "$JOBS"
+}
 
 fetch() {
   curl -sS -L --compressed --max-time 20 \
        -A "$UA" \
-       -o "$TMP" \
+       -o "$2" \
        -w '%{http_code}' \
        "$1" 2>/dev/null
 }
 
-check() {
-  name="$1"
-  url="$2"
+# Which operator serves this URL — the unit requests are paced within.
+#
+# The three patterns are the ones OWNER_FEED_URL names in
+# community-sources.ts. They are matched here rather than imported because
+# this runs per URL inside a shell loop, and because a URL that matches none
+# of them still needs an answer; falling back to the host gives every
+# unaffiliated paper its own group, which is correct — it IS its own
+# operator. See the parallelism note above for why host alone is the wrong
+# unit for the three that are affiliated.
+operator_of() {
+  case "$1" in
+    *search/\?f=rss*)    printf 'lee-townnews\n' ;;
+    *arc/outboundfeeds*) printf 'advance-arc\n' ;;
+    */rss/index.xml)     printf 'sb-nation\n' ;;
+    *) printf '%s\n' "$1" | sed -E 's#^https?://([^/]+).*#\1#' ;;
+  esac
+}
+
+# One source, fetched and classified. Writes a single record:
+#   <status>|<detail>|<format>|<items>
+#
+# Pipe-separated rather than tab, and that is not a style choice. `read` with
+# IFS set to a *whitespace* character — and tab is one — collapses runs of it,
+# so an empty middle field silently disappears and every field after it shifts
+# left by one. An OK record has an empty detail, so under tabs the format
+# column vanished and the item count landed in it. A non-whitespace IFS keeps
+# empty fields; none of the four values can contain a pipe.
+# Everything that decides pass/fail lives here; nothing counts anything,
+# because this runs in a subshell and a counter incremented there would be
+# discarded on exit. render() does the counting from the records.
+probe() {
+  url="$1"
+  body="$2"
 
   [ "$PACE_SECONDS" = "0" ] || sleep "$PACE_SECONDS"
-  status=$(fetch "$url")
+  status=$(fetch "$url" "$body")
 
   # One retry, and only for rate limiting — see the note above. Anything
   # else (404, 403, a timeout) is a real answer and gets reported as one.
   if [ "$status" = "429" ]; then
     sleep "$RETRY_SECONDS"
-    status=$(fetch "$url")
+    status=$(fetch "$url" "$body")
   fi
 
   if [ "$status" != "200" ]; then
-    printf '  %-26s %-9s %s\n' "$name" "HTTP $status" "$url"
-    fail=$((fail + 1))
+    printf 'HTTP|HTTP %s||0\n' "$status"
     return
   fi
 
@@ -122,9 +214,9 @@ check() {
   # for months, so the format now goes in the report and any future gap
   # between "the script can read it" and "the app can read it" is visible.
   fmt="rss"
-  items=$(grep -o '<item[ >]' "$TMP" 2>/dev/null | wc -l | tr -d ' ')
+  items=$(grep -o '<item[ >]' "$body" 2>/dev/null | wc -l | tr -d ' ')
   if [ "${items:-0}" -eq 0 ]; then
-    entries=$(grep -o '<entry[ >]' "$TMP" 2>/dev/null | wc -l | tr -d ' ')
+    entries=$(grep -o '<entry[ >]' "$body" 2>/dev/null | wc -l | tr -d ' ')
     if [ "${entries:-0}" -gt 0 ]; then
       fmt="atom"
       items="$entries"
@@ -132,16 +224,134 @@ check() {
   fi
 
   if [ "${items:-0}" -gt 0 ]; then
-    printf '  %-26s %-9s %-5s %s items\n' "$name" "OK" "$fmt" "$items"
-    pass=$((pass + 1))
+    printf 'OK||%s|%s\n' "$fmt" "$items"
   else
-    printf '  %-26s %-9s %s\n' "$name" "EMPTY" "200 but no items — likely not a feed"
-    fail=$((fail + 1))
+    printf 'EMPTY|200 but no items — likely not a feed||0\n'
   fi
 }
 
-section() {
-  printf '\n%s\n' "$1"
+# Every source in one operator's group, in order, each paced from the last.
+# The group is the sequential unit; groups are what run at the same time.
+run_group() {
+  # The response body scratch file is named after the group file, NOT after
+  # $$. In bash, $$ is the *parent* shell's pid even inside a subshell, so
+  # every group in flight would name the same file and overwrite each other's
+  # download mid-read. That failed the way a race does rather than the way a
+  # bug does: item counts came back low and two healthy feeds reported EMPTY,
+  # which reads exactly like a publisher having a bad morning.
+  body="$1.body"
+  while IFS=$'\t' read -r seq name url; do
+    [ -z "${url:-}" ] && continue
+    probe "$url" "$body" > "$WORK/result.$seq"
+  done < "$1"
+  rm -f "$body"
+}
+
+# Fan the job list out into one file per operator, then run those files
+# concurrently, at most MAX_PARALLEL at a time.
+#
+# The batching is deliberately the dumb kind — launch N, `wait` for all N,
+# launch the next N — because `wait -n` needs bash 4.3 and macOS still ships
+# 3.2, which is where this script is actually run. A batch is only as fast as
+# its slowest group, which costs a little; needing a second shell to run the
+# tool at all would cost more.
+run_jobs() {
+  # The operator was resolved by operator_of() when the job was enqueued and
+  # is carried in field 4, so this only has to make it safe as a filename.
+  # Re-deriving it here would be a second copy of the rule, and a grouping
+  # that disagreed with the operator reported in the JSON is the kind of
+  # discrepancy nobody looks for.
+  awk -F'\t' -v work="$WORK" '
+    $1 == "C" {
+      g = $4
+      gsub(/[^A-Za-z0-9._-]/, "_", g)
+      print NR "\t" $2 "\t" $3 >> (work "/group." g)
+    }
+  ' "$JOBS"
+
+  running=0
+  for group in "$WORK"/group.*; do
+    [ -e "$group" ] || continue
+    run_group "$group" &
+    running=$((running + 1))
+    if [ "$running" -ge "$MAX_PARALLEL" ]; then
+      wait
+      running=0
+    fi
+  done
+  wait
+}
+
+# The report, rebuilt in job-list order from the records the groups wrote.
+# Emits the text report on stdout and the JSON sidecar to $OUT_JSON.
+render() {
+  pass=0
+  fail=0
+  seq=0
+  first=1
+  printf '[\n' > "$OUT_JSON"
+
+  while IFS=$'\t' read -r kind a b op; do
+    seq=$((seq + 1))
+    if [ "$kind" = "S" ]; then
+      printf '\n%s\n' "$a"
+      current_section="$a"
+      continue
+    fi
+    if [ "$kind" = "N" ]; then
+      printf '%s\n' "$a"
+      continue
+    fi
+
+    IFS='|' read -r status detail fmt items < "$WORK/result.$seq" 2>/dev/null || status=""
+    if [ -z "${status:-}" ]; then
+      status="HTTP"
+      detail="HTTP no-result"
+      fmt=""
+      items=0
+    fi
+
+    if [ "$status" = "OK" ]; then
+      printf '  %-26s %-9s %-5s %s items\n' "$a" "OK" "$fmt" "$items"
+      pass=$((pass + 1))
+    elif [ "$status" = "EMPTY" ]; then
+      printf '  %-26s %-9s %s\n' "$a" "EMPTY" "$detail"
+      fail=$((fail + 1))
+    else
+      printf '  %-26s %-9s %s\n' "$a" "$detail" "$b"
+      fail=$((fail + 1))
+    fi
+
+    [ "$first" = 1 ] || printf ',\n' >> "$OUT_JSON"
+    first=0
+    printf '  {"name": %s, "url": %s, "section": %s, "operator": %s, "status": %s, "detail": %s, "format": %s, "items": %s}' \
+      "$(json_string "$a")" "$(json_string "$b")" "$(json_string "${current_section:-}")" \
+      "$(json_string "${op:-}")" "$(json_string "$status")" "$(json_string "${detail:-}")" \
+      "$(json_string "${fmt:-}")" "${items:-0}" >> "$OUT_JSON"
+  done < "$JOBS"
+
+  printf '\n]\n' >> "$OUT_JSON"
+
+  printf '\n%s\n' "----------------------------------------"
+  printf '%s\n' "  $pass passing, $fail failing"
+  printf '%s\n' "----------------------------------------"
+}
+
+# Minimal JSON string escaping. Only what can actually appear in a source
+# name, a URL or a section heading and break the document: a backslash, a
+# double quote, and control characters, since names are human-written.
+#
+# Built with shell substitution rather than sed, because sed works on lines
+# and an empty string has none — it emitted nothing at all for a field like
+# an OK record's empty `detail`, producing `"detail": ,` and a JSON file no
+# parser would open. The text report was fine, which is exactly how a broken
+# sidecar would go unnoticed.
+json_string() {
+  escaped="$1"
+  escaped="${escaped//\\/\\\\}"
+  escaped="${escaped//\"/\\\"}"
+  escaped="$(printf '%s' "$escaped" | LC_ALL=C tr -d '\000-\037')"
+  printf '"%s"' "$escaped"
 }
 
 # Pulls "name<TAB>url" out of the two source files.
@@ -197,61 +407,68 @@ extract_in_app_sources() {
   '
 }
 
+# Build the job list, run it, then render. Three phases rather than one
+# streamed pass, because the fetches no longer happen in report order — see
+# the parallelism note above.
+#
+# The header is written before any request goes out, so a run killed halfway
+# still leaves a file that says what it was and when it started.
 {
   printf '%s\n' "Feed liveness report"
   printf '%s\n' "  generated  $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
   printf '%s\n' "  commit     $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
   printf '%s\n' "  script     scripts/check-feeds.sh$([ "$CANDIDATES" = 1 ] && echo ' --candidates')"
+} | tee "$OUT"
 
-  section "In-app sources (read from src/lib/source-catalog.ts + src/lib/community-sources.ts)"
-  in_app_count=0
-  while IFS=$'\t' read -r name url; do
-    [ -z "${url:-}" ] && continue
-    check "$name" "$url"
-    in_app_count=$((in_app_count + 1))
-  done <<EOF
+section "In-app sources (read from src/lib/source-catalog.ts + src/lib/community-sources.ts)"
+in_app_count=0
+while IFS=$'\t' read -r name url; do
+  [ -z "${url:-}" ] && continue
+  enqueue "$name" "$url"
+  in_app_count=$((in_app_count + 1))
+done <<EOF
 $(extract_in_app_sources)
 EOF
 
-  if [ "$in_app_count" -eq 0 ]; then
-    printf '  %s\n' "!! extracted no sources — the parser in extract_in_app_sources()"
-    printf '  %s\n' "!! has probably drifted from the shape of those files. Fix it;"
-    printf '  %s\n' "!! an empty run here looks like a clean bill of health."
-  fi
+if [ "$in_app_count" -eq 0 ]; then
+  note "  !! extracted no sources — the parser in extract_in_app_sources()"
+  note "  !! has probably drifted from the shape of those files. Fix it;"
+  note "  !! an empty run here looks like a clean bill of health."
+fi
 
-  if [ "$CANDIDATES" = 1 ]; then
-    # Deliberately NOT in the app. Kept so the negative results stay recorded
-    # — most of these are expected to fail, and re-discovering that by hand
-    # every few months is the waste this section exists to prevent. See the
-    # header comment in src/lib/community-sources.ts for the conclusions.
-    section "Candidates not in the app (Gannett / Tribune retired or block RSS)"
-    check "DMR home"            "https://rssfeeds.desmoinesregister.com/desmoinesregister/home"
-    check "DMR sports"          "https://rssfeeds.desmoinesregister.com/desmoinesregister/sports"
-    check "IndyStar home"       "https://rssfeeds.indystar.com/indystar/home"
-    check "IndyStar sports"     "https://rssfeeds.indystar.com/indystar/sports"
-    check "ChiTrib sports"      "https://www.chicagotribune.com/sports/feed/"
-    check "ChiTrib arc"         "https://www.chicagotribune.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
-    check "BaltSun sports"      "https://www.baltimoresun.com/sports/feed/"
-    check "BaltSun arc"         "https://www.baltimoresun.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
+if [ "$CANDIDATES" = 1 ]; then
+  # Deliberately NOT in the app. Kept so the negative results stay recorded
+  # — most of these are expected to fail, and re-discovering that by hand
+  # every few months is the waste this section exists to prevent. See the
+  # header comment in src/lib/community-sources.ts for the conclusions.
+  section "Candidates not in the app (Gannett / Tribune retired or block RSS)"
+  enqueue "DMR home"            "https://rssfeeds.desmoinesregister.com/desmoinesregister/home"
+  enqueue "DMR sports"          "https://rssfeeds.desmoinesregister.com/desmoinesregister/sports"
+  enqueue "IndyStar home"       "https://rssfeeds.indystar.com/indystar/home"
+  enqueue "IndyStar sports"     "https://rssfeeds.indystar.com/indystar/sports"
+  enqueue "ChiTrib sports"      "https://www.chicagotribune.com/sports/feed/"
+  enqueue "ChiTrib arc"         "https://www.chicagotribune.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
+  enqueue "BaltSun sports"      "https://www.baltimoresun.com/sports/feed/"
+  enqueue "BaltSun arc"         "https://www.baltimoresun.com/arc/outboundfeeds/rss/category/sports/?outputType=xml"
 
-    section "Alternates for programs with no local newsroom feed"
-    check "Gazette (Iowa)"      "https://www.thegazette.com/feed/"
-    check "HawkCentral (Iowa)"  "https://rssfeeds.desmoinesregister.com/hawkcentral/home"
-    check "Herald-Times (IU)"   "https://rssfeeds.heraldtimesonline.com/heraldtimesonline/home"
-    check "J&C (Purdue)"        "https://rssfeeds.jconline.com/jconline/home"
-    check "Daily Northwestern"  "https://dailynorthwestern.com/feed/"
-    check "Diamondback (Md)"    "https://dbknews.com/feed/"
-    check "Daily Illini"        "https://dailyillini.com/feed/"
+  section "Alternates for programs with no local newsroom feed"
+  enqueue "Gazette (Iowa)"      "https://www.thegazette.com/feed/"
+  enqueue "HawkCentral (Iowa)"  "https://rssfeeds.desmoinesregister.com/hawkcentral/home"
+  enqueue "Herald-Times (IU)"   "https://rssfeeds.heraldtimesonline.com/heraldtimesonline/home"
+  enqueue "J&C (Purdue)"        "https://rssfeeds.jconline.com/jconline/home"
+  enqueue "Daily Northwestern"  "https://dailynorthwestern.com/feed/"
+  enqueue "Diamondback (Md)"    "https://dbknews.com/feed/"
+  enqueue "Daily Illini"        "https://dailyillini.com/feed/"
 
-    section "Student papers (not currently used)"
-    check "Lantern (Ohio St)"   "https://www.thelantern.com/feed/"
-    check "Michigan Daily"      "https://www.michigandaily.com/feed/"
-    check "Daily Cardinal (Wis)" "https://www.dailycardinal.com/search/?f=rss&t=article&c=sports&l=50"
-  fi
+  section "Student papers (not currently used)"
+  enqueue "Lantern (Ohio St)"   "https://www.thelantern.com/feed/"
+  enqueue "Michigan Daily"      "https://www.michigandaily.com/feed/"
+  enqueue "Daily Cardinal (Wis)" "https://www.dailycardinal.com/search/?f=rss&t=article&c=sports&l=50"
+fi
 
-  printf '\n%s\n' "----------------------------------------"
-  printf '%s\n' "  $pass passing, $fail failing"
-  printf '%s\n' "----------------------------------------"
-} | tee "$OUT"
+run_jobs
+render | tee -a "$OUT"
 
-printf '\nWrote %s\n' "$OUT"
+printf '\nWrote %s\n' "$OUT_JSON"
+printf 'Wrote %s\n' "$OUT"
+
