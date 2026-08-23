@@ -3,7 +3,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
-import { visibleOn } from '@/lib/color';
+import { inkOn, visibleOn } from '@/lib/color';
 import { DEFAULT_LEAGUE, getLeague } from '@/lib/league-catalog';
 import { fetchTeamColor } from '@/lib/team-color';
 import { Team } from '@/lib/teams';
@@ -74,9 +74,11 @@ export function TeamBadgeRow({
   // `lib/color.ts`; a color that already clears the floor is untouched.
   const shown = visibleOn(color, theme.background);
 
-  // White on the team's color, ink on the placeholder — the same choice
-  // the team screen's header makes for the same reason.
-  const ink = shown ? '#FFFFFF' : theme.text;
+  // Measured, not assumed: white wears well on most team colours, but a
+  // light one the ground floor leaves untouched — the Saints' beige —
+  // carried hardcoded white at 1.85:1. Ink on the placeholder as before,
+  // and the team screen's header makes the same call on the same value.
+  const ink = shown ? inkOn(shown) : theme.text;
 
   // measureInWindow is asynchronous, and a press that somehow resolves
   // without a mounted node still has to navigate — the frame is what the

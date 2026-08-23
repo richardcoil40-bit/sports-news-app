@@ -323,6 +323,13 @@ Established and intentional — don't drift from it without discussing:
     field reads at any lightness. The bars on the same screen are the
     same color, and lifting only those puts two shades of one team's
     color on one screen.
+  - **Text painted on the team's colour picks its ink the same way.**
+    `inkOn` measures white and the palette ink against the mark and takes
+    the winner — the floor above can leave a light colour untouched (the
+    Saints' beige passes the dark ground at 10:1), and hardcoded white on
+    it was 1.85:1. Two call sites, the badge disc and the team screen's
+    header title; both compute it from the same adjusted colour, so the
+    badge that grows into the screen always agrees with the screen.
 - No gradients, no shadows-as-decoration. Flat surfaces only.
 
 ## Source reliability and data retention

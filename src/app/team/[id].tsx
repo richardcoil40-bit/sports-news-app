@@ -29,7 +29,7 @@ import { fetchGameOdds, fetchTeamSchedule, ScheduledGame } from '@/lib/schedule'
 import { clusterArticles, leadsWithDuplicates } from '@/lib/cluster';
 import { balanceBySource } from '@/lib/source-balance';
 import { withTeamMentions } from '@/lib/team-mentions';
-import { visibleOn } from '@/lib/color';
+import { inkOn, visibleOn } from '@/lib/color';
 import { fetchTeamColor } from '@/lib/team-color';
 import { StatLeader, fetchTeamStatLeaders } from '@/lib/team-leaders';
 import { fetchTeamNewsPool } from '@/lib/team-news-pool';
@@ -117,7 +117,10 @@ export default function TeamScreen() {
   // color, and lifting only those would put two shades of one team's
   // color on a single screen. Adjusting here keeps them the same color.
   // A seeded `params.accent` has already been through this on the way out
-  // of the badge; `visibleOn` is idempotent, so that costs nothing.
+  // of the badge; `visibleOn` is idempotent, so that costs nothing. The
+  // title's ink below is measured against the band (`inkOn`) rather than
+  // assumed white, for the colours the floor leaves light — the badge that
+  // grew into this screen made the same call on the same value.
   const shownColor = visibleOn(teamColor, theme.background);
 
   const news = useAsync<Article[]>(async () => {
@@ -274,7 +277,7 @@ export default function TeamScreen() {
           ) : null}
           <ThemedText
             type="title"
-            style={[styles.teamName, { color: shownColor ? '#FFFFFF' : theme.text }]}>
+            style={[styles.teamName, { color: shownColor ? inkOn(shownColor) : theme.text }]}>
             {name}
           </ThemedText>
         </View>

@@ -18,6 +18,12 @@
  * clears the floor. On a dark ground that lightens, on a light ground it
  * darkens, and a colour that already clears is returned untouched.
  *
+ * `inkOn` is the same measurement pointed the other way: the text is ours
+ * but the ground under it — the badge disc, the header band — is theirs.
+ * `visibleOn` floors the mark against the page; nothing floors the text
+ * against the mark, and a colour light enough to pass the page untouched
+ * is exactly the one white text drowns on.
+ *
  * Everything here is pure and synchronous. It deliberately does not know
  * the colour scheme — `src/lib/` cannot import react-native (see the
  * `no-restricted-imports` rule), and more importantly `team-color.ts`
@@ -251,4 +257,34 @@ function solve(color: string, ground: string, minRatio: number): string | null {
   // Nothing along the axis cleared it — only possible against a mid-tone
   // ground, which neither theme has. The endpoint is the best available.
   return best ?? toHex(gamutMap({ ...start, l: target }));
+}
+
+/**
+ * The palette's ink — `Colors.light.text`. Restated rather than imported:
+ * `constants/theme.ts` pulls in react-native, which this layer must stay
+ * clear of (see the header). Nothing enforces the match, so a retune of
+ * the ink token belongs here too.
+ */
+const INK_HEX = '#1B1410';
+const INK = parseHex(INK_HEX)!;
+const WHITE_HEX = '#FFFFFF';
+
+/**
+ * The more legible of white and ink for text sitting on `ground` — the
+ * team-colour marks: the badge disc and the team screen's header band.
+ *
+ * White is what every team colour has always worn, and for most of the
+ * catalogue it is also the measured winner, so most marks don't change.
+ * The exception is a colour light enough that `visibleOn` leaves it
+ * untouched against the dark ground: the Saints' beige clears that floor
+ * at 10:1, and the white text hardcoded on it measured 1.85:1. The mark's
+ * own colour — not the app's scheme — is the ground that matters here, so
+ * unlike `visibleOn` there is no ground parameter to get wrong.
+ *
+ * Ties and an unparseable ground fall back to white, the status quo.
+ */
+export function inkOn(ground: string): string {
+  const base = parseHex(ground);
+  if (!base) return WHITE_HEX;
+  return contrastRatio(WHITE, base) >= contrastRatio(INK, base) ? WHITE_HEX : INK_HEX;
 }

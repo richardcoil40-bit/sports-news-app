@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { contrastRatio, MIN_GRAPHIC_CONTRAST, parseHex, visibleOn } from '@/lib/color';
+import { contrastRatio, inkOn, MIN_GRAPHIC_CONTRAST, parseHex, visibleOn } from '@/lib/color';
 
 /** The two grounds the app actually paints on — see `constants/theme.ts`. */
 const DARK = '#16100C';
@@ -177,5 +177,44 @@ describe('visibleOn', () => {
         expect(channel).toBeLessThanOrEqual(1);
       }
     }
+  });
+});
+
+describe('inkOn', () => {
+  it('keeps white on the dark colours that have always worn it', () => {
+    expect(inkOn('#061440')).toBe('#FFFFFF'); // Penn State navy
+    expect(inkOn('#330A57')).toBe('#FFFFFF'); // Kansas State purple
+    // Nebraska scarlet: ink clears 3:1 here too — white still wins the
+    // measurement, so a mid-dark colour doesn't churn.
+    expect(inkOn('#E31937')).toBe('#FFFFFF');
+  });
+
+  it('switches to ink on a light colour, where white washes out', () => {
+    // The finding that prompted this: the Saints' beige passes the dark
+    // ground's floor untouched, and white text on it measured 1.85:1.
+    expect(inkOn('#D3BC8D')).toBe('#1B1410');
+    expect(inkOn('#FFC627')).toBe('#1B1410'); // Arizona State gold
+    expect(inkOn('#CFB87C')).toBe('#1B1410'); // Colorado
+  });
+
+  it('clears the graphic floor with whichever ink it picks', () => {
+    const grounds = ['#D3BC8D', '#FFC627', '#CFB87C', '#061440', '#330A57', '#E31937', '#000000'];
+    for (const ground of grounds) {
+      expect(ratio(inkOn(ground), ground)).toBeGreaterThanOrEqual(MIN_GRAPHIC_CONTRAST);
+    }
+  });
+
+  it('does not flip once visibleOn has adjusted the mark', () => {
+    // The badge paints the lifted colour and the header re-derives from the
+    // same value, so both compute inkOn of the same hex — but the lift
+    // itself must not change the answer. A lift solves to just past 3:1 on
+    // the dark ground, well below the white/ink crossover.
+    for (const color of ['#061440', '#330A57', '#000000', '#231F20']) {
+      expect(inkOn(visibleOn(color, DARK)!)).toBe(inkOn(color));
+    }
+  });
+
+  it('defaults to white when the ground is unreadable', () => {
+    expect(inkOn('not a colour')).toBe('#FFFFFF');
   });
 });
