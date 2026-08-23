@@ -1,5 +1,124 @@
 {
   "leagues": {
+    "big-12": {
+      "displayName": "Big 12",
+      "pro": false,
+      "generated": "2026-08-23",
+      "teams": [
+        {
+          "id": "12",
+          "slug": "arizona",
+          "shortName": "Arizona",
+          "displayName": "Arizona Wildcats",
+          "mascot": "Wildcats"
+        },
+        {
+          "id": "9",
+          "slug": "arizona-state",
+          "shortName": "Arizona St",
+          "displayName": "Arizona State Sun Devils",
+          "mascot": "Sun Devils"
+        },
+        {
+          "id": "239",
+          "slug": "baylor",
+          "shortName": "Baylor",
+          "displayName": "Baylor Bears",
+          "mascot": "Bears"
+        },
+        {
+          "id": "252",
+          "slug": "byu",
+          "shortName": "BYU",
+          "displayName": "BYU Cougars",
+          "mascot": "Cougars"
+        },
+        {
+          "id": "2132",
+          "slug": "cincinnati",
+          "shortName": "Cincinnati",
+          "displayName": "Cincinnati Bearcats",
+          "mascot": "Bearcats"
+        },
+        {
+          "id": "38",
+          "slug": "colorado",
+          "shortName": "Colorado",
+          "displayName": "Colorado Buffaloes",
+          "mascot": "Buffaloes"
+        },
+        {
+          "id": "248",
+          "slug": "houston",
+          "shortName": "Houston",
+          "displayName": "Houston Cougars",
+          "mascot": "Cougars"
+        },
+        {
+          "id": "66",
+          "slug": "iowa-state",
+          "shortName": "Iowa State",
+          "displayName": "Iowa State Cyclones",
+          "mascot": "Cyclones"
+        },
+        {
+          "id": "2305",
+          "slug": "kansas",
+          "shortName": "Kansas",
+          "displayName": "Kansas Jayhawks",
+          "mascot": "Jayhawks"
+        },
+        {
+          "id": "2306",
+          "slug": "kansas-state",
+          "shortName": "Kansas St",
+          "displayName": "Kansas State Wildcats",
+          "mascot": "Wildcats"
+        },
+        {
+          "id": "197",
+          "slug": "oklahoma-state",
+          "shortName": "Oklahoma St",
+          "displayName": "Oklahoma State Cowboys",
+          "mascot": "Cowboys"
+        },
+        {
+          "id": "2628",
+          "slug": "tcu",
+          "shortName": "TCU",
+          "displayName": "TCU Horned Frogs",
+          "mascot": "Horned Frogs"
+        },
+        {
+          "id": "2641",
+          "slug": "texas-tech",
+          "shortName": "Texas Tech",
+          "displayName": "Texas Tech Red Raiders",
+          "mascot": "Red Raiders"
+        },
+        {
+          "id": "2116",
+          "slug": "ucf",
+          "shortName": "UCF",
+          "displayName": "UCF Knights",
+          "mascot": "Knights"
+        },
+        {
+          "id": "254",
+          "slug": "utah",
+          "shortName": "Utah",
+          "displayName": "Utah Utes",
+          "mascot": "Utes"
+        },
+        {
+          "id": "277",
+          "slug": "west-virginia",
+          "shortName": "West Virginia",
+          "displayName": "West Virginia Mountaineers",
+          "mascot": "Mountaineers"
+        }
+      ]
+    },
     "big-ten": {
       "displayName": "Big Ten",
       "pro": false,
@@ -130,6 +249,237 @@
           "shortName": "Wisconsin",
           "displayName": "Wisconsin Badgers",
           "mascot": "Badgers"
+        }
+      ]
+    },
+    "nfl": {
+      "displayName": "NFL",
+      "pro": true,
+      "generated": "2026-08-23",
+      "teams": [
+        {
+          "id": "25",
+          "slug": "49ers",
+          "shortName": "49ers",
+          "displayName": "San Francisco 49ers",
+          "mascot": "49ers"
+        },
+        {
+          "id": "3",
+          "slug": "bears",
+          "shortName": "Bears",
+          "displayName": "Chicago Bears",
+          "mascot": "Bears"
+        },
+        {
+          "id": "4",
+          "slug": "bengals",
+          "shortName": "Bengals",
+          "displayName": "Cincinnati Bengals",
+          "mascot": "Bengals"
+        },
+        {
+          "id": "2",
+          "slug": "bills",
+          "shortName": "Bills",
+          "displayName": "Buffalo Bills",
+          "mascot": "Bills"
+        },
+        {
+          "id": "7",
+          "slug": "broncos",
+          "shortName": "Broncos",
+          "displayName": "Denver Broncos",
+          "mascot": "Broncos"
+        },
+        {
+          "id": "5",
+          "slug": "browns",
+          "shortName": "Browns",
+          "displayName": "Cleveland Browns",
+          "mascot": "Browns"
+        },
+        {
+          "id": "27",
+          "slug": "buccaneers",
+          "shortName": "Buccaneers",
+          "displayName": "Tampa Bay Buccaneers",
+          "mascot": "Buccaneers"
+        },
+        {
+          "id": "22",
+          "slug": "cardinals",
+          "shortName": "Cardinals",
+          "displayName": "Arizona Cardinals",
+          "mascot": "Cardinals"
+        },
+        {
+          "id": "24",
+          "slug": "chargers",
+          "shortName": "Chargers",
+          "displayName": "Los Angeles Chargers",
+          "mascot": "Chargers"
+        },
+        {
+          "id": "12",
+          "slug": "chiefs",
+          "shortName": "Chiefs",
+          "displayName": "Kansas City Chiefs",
+          "mascot": "Chiefs"
+        },
+        {
+          "id": "11",
+          "slug": "colts",
+          "shortName": "Colts",
+          "displayName": "Indianapolis Colts",
+          "mascot": "Colts"
+        },
+        {
+          "id": "28",
+          "slug": "commanders",
+          "shortName": "Commanders",
+          "displayName": "Washington Commanders",
+          "mascot": "Commanders"
+        },
+        {
+          "id": "6",
+          "slug": "cowboys",
+          "shortName": "Cowboys",
+          "displayName": "Dallas Cowboys",
+          "mascot": "Cowboys"
+        },
+        {
+          "id": "15",
+          "slug": "dolphins",
+          "shortName": "Dolphins",
+          "displayName": "Miami Dolphins",
+          "mascot": "Dolphins"
+        },
+        {
+          "id": "21",
+          "slug": "eagles",
+          "shortName": "Eagles",
+          "displayName": "Philadelphia Eagles",
+          "mascot": "Eagles"
+        },
+        {
+          "id": "1",
+          "slug": "falcons",
+          "shortName": "Falcons",
+          "displayName": "Atlanta Falcons",
+          "mascot": "Falcons"
+        },
+        {
+          "id": "19",
+          "slug": "giants",
+          "shortName": "Giants",
+          "displayName": "New York Giants",
+          "mascot": "Giants"
+        },
+        {
+          "id": "30",
+          "slug": "jaguars",
+          "shortName": "Jaguars",
+          "displayName": "Jacksonville Jaguars",
+          "mascot": "Jaguars"
+        },
+        {
+          "id": "20",
+          "slug": "jets",
+          "shortName": "Jets",
+          "displayName": "New York Jets",
+          "mascot": "Jets"
+        },
+        {
+          "id": "8",
+          "slug": "lions",
+          "shortName": "Lions",
+          "displayName": "Detroit Lions",
+          "mascot": "Lions"
+        },
+        {
+          "id": "9",
+          "slug": "packers",
+          "shortName": "Packers",
+          "displayName": "Green Bay Packers",
+          "mascot": "Packers"
+        },
+        {
+          "id": "29",
+          "slug": "panthers",
+          "shortName": "Panthers",
+          "displayName": "Carolina Panthers",
+          "mascot": "Panthers"
+        },
+        {
+          "id": "17",
+          "slug": "patriots",
+          "shortName": "Patriots",
+          "displayName": "New England Patriots",
+          "mascot": "Patriots"
+        },
+        {
+          "id": "13",
+          "slug": "raiders",
+          "shortName": "Raiders",
+          "displayName": "Las Vegas Raiders",
+          "mascot": "Raiders"
+        },
+        {
+          "id": "14",
+          "slug": "rams",
+          "shortName": "Rams",
+          "displayName": "Los Angeles Rams",
+          "mascot": "Rams"
+        },
+        {
+          "id": "33",
+          "slug": "ravens",
+          "shortName": "Ravens",
+          "displayName": "Baltimore Ravens",
+          "mascot": "Ravens"
+        },
+        {
+          "id": "18",
+          "slug": "saints",
+          "shortName": "Saints",
+          "displayName": "New Orleans Saints",
+          "mascot": "Saints"
+        },
+        {
+          "id": "26",
+          "slug": "seahawks",
+          "shortName": "Seahawks",
+          "displayName": "Seattle Seahawks",
+          "mascot": "Seahawks"
+        },
+        {
+          "id": "23",
+          "slug": "steelers",
+          "shortName": "Steelers",
+          "displayName": "Pittsburgh Steelers",
+          "mascot": "Steelers"
+        },
+        {
+          "id": "34",
+          "slug": "texans",
+          "shortName": "Texans",
+          "displayName": "Houston Texans",
+          "mascot": "Texans"
+        },
+        {
+          "id": "10",
+          "slug": "titans",
+          "shortName": "Titans",
+          "displayName": "Tennessee Titans",
+          "mascot": "Titans"
+        },
+        {
+          "id": "16",
+          "slug": "vikings",
+          "shortName": "Vikings",
+          "displayName": "Minnesota Vikings",
+          "mascot": "Vikings"
         }
       ]
     },
