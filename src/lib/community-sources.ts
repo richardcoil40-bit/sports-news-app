@@ -387,6 +387,148 @@ const SEC_NO_SOURCE_REASONS: Record<string, string> = {
 };
 
 /**
+ * ## Big 12
+ *
+ * A third table, for the reason there is a second: slugs are unique per
+ * school and realignment moves schools between conferences, so one merged
+ * map would eventually serve a school another school's feeds. This
+ * conference is the argument rather than the exception — Arizona, Arizona
+ * State, Colorado, Utah, BYU, Cincinnati, Houston and UCF all arrived here
+ * from somewhere else.
+ *
+ * What this league cost, and what it says about the next one:
+ *
+ * - **The TownNews/BLOX papers are the reliable tier now, not SB Nation.**
+ *   Six of six answered with a full sports feed; four of fifteen Vox blogs
+ *   are gone (Our Daily Bears, Down The Drive, Cowboys Ride For Free, Viva
+ *   The Matadors) and two more are up with a 404 feed (House of Sparky,
+ *   Block U) — the Alligator Army case from the SEC, twice.
+ * - **Three of those six papers are not Lee Enterprises.** The Manhattan
+ *   Mercury, the Stillwater News Press and the Charleston Gazette-Mail are
+ *   independently owned and answer on the identical query string, because
+ *   what they share is the CMS rather than the owner. The LEE() helper is
+ *   named for the biggest operator on that platform, not for who cashes
+ *   the cheque; see its comment.
+ * - **The metro dailies that block are a different failure from the ones
+ *   that retired RSS.** The Daily Camera and the Denver Post return 403 to
+ *   a programmatic request rather than 200-with-nothing, and the Houston
+ *   Chronicle (Hearst) and both Salt Lake dailies simply publish no feed at
+ *   any path tried. None of those are Gannett, Tribune or McClatchy, so
+ *   DEAD_FEED_OWNERS does not cover them and each cost its own probe.
+ * - **Student papers carry five programs here.** That is a bigger share
+ *   than either other conference, and it is what the Big 12 has instead of
+ *   metro coverage.
+ */
+const BIG_12_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
+  arizona: [
+    SB_NATION('az-desert-swarm', 'AZ Desert Swarm', 'azdesertswarm.com'),
+    LEE('arizona-daily-star', 'Arizona Daily Star', 'tucson.com'),
+  ],
+  // Reviewed and deliberately empty: nothing this school has publishes a
+  // feed. See BIG_12_NO_SOURCE_REASONS.
+  'arizona-state': [],
+  baylor: [LEE('waco-tribune-herald', 'Waco Tribune-Herald', 'wacotrib.com')],
+  byu: [SB_NATION('vanquish-the-foe', 'Vanquish The Foe', 'vanquishthefoe.com')],
+  cincinnati: [LEE('news-record', 'The News Record', 'www.newsrecord.org', 3)],
+  colorado: [
+    SB_NATION('ralphie-report', 'The Ralphie Report', 'ralphiereport.com'),
+    {
+      id: 'cu-independent',
+      name: 'CU Independent',
+      url: 'https://cuindependent.com/feed/',
+      tier: 3,
+      scope: 'broad',
+    },
+  ],
+  houston: [
+    {
+      id: 'daily-cougar',
+      name: 'The Daily Cougar',
+      url: 'https://thedailycougar.com/feed/',
+      tier: 3,
+      scope: 'broad',
+    },
+  ],
+  'iowa-state': [
+    SB_NATION('wide-right-natty-lite', 'Wide Right & Natty Lite', 'widerightnattylite.com'),
+  ],
+  kansas: [
+    SB_NATION('rock-chalk-talk', 'Rock Chalk Talk', 'rockchalktalk.com'),
+    LEE('the-kansan', 'The University Daily Kansan', 'www.kansan.com', 3),
+  ],
+  'kansas-state': [
+    SB_NATION('bring-on-the-cats', 'Bring On The Cats', 'bringonthecats.com'),
+    LEE('manhattan-mercury', 'The Manhattan Mercury', 'themercury.com'),
+  ],
+  // No blog left, so Oklahoma State runs on the statewide paper plus its
+  // own small-city daily — the shape Auburn has in the SEC.
+  //
+  // The Tulsa World is the first source two leagues share: Oklahoma has it
+  // in the SEC table, for the obvious reason that one statewide paper covers
+  // both programs. Two things follow, and the second is the load-bearing one.
+  //
+  // It is why scripts/check-feeds.sh reports 21 new sources here and not 22
+  // — the report dedupes by URL, so a paper already in the catalog is
+  // checked once however many teams claim it.
+  //
+  // And **the id must be identical in both tables**, which is why this one
+  // is copied rather than renamed. nickname-safety.ts decides whether a
+  // shared broad source makes a nickname collision real by intersecting
+  // `broadSourceIds`, and it compares ids, not URLs. Two entries for one
+  // paper under different ids would read as two different papers, and the
+  // gate would pass a collision it exists to catch. Nothing costs anything
+  // today because Oklahoma State claims no nicknames at all — but the day
+  // it does, this is what makes the check work.
+  'oklahoma-state': [
+    LEE('tulsa-world', 'Tulsa World', 'tulsaworld.com'),
+    LEE('stillwater-news-press', 'Stillwater News Press', 'www.stwnewspress.com'),
+  ],
+  tcu: [SB_NATION('frogs-o-war', "Frogs O' War", 'frogsowar.com')],
+  // Reviewed and deliberately empty, like Arizona State above.
+  'texas-tech': [],
+  ucf: [SB_NATION('black-and-gold-banneret', 'Black And Gold Banneret', 'blackandgoldbanneret.com')],
+  utah: [
+    {
+      id: 'daily-utah-chronicle',
+      name: 'Daily Utah Chronicle',
+      url: 'https://dailyutahchronicle.com/feed/',
+      tier: 3,
+      scope: 'broad',
+    },
+  ],
+  // The best-covered program in the conference: a blog, a metro daily and a
+  // statewide newsroom.
+  'west-virginia': [
+    SB_NATION('the-smoking-musket', 'The Smoking Musket', 'smokingmusket.com'),
+    LEE('charleston-gazette-mail', 'Charleston Gazette-Mail', 'wvgazettemail.com'),
+    {
+      id: 'wv-metronews',
+      name: 'WV MetroNews',
+      url: 'https://wvmetronews.com/feed/',
+      tier: 1,
+      scope: 'broad',
+    },
+  ],
+};
+
+/** The Big 12's third of the same record. See BIG_TEN_NO_SOURCE_REASONS. */
+const BIG_12_NO_SOURCE_REASONS: Record<string, string> = {
+  'arizona-state': `House of Sparky is still publishing but /rss/index.xml 404s, the same broken-feed-on-a-live-site case as Alligator Army. The State Press runs TownNews and returns no items at any category slug tried. Arizona Republic: ${GANNETT}`,
+  baylor: `Our Daily Bears is gone: ${VOX_SHUTDOWN} The Waco Tribune-Herald carries the program.`,
+  byu: 'Neither Salt Lake daily publishes a feed: the Deseret News and the Salt Lake Tribune both 404 at every path tried. Vanquish The Foe carries the program, and is the reason BYU has no broad-scoped source at all.',
+  cincinnati: `Down The Drive is gone: ${VOX_SHUTDOWN} Cincinnati Enquirer: ${GANNETT} The student paper carries the program.`,
+  colorado: 'The Daily Camera and the Denver Post both answer 403 to a programmatic request — a block rather than a retirement, so worth re-checking rather than writing off.',
+  houston: 'The Houston Chronicle is Hearst and publishes no public sports feed at any path tried. No SB Nation blog ever covered Houston.',
+  'iowa-state': `Des Moines Register and Ames Tribune: ${GANNETT} The same finding Iowa already carries in the Big Ten table, for the same two papers.`,
+  kansas: `The Lawrence Journal-World returns 200 with no items at both feed paths. Kansas City Star: ${MCCLATCHY}`,
+  'oklahoma-state': `Cowboys Ride For Free is gone: ${VOX_SHUTDOWN}`,
+  tcu: `Fort Worth Star-Telegram: ${MCCLATCHY}`,
+  'texas-tech': `Viva The Matadors is gone: ${VOX_SHUTDOWN} The Daily Toreador runs TownNews and returns no items at any category slug tried. Lubbock Avalanche-Journal: ${GANNETT}`,
+  ucf: `Orlando Sentinel: ${TRIBUNE}`,
+  utah: 'Block U is still up but its feed 404s, and neither Salt Lake daily publishes one — the same gap BYU has, from the other school in that city.',
+};
+
+/**
  * Everything in this file is beat coverage by definition — a team blog, an
  * independent that covers one program, or a metro paper's sports section.
  * Tagged in one place rather than repeated on every entry, so a source
@@ -409,8 +551,13 @@ export function secSourcesForTeam(teamShortName: string): FeedSource[] {
   return beatSources(SEC_SOURCES_BY_SLUG, teamShortName);
 }
 
+export function big12SourcesForTeam(teamShortName: string): FeedSource[] {
+  return beatSources(BIG_12_SOURCES_BY_SLUG, teamShortName);
+}
+
 const bigTenReview = createTeamReview(BIG_TEN_SOURCES_BY_SLUG, BIG_TEN_NO_SOURCE_REASONS);
 const secReview = createTeamReview(SEC_SOURCES_BY_SLUG, SEC_NO_SOURCE_REASONS);
+const big12Review = createTeamReview(BIG_12_SOURCES_BY_SLUG, BIG_12_NO_SOURCE_REASONS);
 
 /**
  * One conference's table as data, for the review gate and
@@ -440,6 +587,11 @@ export const SEC_CURATED: CuratedSourceTable = {
   reviewFor: (teamShortName) => secReview.reviewFor(teamShortName),
 };
 
+export const BIG_12_CURATED: CuratedSourceTable = {
+  sourcesBySlug: BIG_12_SOURCES_BY_SLUG,
+  reviewFor: (teamShortName) => big12Review.reviewFor(teamShortName),
+};
+
 /**
  * Which league each table serves.
  *
@@ -457,6 +609,7 @@ export const SEC_CURATED: CuratedSourceTable = {
 export const CURATED_SOURCE_TABLES: Readonly<Record<string, CuratedSourceTable>> = {
   'big-ten': BIG_TEN_CURATED,
   sec: SEC_CURATED,
+  'big-12': BIG_12_CURATED,
 };
 
 /**
@@ -472,7 +625,11 @@ export function secSourceReviewFor(teamShortName: string): ReviewState {
   return secReview.reviewFor(teamShortName);
 }
 
+export function big12SourceReviewFor(teamShortName: string): ReviewState {
+  return big12Review.reviewFor(teamShortName);
+}
+
 /** Empty in healthy tables — see TeamReview.issues. */
 export function communitySourceReviewIssues(): string[] {
-  return [...bigTenReview.issues(), ...secReview.issues()];
+  return [...bigTenReview.issues(), ...secReview.issues(), ...big12Review.issues()];
 }

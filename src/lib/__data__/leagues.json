@@ -20,6 +20,16 @@
     "seasonStartMonth": 8
   },
   {
+    "id": "big-12",
+    "displayName": "Big 12",
+    "sport": "Football",
+    "level": "College",
+    "espnSport": "football",
+    "espnLeaguePath": "college-football",
+    "espnGroup": 4,
+    "seasonStartMonth": 8
+  },
+  {
     "id": "nfl",
     "displayName": "NFL",
     "sport": "Football",

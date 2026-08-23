@@ -9,6 +9,14 @@
  * table is exactly how they'd stop agreeing.
  */
 const SLUG_ALIASES: Record<string, string> = {
+  // The Big 12 brought three more of ESPN's "St" abbreviations. They expand
+  // the same way the Big Ten's do, and they are here rather than left alone
+  // for the same reason: a table keyed on `arizona-st` beside one keyed on
+  // `michigan-state` is two conventions for one thing, and the second league
+  // to add an "St" school is exactly when that starts.
+  'arizona-st': 'arizona-state',
+  'kansas-st': 'kansas-state',
+  'oklahoma-st': 'oklahoma-state',
   'michigan-st': 'michigan-state',
   'mississippi-st': 'mississippi-state',
   'ohio-st': 'ohio-state',

@@ -1,5 +1,5 @@
 import { createEntityCache } from '@/lib/cache';
-import { bigTenSourcesForTeam, secSourcesForTeam } from '@/lib/community-sources';
+import { big12SourcesForTeam, bigTenSourcesForTeam, secSourcesForTeam } from '@/lib/community-sources';
 import { FeedSource, FetchAllResult, fetchFeeds } from '@/lib/feeds';
 import { getLeagues } from '@/lib/league-catalog';
 import { League } from '@/lib/leagues';
@@ -100,6 +100,13 @@ const CATALOG: Record<string, LeagueSources> = {
   'sec': {
     nationalFeeds: [...NATIONAL_CFB_FEEDS, SATURDAY_DOWN_SOUTH],
     teamSources: secSourcesForTeam,
+  },
+  // No conference-wide blog: SB Nation's Big 12 equivalent went the way of
+  // Team Speed Kills, and nothing independent covers the conference the way
+  // Saturday Down South covers the SEC. The national four carry it.
+  'big-12': {
+    nationalFeeds: NATIONAL_CFB_FEEDS,
+    teamSources: big12SourcesForTeam,
   },
   // No teamSources: see NATIONAL_NFL_FEEDS. A league with no per-team table
   // is the graceful path, not a gap to fill before shipping.

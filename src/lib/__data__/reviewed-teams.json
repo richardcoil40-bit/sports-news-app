@@ -1,5 +1,124 @@
 {
   "leagues": {
+    "big-12": {
+      "displayName": "Big 12",
+      "pro": false,
+      "generated": "2026-08-23",
+      "teams": [
+        {
+          "id": "12",
+          "slug": "arizona",
+          "shortName": "Arizona",
+          "displayName": "Arizona Wildcats",
+          "mascot": "Wildcats"
+        },
+        {
+          "id": "9",
+          "slug": "arizona-state",
+          "shortName": "Arizona St",
+          "displayName": "Arizona State Sun Devils",
+          "mascot": "Sun Devils"
+        },
+        {
+          "id": "239",
+          "slug": "baylor",
+          "shortName": "Baylor",
+          "displayName": "Baylor Bears",
+          "mascot": "Bears"
+        },
+        {
+          "id": "252",
+          "slug": "byu",
+          "shortName": "BYU",
+          "displayName": "BYU Cougars",
+          "mascot": "Cougars"
+        },
+        {
+          "id": "2132",
+          "slug": "cincinnati",
+          "shortName": "Cincinnati",
+          "displayName": "Cincinnati Bearcats",
+          "mascot": "Bearcats"
+        },
+        {
+          "id": "38",
+          "slug": "colorado",
+          "shortName": "Colorado",
+          "displayName": "Colorado Buffaloes",
+          "mascot": "Buffaloes"
+        },
+        {
+          "id": "248",
+          "slug": "houston",
+          "shortName": "Houston",
+          "displayName": "Houston Cougars",
+          "mascot": "Cougars"
+        },
+        {
+          "id": "66",
+          "slug": "iowa-state",
+          "shortName": "Iowa State",
+          "displayName": "Iowa State Cyclones",
+          "mascot": "Cyclones"
+        },
+        {
+          "id": "2305",
+          "slug": "kansas",
+          "shortName": "Kansas",
+          "displayName": "Kansas Jayhawks",
+          "mascot": "Jayhawks"
+        },
+        {
+          "id": "2306",
+          "slug": "kansas-state",
+          "shortName": "Kansas St",
+          "displayName": "Kansas State Wildcats",
+          "mascot": "Wildcats"
+        },
+        {
+          "id": "197",
+          "slug": "oklahoma-state",
+          "shortName": "Oklahoma St",
+          "displayName": "Oklahoma State Cowboys",
+          "mascot": "Cowboys"
+        },
+        {
+          "id": "2628",
+          "slug": "tcu",
+          "shortName": "TCU",
+          "displayName": "TCU Horned Frogs",
+          "mascot": "Horned Frogs"
+        },
+        {
+          "id": "2641",
+          "slug": "texas-tech",
+          "shortName": "Texas Tech",
+          "displayName": "Texas Tech Red Raiders",
+          "mascot": "Red Raiders"
+        },
+        {
+          "id": "2116",
+          "slug": "ucf",
+          "shortName": "UCF",
+          "displayName": "UCF Knights",
+          "mascot": "Knights"
+        },
+        {
+          "id": "254",
+          "slug": "utah",
+          "shortName": "Utah",
+          "displayName": "Utah Utes",
+          "mascot": "Utes"
+        },
+        {
+          "id": "277",
+          "slug": "west-virginia",
+          "shortName": "West Virginia",
+          "displayName": "West Virginia Mountaineers",
+          "mascot": "Mountaineers"
+        }
+      ]
+    },
     "big-ten": {
       "displayName": "Big Ten",
       "pro": false,
