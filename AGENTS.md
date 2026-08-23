@@ -389,6 +389,25 @@ running locally with full access:
 
   The traceback points into `Pod::Config#installation_root` and looks
   like a corrupt Podfile, which it isn't.
+- **`ios/Podfile.lock` drifts out of sync with `node_modules`, and says so
+  in the least useful way.** They are two locks over one dependency set, so
+  any `npm install` — including one that only *removes* a package — can
+  leave a pod's podspec at a version the lock doesn't know. `pod install`
+  then fails with `could not find compatible versions for pod "X" … It
+  seems like you've changed the version of the dependency`, naming whichever
+  pod it happened to reach first rather than the change that caused it.
+  Running the `pod update X` it suggests just moves the error to the next
+  pod. Re-resolve the whole thing instead:
+
+  ```
+  rm ios/Podfile.lock && (cd ios && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install)
+  ```
+
+  That is safe in a way `prebuild --clean` is not: `Podfile.lock` is a
+  generated file inside gitignored `ios/`, and regenerating it doesn't touch
+  `project.pbxproj`, so `DEVELOPMENT_TEAM` survives. Worth doing after any
+  dependency change, because the drift is invisible until the next *native*
+  build — which can easily be the release archive.
 - **`expo run:ios` does not exit.** After building, installing and
   launching, it stays in the foreground streaming device logs. Piping it
   to `tail` therefore shows nothing and looks like a hang — the build

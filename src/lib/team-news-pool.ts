@@ -386,6 +386,15 @@ function withHardCap(
  * Deduped and sorted newest-first. Used as the base for the News and
  * Players tabs, and for each player's detail screen — all pulling from the
  * same cached pool rather than fetching their own.
+ *
+ * **Rejects on an empty `teamShortName` rather than fetching.** Every filter
+ * below narrows a broad feed to the articles naming this team, and
+ * `wordBoundaryMatch(text, '')` is `true` — so a nameless call doesn't return
+ * less, it returns *everything*, and then stores that under this team's own
+ * cache key for the TTL. The next legitimate caller reads back a pool of
+ * unrelated national news that looks perfectly healthy. Throwing keeps it
+ * uncached (see cache.ts) so the screen shows a retryable error, which is why
+ * this doesn't degrade to empty the way the sources themselves do.
  */
 export async function fetchTeamNewsPool(
   teamId: string,
@@ -393,6 +402,10 @@ export async function fetchTeamNewsPool(
   league: League,
   options?: { force?: boolean },
 ): Promise<TeamNewsPool> {
+  if (!teamShortName.trim()) {
+    throw new Error(`fetchTeamNewsPool: no team name for team ${teamId} (${league.id})`);
+  }
+
   return poolCache.get(
     espnCacheKey(league, teamId),
     () =>
