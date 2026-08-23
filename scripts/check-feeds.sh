@@ -111,6 +111,26 @@ PACE_SECONDS="${PACE_SECONDS:-1}"
 RETRY_SECONDS="${RETRY_SECONDS:-10}"
 MAX_PARALLEL="${MAX_PARALLEL:-8}"
 
+# The app's own fetch budget, imported rather than restated.
+#
+# curl gets 20s below, on purpose: this script asks whether a feed exists
+# at all, and a generous budget is right for that question. src/lib/http.ts
+# gives the app 10s, because a phone cannot wait. A source that lands
+# between those two numbers passes here and times out on every device —
+# alive in the report, absent from the feed.
+#
+# That gap is the same shape as the Atom problem the format column exists
+# to expose: being more tolerant than the app is exactly what lets a source
+# look healthy while contributing nothing. WV MetroNews sat in it for a day
+# (16-20s against a 10s budget), which is why the number is read from the
+# app here rather than being nobody's job to notice.
+APP_TIMEOUT_MS="${APP_TIMEOUT_MS:-$(node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON -e '
+  import("./scripts/lib/app-modules.mjs")
+    .then(({ loadAppModule }) => loadAppModule("@/lib/http"))
+    .then((http) => console.log(http.FETCH_TIMEOUT_MS))
+    .catch(() => console.log(""));
+' 2>/dev/null)}"
+
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -150,12 +170,16 @@ note() {
   printf 'N\t%s\n' "$1" >> "$JOBS"
 }
 
+# Prints "<status> <milliseconds>". The timing comes from curl rather than
+# from `date` around the call: whole-second resolution rounds a 10.9s
+# response down to 10, which is exactly the boundary the SLOW check sits on.
 fetch() {
   curl -sS -L --compressed --max-time 20 \
        -A "$UA" \
        -o "$2" \
-       -w '%{http_code}' \
-       "$1" 2>/dev/null
+       -w '%{http_code} %{time_total}' \
+       "$1" 2>/dev/null |
+    awk '{ printf "%s %d", $1, ($2 * 1000) }'
 }
 
 # Which operator serves this URL — the unit requests are paced within.
@@ -193,17 +217,21 @@ probe() {
   body="$2"
 
   [ "$PACE_SECONDS" = "0" ] || sleep "$PACE_SECONDS"
-  status=$(fetch "$url" "$body")
+  read -r status elapsed <<EOF
+$(fetch "$url" "$body")
+EOF
 
   # One retry, and only for rate limiting — see the note above. Anything
   # else (404, 403, a timeout) is a real answer and gets reported as one.
   if [ "$status" = "429" ]; then
     sleep "$RETRY_SECONDS"
-    status=$(fetch "$url" "$body")
+    read -r status elapsed <<EOF
+$(fetch "$url" "$body")
+EOF
   fi
 
   if [ "$status" != "200" ]; then
-    printf 'HTTP|HTTP %s||0\n' "$status"
+    printf 'HTTP|HTTP %s||0|%s\n' "$status" "$elapsed"
     return
   fi
 
@@ -224,9 +252,9 @@ probe() {
   fi
 
   if [ "${items:-0}" -gt 0 ]; then
-    printf 'OK||%s|%s\n' "$fmt" "$items"
+    printf 'OK||%s|%s|%s\n' "$fmt" "$items" "$elapsed"
   else
-    printf 'EMPTY|200 but no items — likely not a feed||0\n'
+    printf 'EMPTY|200 but no items — likely not a feed||0|%s\n' "$elapsed"
   fi
 }
 
@@ -287,6 +315,7 @@ run_jobs() {
 render() {
   pass=0
   fail=0
+  slow_count=0
   seq=0
   first=1
   printf '[\n' > "$OUT_JSON"
@@ -303,16 +332,28 @@ render() {
       continue
     fi
 
-    IFS='|' read -r status detail fmt items < "$WORK/result.$seq" 2>/dev/null || status=""
+    IFS='|' read -r status detail fmt items elapsed < "$WORK/result.$seq" 2>/dev/null || status=""
     if [ -z "${status:-}" ]; then
       status="HTTP"
       detail="HTTP no-result"
       fmt=""
       items=0
+      elapsed=0
+    fi
+
+    # Alive, and slower than the app will wait. Still counted as a pass,
+    # because the feed is real — but called out, because this is the one
+    # outcome the report used to render as unqualified health.
+    slow=""
+    if [ "$status" = "OK" ] && [ -n "${APP_TIMEOUT_MS:-}" ] && [ "${elapsed:-0}" -gt 0 ]; then
+      if [ "${elapsed:-0}" -gt "$APP_TIMEOUT_MS" ]; then
+        slow="  SLOW $(awk -v ms="$elapsed" 'BEGIN{printf "%.1f", ms/1000}')s > $(awk -v ms="$APP_TIMEOUT_MS" 'BEGIN{printf "%g", ms/1000}')s app timeout"
+        slow_count=$(( slow_count + 1 ))
+      fi
     fi
 
     if [ "$status" = "OK" ]; then
-      printf '  %-26s %-9s %-5s %s items\n' "$a" "OK" "$fmt" "$items"
+      printf '  %-26s %-9s %-5s %s items%s\n' "$a" "OK" "$fmt" "$items" "$slow"
       pass=$((pass + 1))
     elif [ "$status" = "EMPTY" ]; then
       printf '  %-26s %-9s %s\n' "$a" "EMPTY" "$detail"
@@ -324,16 +365,16 @@ render() {
 
     [ "$first" = 1 ] || printf ',\n' >> "$OUT_JSON"
     first=0
-    printf '  {"name": %s, "url": %s, "section": %s, "operator": %s, "status": %s, "detail": %s, "format": %s, "items": %s}' \
+    printf '  {"name": %s, "url": %s, "section": %s, "operator": %s, "status": %s, "detail": %s, "format": %s, "items": %s, "ms": %s}' \
       "$(json_string "$a")" "$(json_string "$b")" "$(json_string "${current_section:-}")" \
       "$(json_string "${op:-}")" "$(json_string "$status")" "$(json_string "${detail:-}")" \
-      "$(json_string "${fmt:-}")" "${items:-0}" >> "$OUT_JSON"
+      "$(json_string "${fmt:-}")" "${items:-0}" "${elapsed:-0}" >> "$OUT_JSON"
   done < "$JOBS"
 
   printf '\n]\n' >> "$OUT_JSON"
 
   printf '\n%s\n' "----------------------------------------"
-  printf '%s\n' "  $pass passing, $fail failing"
+  printf '%s\n' "  $pass passing, $fail failing$([ "$slow_count" -gt 0 ] && echo ", $slow_count slower than the app will wait")"
   printf '%s\n' "----------------------------------------"
 }
 

@@ -25,6 +25,13 @@ CI workflow already reads the JSON rather than the text columns — the text
 report pads the name field to 26 characters, so a long enough publisher name
 would shift every column after it.
 
+A source that answers, but slower than `FETCH_TIMEOUT_MS`, is flagged
+`SLOW` and still counted as passing — it is a real feed that no device
+will ever wait for. curl gets 20s here because the question is whether a
+feed exists; the app gets 10s because a phone cannot wait, and anything
+between the two reads as healthy while contributing nothing. That is the
+Atom problem's shape exactly, and WV MetroNews spent a day in it.
+
 Requests run **grouped by operator**: concurrent across operators, sequential
 and paced within one. That is a 5x speedup (60 sources in ~35s rather than
 ~3min) and nobody receives requests any faster than before — see the long
@@ -59,6 +66,7 @@ before adding a source, and periodically otherwise.
 | `feed-status-20260822-232959.txt` | 2026-08-22, the run confirming the script still sees the whole catalog after the extractor stopped parsing `community-sources.ts` and started importing it. Same 60 sources, same 59/1. |
 | `feed-status-20260823-015042.txt` | 2026-08-23, the first run of the parallelized script. Same 60 sources, same 59/1 as the two runs before it — which is the point of it: grouping by operator and running the groups concurrently changed the runtime from ~3min to ~35s and changed nothing else. First run with a `.json` sidecar. |
 | `feed-status-20260823-022754.txt` | 2026-08-23, the same script against the catalog the NFL and the Big 12 left behind: **83 sources, 82/1**, in ~61s. Identical line for line to the serial run earlier that day. The runtime is now the largest operator group rather than the list — SB Nation is 36 of the 83, and 36 paced requests is what the minute is. |
+| `feed-status-20260823-024250.txt` | 2026-08-23, first run that times each fetch and flags a source the app would give up on. 82 sources, 81/1, no SLOW flags — the one that would have tripped it, WV MetroNews at 16-20s, was removed in the same change. The `.json` carries `ms` per source; the slowest thing left in the catalog is under a second. |
 
 The two 2026-08-11 files predate the timestamping in the current script — those
 timestamps come from the files' modification times, which is exactly the

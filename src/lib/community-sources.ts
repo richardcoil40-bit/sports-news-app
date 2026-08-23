@@ -496,18 +496,11 @@ const BIG_12_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
       scope: 'broad',
     },
   ],
-  // The best-covered program in the conference: a blog, a metro daily and a
-  // statewide newsroom.
+  // A blog and a metro daily. WV MetroNews was here for a day and came out
+  // again — see BIG_12_NO_SOURCE_REASONS.
   'west-virginia': [
     SB_NATION('the-smoking-musket', 'The Smoking Musket', 'smokingmusket.com'),
     LEE('charleston-gazette-mail', 'Charleston Gazette-Mail', 'wvgazettemail.com'),
-    {
-      id: 'wv-metronews',
-      name: 'WV MetroNews',
-      url: 'https://wvmetronews.com/feed/',
-      tier: 1,
-      scope: 'broad',
-    },
   ],
 };
 
@@ -525,6 +518,13 @@ const BIG_12_NO_SOURCE_REASONS: Record<string, string> = {
   tcu: `Fort Worth Star-Telegram: ${MCCLATCHY}`,
   'texas-tech': `Viva The Matadors is gone: ${VOX_SHUTDOWN} The Daily Toreador runs TownNews and returns no items at any category slug tried. Lubbock Avalanche-Journal: ${GANNETT}`,
   ucf: `Orlando Sentinel: ${TRIBUNE}`,
+  'west-virginia':
+    'WV MetroNews answers, and takes 16-20s to do it — measured five times '  +
+    'in a row. That is inside check-feeds.sh\'s 20s curl budget and outside '  +
+    'FETCH_TIMEOUT_MS, so it reported healthy and would have timed out on '  +
+    'every device. Removed rather than kept as a source that can only ever '  +
+    'contribute a failed-source line. Worth re-checking: a slow origin is '  +
+    'not a dead one.',
   utah: 'Block U is still up but its feed 404s, and neither Salt Lake daily publishes one — the same gap BYU has, from the other school in that city.',
 };
 
