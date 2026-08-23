@@ -8,9 +8,13 @@
  * is kept in the comment beside each one so a future retune can be done
  * in the space the design was authored in.
  *
- * `Colors.dark` was explicitly out of scope for that pass and keeps the
- * neutral scale it always had, plus a lightened accent so the one accent
- * colour still reads against black.
+ * `Colors.dark` is derived from it rather than authored separately: the
+ * same warm hues (the old scale was cool — hues near 260, which is why it
+ * read as a different app), lightness inverted, and each token solved so
+ * its contrast against the dark ground matches what the light token has
+ * against paper. text 16.66:1 vs light's 16.67, textSecondary 5.99 vs
+ * 6.00, accent 5.85 vs 5.85, accentControl 5.46 vs 5.50. Retune either
+ * side in OKLCH and re-solve rather than nudging hex.
  */
 
 import '@/global.css';
@@ -52,23 +56,32 @@ export const Colors = {
     claimReported: '#1B1410',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-    accent: '#C8664E',
-    /** Lightened so the teal still reads against black. */
-    accentControl: '#6FB6C6',
+    /** ink, inverted — oklch(0.957 0.012 70) */
+    text: '#F6F0E8',
+    /** paper at night — oklch(0.18 0.012 60) */
+    background: '#16100C',
+    /** placeholder / inset surfaces — oklch(0.24 0.014 62) */
+    backgroundElement: '#241E19',
+    /** pressed & selected rows — oklch(0.28 0.016 62) */
+    backgroundSelected: '#2F2721',
+    /** meta text — oklch(0.658 0.02 58) */
+    textSecondary: '#9B8F86',
+    /** brick red, lifted to clear the dark ground — oklch(0.663 0.12 36) */
+    accent: '#D1775E',
+    /** teal, lifted to match — oklch(0.628 0.07 216) */
+    accentControl: '#5393A4',
     /**
-     * Not `text`, which would make this a solid *white* block. Reported
-     * is the commonest claim by a wide margin, and inverted alongside
-     * the two fixed hues it drowned them out: white on black is ~19:1
-     * where rumor and take sit near 3:1 against the page. This grey is
-     * tuned to that same weight, so the three badges read as three
-     * variants of one thing rather than one shout and two murmurs.
+     * Not `text`, which would make this a solid near-white block.
+     * Reported is the commonest claim by a wide margin, and inverted
+     * alongside the two fixed hues it drowned them out. This warm grey
+     * is tuned so all three badges sit at comparable weight against the
+     * page — 3.08:1 here, between rumor's 3.53:1 and take's 2.62:1 — so
+     * they read as three variants of one thing rather than one shout and
+     * two murmurs. It also clears 4.5:1 against the cream badge text.
+     *
+     * oklch(0.495 0.01 58)
      */
-    claimReported: '#55585C',
+    claimReported: '#66615C',
   },
 } as const;
 
