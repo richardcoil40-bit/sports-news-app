@@ -24,7 +24,6 @@
     "displayName": "NFL",
     "sport": "Football",
     "level": "NFL",
-    "status": "planned",
     "espnSport": "football",
     "espnLeaguePath": "nfl",
     "seasonStartMonth": 8

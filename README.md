@@ -7,10 +7,12 @@ headlines from a curated set of sources, filtered to your teams.
 Currently scoped to football — the Big Ten, the SEC and the NFL — while
 the core is being proven out, with the explicit intent to expand to
 other sports and leagues later. The NFL runs on ESPN's own team feeds
-for now: the curated community, independent and local sources in
-`src/lib/community-sources.ts` are per-conference research that hasn't
-been done for it yet, and a league without them is a normal state
-rather than a broken one.
+plus three national ones for now: the curated community, independent
+and local sources in `src/lib/community-sources.ts` are per-conference
+research that hasn't been done for it yet, and a league without them is
+a normal state rather than a broken one. Its team names have been
+through the review gate in `docs/review/`, which is the part that
+isn't optional — see that directory's README for the difference.
 
 Code and naming choices favor sport-agnostic terms where reasonable, so
 that expansion doesn't mean a rewrite.

@@ -31,15 +31,53 @@ id = "5bba8039a42f49418095e9e2e8c4a676"
 MODEL = "claude-haiku-4-5"
 
 # Hard brake #1: the most model calls this Worker will make in a UTC day.
-# Each call classifies up to 100 headlines, so 40 ≈ 4,000 new headlines/day —
-# far more than 35 feeds actually produce. Past the cap the endpoint keeps
-# serving cached verdicts and tells the client it is degraded, which the app
-# reads as "use the local rules". A bug or an abused endpoint costs a capped
-# amount and a slightly worse feed, never a surprise bill.
+# Past the cap the endpoint keeps serving cached verdicts and tells the
+# client the rest is degraded, which the app reads as "use the local rules".
+# A bug or an abused endpoint costs a capped amount and a slightly worse
+# feed, never a surprise bill.
+#
+# ## A call is a request, not a hundred headlines
+#
+# This was sized as "each call classifies up to 100 headlines, so 40 ≈ 4,000
+# new headlines/day", and that is the ceiling rather than the behaviour. One
+# call is spent per /v1/classify request carrying *at least one* headline
+# nobody has classified yet (src/index.ts — the cap check and recordCall
+# both sit inside `if (uncachedIndices.length > 0)`). A request with three
+# new headlines and ninety-seven cached ones costs exactly as much of this
+# budget as a full batch.
+#
+# So the count tracks refreshes that catch the leading edge of the news,
+# which scales with **users** as well as leagues, while the model *spend*
+# tracks unique headlines, which scales with leagues alone. The two are not
+# the same number and this cap is the first one:
+#
+#   calls/day  ≈  min(unique new headlines, requests that catch a new one)
+#
+# The app fetches one pool per followed team (multi-team-feed.ts), each
+# issuing its own classify request, so a single refresh of five followed
+# teams can spend several calls before the KV cache closes behind it.
+#
+# ## What a call costs
+#
+# Haiku 4.5 at $1/$5 per MTok. A full 100-headline call is ~2.6k input
+# (300-token system prompt + ~23/headline) and ~3.5k output (~35/headline)
+# ≈ $0.02. A typical call — a handful of new headlines — is ~$0.002.
+#
+# At 3 leagues and ~50 users the model is roughly 400 calls/day at well
+# under $1/day. 750 leaves headroom over that without making the brake
+# meaningless: a runaway day of full batches ceilings at ~$15.
+#
+# Re-derive this per league batch, per docs/scaling-plan.md — raising it is
+# cheap and silent degradation is not, because nothing errors when the cap
+# binds. The feed just gets quietly worse.
 #
 # Hard brake #2 is not in this file and is the more important one: set a
-# spend limit on the Anthropic account itself.
-DAILY_CALL_CAP = "40"
+# spend limit on the Anthropic account itself. The two soft spots below
+# matter more now that this number is larger — withinDailyCap fails open on
+# a KV read error and recordCall is a non-atomic read-modify-write that
+# under-counts under concurrency. Both are deliberate, both err toward
+# serving the user, and neither is a substitute for brake #2.
+DAILY_CALL_CAP = "750"
 
 # Verdicts are about a fixed string of text, so they never go stale — this
 # TTL exists only to bound storage, not to refresh anything.
