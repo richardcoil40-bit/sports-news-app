@@ -72,15 +72,61 @@ app isn't on the App Store or public TestFlight, so Apple's guidelines
 don't apply — and that stays true for *internal* TestFlight testing
 (up to 100 named testers via App Store Connect), which isn't reviewed
 at all. What changes the picture is an external/public TestFlight beta
-or a full App Store submission. At that point Apple generally requires
-in-app purchase for tips and donations rather than an external link,
-with only a narrow and inconsistently-enforced exception for a
-personal, unconditional peer-to-peer gift not tied to any content or
-feature.
+or a full App Store submission.
 
-So: **the link must be removed or converted to Apple in-app purchase
-before any external TestFlight beta or App Store submission.** Not
-before — and not after.
+### What review would actually make of the link — checked 2026-08-23
+
+An earlier version of this section said the link **must** be removed or
+converted to in-app purchase before any reviewed build. That was the
+right summary of the rules when it was written, and it is now too
+absolute: the ground shifted in 2025, in this app's favor, without
+becoming safe. Three rules are in play, read from the live guidelines
+(developer.apple.com/app-store/review/guidelines) on 2026-08-23:
+
+- **Guideline 3.1.1** is the baseline — digital content and features
+  must use in-app purchase — and it contains the sentence a reviewer
+  reaches for on tips specifically: apps "may use in-app purchase
+  currencies to enable customers to 'tip' the developer." Apple's
+  sanctioned path for developer tips is IAP.
+- **Guideline 3.1.1(a)** is the post-*Epic v. Apple* carve-out. After
+  the May 2025 contempt ruling, a failed appeal, and a denied Supreme
+  Court stay, the guidelines now say entitlements "are not required for
+  developers to include buttons, external links, or other calls to
+  action in their United States storefront apps," and the prohibition
+  on linking to non-IAP purchasing mechanisms "does not apply" to the
+  US storefront.
+- **Guideline 3.2.1(vii)** allows monetary gifts to "another
+  individual" without IAP when giving is fully optional, 100% of the
+  funds go to the receiver, and the gift is never tied to content or
+  features. A personal Venmo link that changes nothing in the app is a
+  fair fit for all three clauses.
+
+On the plain text, a US-only listing has a defensible case for keeping
+the link. Enforcement has not caught up with the text: developer-forum
+threads from the post-injunction era still show 3.1.1 rejections for
+exactly this pattern — "Donate to the Project", "Support the
+Developer" — with Apple staff declining to name any acceptable wording
+when asked directly. So the honest odds, which are not a clearance:
+
+- **External TestFlight with the link in.** Beta App Review is the
+  lighter pass and may well let it through — but every build is a
+  fresh roll, and passing it establishes nothing for App Store review.
+- **App Store submission with the link in.** Genuinely arguable; treat
+  it as a coin flip that costs a rejection-and-appeal cycle if it goes
+  badly. An appeal citing 3.1.1(a)'s US-storefront sentence and
+  3.2.1(vii) is a legitimate fight to pick, not a formality.
+- **The near-certain routes.** An IAP tip jar (sanctioned outright;
+  Apple takes 15% under the Small Business Program), or pointing the
+  in-app link at a website the developer owns and letting the Venmo
+  ask live there — Apple doesn't review the website, and a link to
+  your own site is uncontroversial.
+
+Two bounds on how far to lean on this. The US carve-out exists because
+of a court order Apple complied with under protest, so the text could
+regress if the litigation shifts — re-check the live guidelines at
+submission time rather than trusting this snapshot. And it is
+US-storefront only; every other storefront is still under the old
+rule.
 
 ### "Internal" is narrower than it sounds — check which one you're doing
 
@@ -107,17 +153,20 @@ email, it has.
 `DONATION_URL` is set, the tip section renders, and the next planned
 step is TestFlight. Switching the URL on and inviting external testers
 are two changes that are individually harmless and jointly the thing
-this section exists to prevent — and they are now half done.
+this section exists to catch — and they are now half done.
 
 Concretely, before a build goes to anyone who is not an App Store
-Connect team member, one of these has to happen:
+Connect team member, the link stops being a default and becomes a
+decision — one of:
 
-- set `DONATION_URL` back to `''` for that build, or
-- replace the link with an Apple in-app purchase.
+- leave it in and accept the review odds above,
+- set `DONATION_URL` back to `''` for that build,
+- replace the link with an Apple in-app purchase, or
+- point it at a developer-owned website that carries the ask.
 
 Sideloading to your own devices and internal TestFlight are unaffected;
-the link can stay for both. The checkpoint is the first external
-invite, not the first upload.
+the link can stay for both without any decision. The checkpoint is the
+first external invite, not the first upload.
 
 ### Which one we are actually doing — answered 2026-08-23
 
@@ -132,15 +181,17 @@ determination expires the moment either of these happens, and neither
 produces a warning:
 
 - **Anyone is invited by email or public link.** That is external
-  testing, it needs Beta App Review, and the link must be `''` or an IAP
-  in the build they receive. Adding one person to a build that already
-  has 99 team members is enough.
+  testing, it needs Beta App Review, and the link in that build has to
+  have been through the decision list above rather than ridden along as
+  a default. Adding one person to a build that already has 99 team
+  members is enough.
 - **The app is submitted to the App Store**, whatever the TestFlight
   history. Full review applies and internal-vs-external stops mattering.
 
 So the pre-flight before any upload is a question about the *audience*,
 not about the code: if the answer isn't "team members only", the link
-comes out of that build first.
+question gets decided for that build first — with the odds above in
+front of whoever decides.
 
 Worth reading alongside the team-name/logo question above if this ever
 gets a real legal review before a public launch. A donation link is a
