@@ -14,13 +14,16 @@ no user accounts, no article content, no usage or behavioral history. See
 a single overwritten value rather than a log.
 
 Every other cache in the codebase is in-memory only and exists for the
-lifetime of the running app process. All but one are created through
+lifetime of the running app process. All but two are created through
 `createEntityCache` in `lib/cache.ts` — one helper,
 so what's cached and for how long is visible in one place rather than
-hand-rolled per module. The exception is the league catalog, which isn't
+hand-rolled per module. One exception is the league catalog, which isn't
 keyed by anything: it's a single fetched list held in a module variable and
 replaced at most once per launch, so there is no key to evict and nothing
-for that helper to do.
+for that helper to do. The other is `lib/diagnostics.ts` (below), whose three
+logs aren't a resolved-value-per-key cache at all — they're bounded arrays
+and a map, capped by splicing off the oldest entries rather than by LRU
+eviction, since nothing about them is ever "refetched."
 
 Two independent limits apply, and the distinction matters: **`ttlMs` bounds
 staleness, `maxEntries` bounds size.** An expired entry keeps its payload
@@ -42,6 +45,22 @@ least-recently-used on insert.
 | Player season stats | `lib/player-stats.ts` | Athlete ID — one per player screen opened | 500 | None (process lifetime) |
 | Verdict classifications | `lib/verdicts.ts` | Headline title — one per unique headline seen; empty only if `EXPO_PUBLIC_VERDICT_URL` is cleared | 2000 | None (process lifetime) |
 | League catalog | `lib/league-catalog.ts` | Not a keyed cache — a single list, fetched at most once per launch and held in a module variable. Bounded by the catalog itself, a few KB | n/a | None (process lifetime) |
+| Diagnostics: verdict disagreements | `lib/diagnostics.ts` | Not keyed — a flat log, oldest entries spliced off once full | 200 | None (process lifetime) |
+| Diagnostics: source-group yield | `lib/diagnostics.ts` | Not keyed — a flat log, oldest entries spliced off once full | 300 | None (process lifetime) |
+| Diagnostics: nickname usefulness | `lib/diagnostics.ts` | Team + nickname — one entry per curated nickname that has ever rescued an article this session | Bounded by the curated nickname table itself, a few hundred entries at most | None (process lifetime) |
+
+The three diagnostics rows exist for a dev-gated screen
+(`src/app/settings/diagnostics.tsx`, reachable only when `__DEV__` is true)
+that reads runtime signals the review gate (`docs/review/README.md`,
+`team-review.ts`) can't see: a nickname the classifier disagrees with, a
+source group whose filter has stopped filtering, and a nickname that's
+never rescued anything. Same posture as everything else here — per-device,
+in-memory, gone on force-quit — just collected unconditionally rather than
+only when the screen is open, since it's cheap arithmetic on work the news
+pool already does. The one part of it that isn't free — sampling a few
+rejected articles for an extra classify call to catch false negatives — is
+itself gated on `__DEV__` at its call site in `team-news-pool.ts`, since
+that one *does* cost against the verdicts service's daily cap.
 
 Force-quitting the app clears all of it. **The team list is the one cache
 with no size bound, and deliberately: its key is a league, so the catalog
