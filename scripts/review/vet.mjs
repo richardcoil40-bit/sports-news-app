@@ -35,7 +35,7 @@
  * `VET_URL` — the Worker's /v1/vet-source endpoint. Unset means --ai
  * cannot run, which is the default state: nothing here reaches the network
  * unless somebody has deployed the endpoint and set a second API key for
- * it. `VET_TOKEN` if the Worker has one set.
+ * it. `VET_TOKEN` must match the Worker's — the route requires one.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -126,8 +126,9 @@ if (!useAi) {
       '',
       candidates.length > MAX_BATCH ? `Only the first ${MAX_BATCH} would go in one batch.` : '',
       'Re-run with --ai to score these against docs/source-reliability.md.',
-      'That needs VET_URL pointing at a deployed Worker with VET_ANTHROPIC_API_KEY set;',
-      'the endpoint is off until then, and does not borrow the app\'s key.',
+      'That needs VET_URL pointing at a deployed Worker with VET_ANTHROPIC_API_KEY and',
+      'VET_TOKEN set (and VET_TOKEN exported here); the endpoint is off until then,',
+      'and does not borrow the app\'s key.',
       '',
     ]
       .filter((line) => line !== '')

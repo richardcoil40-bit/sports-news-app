@@ -78,10 +78,35 @@ export interface Env {
    * and separately limitable on the Anthropic account.
    */
   VET_ANTHROPIC_API_KEY?: string;
+  /**
+   * Also required for /v1/vet-source — the route answers 503 until both
+   * secrets are set. Unlike CLIENT_TOKEN this one fails *closed*: classify
+   * degrades to the app's local rules and is capped against the cheap
+   * model, while this route spends against the expensive one with no
+   * fallback behaviour to degrade to. A key set without a token would be a
+   * paid endpoint open to anyone who finds the URL.
+   */
   VET_TOKEN?: string;
 }
 
 const MAX_ITEMS = 100;
+
+/**
+ * The longest title classified as-is; anything past this is truncated, not
+ * rejected. MAX_ITEMS bounds how many headlines a request may carry, but
+ * nothing bounded how long each one could be — and the input half of a
+ * model call's cost scales with exactly that. Titles come from RSS feeds
+ * the app treats as hostile input by design, and CLIENT_TOKEN is a speed
+ * bump rather than access control (see README), so an unbounded title was
+ * the one way a single capped call could be made arbitrarily expensive.
+ *
+ * Truncation rather than a 400 keeps the tolerate-partial-failure posture:
+ * one malformed feed's garbage title shouldn't cost the other 99 headlines
+ * in the batch their classification. 500 characters is several times the
+ * longest real headline, and the cache key hashes the truncated form, so
+ * the same oversized title still hits its own cached verdict next time.
+ */
+const MAX_TITLE_CHARS = 500;
 const CACHE_VERSION = 'v1';
 
 /**
@@ -280,7 +305,7 @@ function parseItems(body: unknown): ClassifyItem[] | null {
     const id = (item as { id?: unknown })?.id;
     const title = (item as { title?: unknown })?.title;
     if (typeof id !== 'string' || typeof title !== 'string' || !title.trim()) return null;
-    result.push({ id, title });
+    result.push({ id, title: title.length > MAX_TITLE_CHARS ? title.slice(0, MAX_TITLE_CHARS) : title });
   }
   return result;
 }
@@ -372,6 +397,16 @@ async function handleClassify(request: Request, env: Env, ctx: ExecutionContext)
  */
 const MAX_SOURCES = 20;
 
+/**
+ * Vet candidates are rejected outright past this, where classify truncates
+ * — the right posture differs because the caller does. Classify serves
+ * phones relaying feed titles they didn't write; this serves a developer's
+ * own worksheet lines, where an oversized field is a malformed request
+ * worth a loud 400, not someone else's data to salvage. No real outlet
+ * name, host or URL approaches 300 characters.
+ */
+const MAX_SOURCE_FIELD_CHARS = 300;
+
 const VET_SCHEMA = {
   type: 'object',
   properties: {
@@ -456,7 +491,10 @@ function parseCandidates(body: unknown): VetCandidate[] | null {
       typeof source?.id !== 'string' ||
       typeof source?.name !== 'string' ||
       typeof source?.host !== 'string' ||
-      typeof source?.url !== 'string'
+      typeof source?.url !== 'string' ||
+      [source.id, source.name, source.host, source.url].some(
+        (field) => field.length > MAX_SOURCE_FIELD_CHARS,
+      )
     ) {
       return null;
     }
@@ -485,10 +523,21 @@ async function handleVetSource(request: Request, env: Env, ctx: ExecutionContext
     );
   }
 
-  if (env.VET_TOKEN) {
-    if (request.headers.get('authorization') !== `Bearer ${env.VET_TOKEN}`) {
-      return json({ error: 'unauthorized' }, 401);
-    }
+  if (!env.VET_TOKEN) {
+    // Fail closed rather than open, and unlike CLIENT_TOKEN — see the Env
+    // note: without this, setting the key but forgetting the token would
+    // leave a model-spending endpoint answering anyone who finds the URL.
+    return json(
+      {
+        error:
+          'source vetting is not configured — set the VET_TOKEN secret. ' +
+          'The endpoint stays off until both VET_ANTHROPIC_API_KEY and VET_TOKEN are set.',
+      },
+      503,
+    );
+  }
+  if (request.headers.get('authorization') !== `Bearer ${env.VET_TOKEN}`) {
+    return json({ error: 'unauthorized' }, 401);
   }
 
   let body: unknown;

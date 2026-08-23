@@ -8,10 +8,13 @@
 #   npx wrangler secret put CLIENT_TOKEN           # optional, see README
 #   npx wrangler deploy
 #
-# Source vetting (/v1/vet-source) is off until its own key is set, and
-# deliberately has no fallback to the key above:
-#   npx wrangler secret put VET_ANTHROPIC_API_KEY  # enables the endpoint
-#   npx wrangler secret put VET_TOKEN              # optional, as CLIENT_TOKEN
+# Source vetting (/v1/vet-source) is off until BOTH of its secrets are set,
+# and deliberately has no fallback to the key above. VET_TOKEN is required,
+# unlike CLIENT_TOKEN: this route spends against the expensive model and
+# has nothing to degrade to, so a key without a token would be a paid
+# endpoint open to anyone who finds the URL.
+#   npx wrangler secret put VET_ANTHROPIC_API_KEY
+#   npx wrangler secret put VET_TOKEN
 
 name = "nofrills-verdicts"
 main = "src/index.ts"
