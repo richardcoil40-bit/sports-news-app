@@ -80,8 +80,30 @@ export default function TeamScreen() {
   // what keeps a deep link into an unfollowed league from arriving with no
   // team list at all, which would leave every story on the screen untagged.
   // It is also one standings request instead of one per followed league.
-  const { teams } = useTeams(league);
+  const { teams, loading: teamsLoading } = useTeams(league);
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
+
+  // A deep link carries an id and nothing else — no name, no logo — so those
+  // are resolved from the league's team list instead. Everything else on this
+  // screen keys off the id alone and works either way; the name is the one
+  // thing that has no fallback, and `teams` is already in hand for tagging.
+  const team = useMemo(() => teams.find((t) => t.id === params.id), [teams, params.id]);
+  const name = params.name || team?.name || '';
+  const shortName = params.shortName || team?.shortName || '';
+  const logoUrl = params.logoUrl || team?.logoUrl || '';
+
+  // The name the pool matches articles against, and the gate on fetching at
+  // all. Empty is not a degraded input here, it's a destructive one:
+  // `wordBoundaryMatch(text, '')` is true, so a nameless pool keeps every
+  // national story it sees and then caches that under this team's own key for
+  // the TTL — the next legitimate visit reads back a feed of other people's
+  // news. So the loads below wait for a name rather than fetching without one.
+  const poolName = shortName || name;
+
+  // Nothing left to wait for and still no name: an id that isn't in this
+  // league. Surfaced as the tab's error state rather than a spinner that
+  // never resolves.
+  const unresolvableTeam = !poolName && !teamsLoading;
   // Seeded from the caller when it has already resolved this team's
   // color. The fetch below still runs and returns the same cached value;
   // what this avoids is the first frame painting the placeholder grey and
@@ -90,7 +112,7 @@ export default function TeamScreen() {
   const [teamColor, setTeamColor] = useState<string | null>(params.accent || null);
 
   const news = useAsync<Article[]>(async () => {
-    const pool = await fetchTeamNewsPool(params.id, params.shortName || params.name, league);
+    const pool = await fetchTeamNewsPool(params.id, poolName, league);
     return pool.articles;
   });
 
@@ -134,16 +156,21 @@ export default function TeamScreen() {
   // on mount was slow and stole bandwidth from whatever screen you tapped
   // into next (e.g. a player's news). load() is a no-op once a tab's data
   // has arrived, so re-running this on every tab change is free.
+  // Only the news pool waits on `poolName` — the schedule and roster key off
+  // the id alone, so they load on a deep link's first pass like always. Once
+  // the team list arrives the name lands here as a dependency change and the
+  // pool loads then; load() is a no-op if it already ran, so the ordinary
+  // path (name in the params from the start) is unchanged.
   useEffect(() => {
-    if (tab === 'news') news.load();
+    if (tab === 'news' && poolName) news.load();
     if (tab === 'schedule') schedule.load();
     // The players tab ranks by article mentions, so it needs the news pool too.
     if (tab === 'players') {
       roster.load();
-      news.load();
+      if (poolName) news.load();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, params.id, params.shortName, params.name, league]);
+  }, [tab, params.id, poolName, league]);
 
   // Classified and tagged once here, so every card has its badges
   // whether or not a filter is active. Tagged against the whole league
@@ -207,8 +234,11 @@ export default function TeamScreen() {
         position: player.position ?? '',
         headshotUrl: player.headshotUrl ?? '',
         teamId: params.id,
-        teamName: params.name,
-        teamShortName: params.shortName,
+        // The resolved names, not the raw params: arriving here by deep link
+        // the params are empty, and the player screen fetches this same pool
+        // — with the same consequence for an empty name as above.
+        teamName: name,
+        teamShortName: shortName,
         // The league this screen resolved, not the raw param: if that was
         // absent and this screen fell back, the player screen should land on
         // the same league rather than re-deriving it from nothing.
@@ -221,22 +251,22 @@ export default function TeamScreen() {
     <ThemedView style={styles.flex}>
       <Stack.Screen
         options={{
-          title: params.shortName || params.name,
+          title: shortName || name,
           headerBackTitle: 'Teams',
           headerRight: () => <Logo size={18} />,
         }}
       />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <View style={[styles.header, { backgroundColor: teamColor ?? theme.backgroundElement }]}>
-          {params.logoUrl ? (
+          {logoUrl ? (
             <View style={styles.logoChip}>
-              <Image source={{ uri: params.logoUrl }} style={styles.logo} contentFit="contain" />
+              <Image source={{ uri: logoUrl }} style={styles.logo} contentFit="contain" />
             </View>
           ) : null}
           <ThemedText
             type="title"
             style={[styles.teamName, { color: teamColor ? '#FFFFFF' : theme.text }]}>
-            {params.name}
+            {name}
           </ThemedText>
         </View>
 
@@ -245,8 +275,8 @@ export default function TeamScreen() {
         {tab === 'news' ? (
           <NewsTab
             articles={visibleNews}
-            loading={news.data === null && !news.error}
-            error={news.error}
+            loading={news.data === null && !news.error && !unresolvableTeam}
+            error={news.error || unresolvableTeam}
             claimFilter={claimFilter}
             onChangeClaim={setClaimFilter}
             onOpenArticle={openArticle}
@@ -266,8 +296,13 @@ export default function TeamScreen() {
         {tab === 'players' ? (
           <PlayersTab
             players={notablePlayers}
-            loading={(roster.data === null || news.data === null) && !roster.error && !news.error}
-            error={roster.error}
+            loading={
+              (roster.data === null || news.data === null) &&
+              !roster.error &&
+              !news.error &&
+              !unresolvableTeam
+            }
+            error={roster.error || unresolvableTeam}
             onOpenPlayer={openPlayer}
             accentColor={teamColor}
           />
