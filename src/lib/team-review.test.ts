@@ -139,14 +139,31 @@ describe('no nickname is unsafe against the sources it runs on', () => {
   // Not a failure, and worth asserting anyway: the contested list is the
   // one that has to be re-read whenever a team gains a local paper, and a
   // silent change to it is a change to how much the rule above is holding
-  // up. "Wildcats" is the whole story — Northwestern and Kentucky both
-  // claim it, and both are safe today only because neither has a broad
-  // source for it to run against.
+  // up. It is a tripwire, so it is written as an exact list rather than a
+  // count, and updating it is meant to cost a paragraph.
+  //
+  // **Wildcats** is four schools now: Northwestern and Kentucky, neither of
+  // which has a broad source for the word to run against, plus Arizona and
+  // Kansas State, which do — the Arizona Daily Star and the Manhattan
+  // Mercury. Those two are what changed. It stays safe because Tucson and
+  // Manhattan each cover exactly one Wildcats team and share no source with
+  // each other or with the other two; it stops being safe the day any of
+  // the four is given a paper another one is also matched against.
+  //
+  // **Cougars** arrived with the Big 12 and is two schools, BYU and
+  // Houston. Asymmetric on purpose: Houston's is reachable through the
+  // Daily Cougar, and BYU has no broad-scoped source at all, because
+  // neither Salt Lake daily publishes a feed. So the word can only fire in
+  // Houston today, and the entry to re-read is BYU's — the moment a Utah
+  // paper is found, two schools are matched on one word for the first time
+  // in this table.
+  //
+  // Sorted, because the underlying order is by slug: adding a school
+  // alphabetically before an existing claimant would otherwise reorder this
+  // list without changing what it says.
   it('reports the contested words, which are safe by circumstance rather than by the word', () => {
-    expect([...new Set(hazards.filter((h) => h.kind === 'contested').map((h) => h.nickname))]).toEqual([
-      'Wildcat',
-      'Wildcats',
-    ]);
+    const contested = [...new Set(hazards.filter((h) => h.kind === 'contested').map((h) => h.nickname))];
+    expect(contested.sort()).toEqual(['Cougar', 'Cougars', 'Wildcat', 'Wildcats']);
   });
 });
 

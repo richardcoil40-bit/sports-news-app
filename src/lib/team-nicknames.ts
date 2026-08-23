@@ -62,6 +62,15 @@ import { teamSlug } from '@/lib/team-slug';
  */
 const NICKNAMES_BY_SLUG: Record<string, string[]> = {
   alabama: ['Crimson Tide', 'Bama'],
+  // The fourth school in the table to claim it, after Kentucky,
+  // Northwestern and Kansas State. Safe for the reason all four are: the
+  // Arizona Daily Star covers one Wildcats team, and no two of the four
+  // share a paper.
+  arizona: ['Wildcat', 'Wildcats'],
+  // Recorded although nothing can reach them: ASU has no working feed at
+  // all (see NO_SOURCE_REASONS). Unambiguous and free to carry until one
+  // turns up. Bare "Devils" is left out — New Jersey and Duke.
+  'arizona-state': ['Sun Devil', 'Sun Devils'],
   // "Hogs" is what the Democrat-Gazette writes; the singular is left out
   // because an Arkansas paper also covers actual hog farming.
   arkansas: ['Razorback', 'Razorbacks', 'Hogs'],
@@ -71,13 +80,30 @@ const NICKNAMES_BY_SLUG: Record<string, string[]> = {
   // name nobody else uses. Auburn's is a yell rather than a nickname, and
   // its papers print it constantly.
   auburn: ['War Eagle'],
+  baylor: [],
+  // Shared with Houston below, and safe by circumstance rather than by
+  // the word: BYU has no broad-scoped source, so these never run.
+  byu: ['Cougar', 'Cougars'],
+  cincinnati: ['Bearcat', 'Bearcats'],
+  // "Buffalo" singular is out — a city and a pro team before a mascot.
+  colorado: ['Buffs', 'Buffaloes'],
   florida: ['Gator', 'Gators'],
   // "Bulldogs" is Mississippi State's below and half of college sport's
   // besides; "Dawgs" is Georgia's own spelling and nobody else's.
   georgia: ['Dawg', 'Dawgs'],
+  // "Coogs" is the local short form and belongs to nobody else.
+  houston: ['Coogs', 'Cougar', 'Cougars'],
   illinois: ['Illini', 'Fighting Illini'],
   indiana: ['Hoosier', 'Hoosiers'],
   iowa: ['Hawkeye', 'Hawkeyes'],
+  // "Clones" is out — an ordinary noun.
+  'iowa-state': ['Cyclone', 'Cyclones'],
+  // "Hawks" is out — Atlanta, Chicago's hockey team, and Iowa.
+  kansas: ['Jayhawk', 'Jayhawks'],
+  // "K-State" is what the Manhattan Mercury prints and is not reachable
+  // from ESPN's "Kansas St" by the -St expansion, which only produces
+  // "Kansas State".
+  'kansas-state': ['K-State', 'Wildcat', 'Wildcats'],
   kentucky: ['Wildcat', 'Wildcats'],
   // Reviewed and deliberately empty rather than missing — "Tigers" is the
   // three-way collision described above, and nothing else survives the
@@ -96,20 +122,30 @@ const NICKNAMES_BY_SLUG: Record<string, string[]> = {
   northwestern: ['Wildcat', 'Wildcats'],
   'ohio-state': ['Buckeye', 'Buckeyes'],
   oklahoma: ['Sooner', 'Sooners'],
+  'oklahoma-state': [],
   'ole-miss': ['Rebel', 'Rebels'],
   oregon: ['Duck', 'Ducks'],
   'penn-state': ['Nittany Lion', 'Nittany Lions'],
   purdue: ['Boilermaker', 'Boilermakers'],
   rutgers: ['Scarlet Knight', 'Scarlet Knights'],
   'south-carolina': ['Gamecock', 'Gamecocks'],
+  // Bare "Frogs" is out — an ordinary noun.
+  tcu: ['Horned Frog', 'Horned Frogs'],
   // "Vol" on its own is left out — it is how a volume number abbreviates.
   tennessee: ['Vols', 'Volunteers'],
   texas: ['Longhorn', 'Longhorns', 'Horns'],
   'texas-am': ['Aggie', 'Aggies'],
+  // Only the two-word form: bare "Raiders" is reserved to Las Vegas.
+  'texas-tech': ['Red Raider', 'Red Raiders'],
+  ucf: [],
   ucla: ['Bruin', 'Bruins'],
   usc: ['Trojan', 'Trojans'],
+  utah: ['Ute', 'Utes'],
   vanderbilt: ['Commodore', 'Commodores', 'Vandy'],
   washington: ['Husky', 'Huskies'],
+  // Appalachian State is also the Mountaineers and shares none of West
+  // Virginia's three sources.
+  'west-virginia': ['Mountaineer', 'Mountaineers'],
   wisconsin: ['Badger', 'Badgers'],
 
   /**
@@ -202,6 +238,24 @@ const NO_NICKNAME_REASONS: Record<string, string> = {
     'against LSU\'s own papers. Unreachable either way: both LSU sources ' +
     'are scope: team, so the local-newsroom filter these names feed never ' +
     'runs on them.',
+
+  baylor:
+    '"Bears" is reserved to Chicago — the entry RESERVED_NICKNAMES already ' +
+    'wrote with Baylor in mind. Nothing else survives the metro-sports-' +
+    'section rule: "BU" is Boston University first. The Waco ' +
+    'Tribune-Herald carries the program on the school name alone.',
+  'oklahoma-state':
+    '"Cowboys" is reserved to Dallas, which is a word that only became ' +
+    'unavailable when the NFL shipped — the first time a pro roster took ' +
+    'a name off a college team. "Pokes" is Wyoming too, and a verb ' +
+    'besides; "OSU" is three schools. Cowboys Ride For Free is gone, so ' +
+    'two live papers carry the program on the school name.',
+  ucf:
+    '"Knights" is reserved, and RESERVED_NICKNAMES names UCF itself in ' +
+    'the reason — Rutgers\' "Scarlet Knights" shortens to it and Vegas ' +
+    'has a hockey team. A word reserved because of this team is still ' +
+    'reserved to it, since ownership is only ever established by a pro ' +
+    'roster. No loss: "UCF" is the short name and is unambiguous.',
 
   bears:
     PRO_MASCOT_IS_THE_SHORT_NAME +
