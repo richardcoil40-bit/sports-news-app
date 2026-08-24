@@ -205,10 +205,40 @@ function extractAtomImageUrl(entry: Record<string, unknown>): string | null {
   );
 }
 
+/**
+ * RSS specifies RFC 822 dates and Atom specifies RFC 3339; `new Date()`
+ * reads both. Some publishers emit neither.
+ *
+ * Eleven Warriors serves `Sunday, August 23, 2026 - 14:30` — a rendered
+ * date rather than a machine one, and the ` - ` before the time is what
+ * `new Date()` chokes on. A null date is not a visibly broken feed, which
+ * is why this survived: every item still had a headline, a link and an
+ * image, so the source looked healthy on the page. What it actually did
+ * was drop the dateline from every card *and* sink the whole feed to the
+ * bottom of the sort (see `sortByDate`), so today's stories ranked below
+ * a month-old one. A tester reported it as two separate bugs.
+ *
+ * The relaxed pass runs only after the strict one fails, so a well-formed
+ * date can never be reinterpreted by it. Swept across all 82 feed URLs in
+ * the catalog on 2026-08-23: 81 parse strictly, and Eleven Warriors is
+ * the only one that needs this.
+ *
+ * **The relaxed form carries no timezone**, so it resolves against the
+ * device's. That is a knowingly accepted few-hours' skew in the relative
+ * timestamp, taken because the alternative is no date at all — and a
+ * date that lands slightly in the future degrades to "Just now" in
+ * `formatRelativeTime` rather than rendering a negative. If a second feed
+ * ever needs this, prefer asking the publisher for a real date over
+ * growing a format table here.
+ */
 function parsePubDate(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+
+  const strict = new Date(raw);
+  if (!Number.isNaN(strict.getTime())) return strict.toISOString();
+
+  const relaxed = new Date(raw.trim().replace(/\s+-\s+/, ' '));
+  return Number.isNaN(relaxed.getTime()) ? null : relaxed.toISOString();
 }
 
 /** dc:creator is the common RSS extension for bylines; plain <author> is the fallback. */

@@ -61,6 +61,53 @@ describe('fetchFeeds', () => {
     expect(dates).toEqual([...dates].sort().reverse());
   });
 
+  // A publisher that renders its date instead of encoding it parsed to null,
+  // which is quiet in a way a broken feed is not: the items still had
+  // headlines, links and images, so the source looked healthy while every
+  // card lost its dateline AND the whole feed sank to the bottom of the sort.
+  // Swept across all 82 feed URLs in the catalog on 2026-08-23 — Eleven
+  // Warriors is the only one that needs the relaxed pass.
+  describe('dates a publisher renders rather than encodes', () => {
+    const withDate = (pubDate: string) =>
+      '<?xml version="1.0"?><rss><channel><title>T</title><item>' +
+      '<title>Story</title><link>https://a.test/story</link>' +
+      `<pubDate>${pubDate}</pubDate></item></channel></rss>`;
+
+    it('reads a rendered date that new Date() rejects outright', async () => {
+      respondPerUrl({
+        'https://a.test/rss': { body: withDate('Sunday, August 23, 2026 - 14:30') },
+      });
+
+      const { articles } = await fetchFeeds([source('a', 'https://a.test/rss')]);
+
+      expect(articles[0].publishedAt).not.toBeNull();
+      // Asserted in local components rather than as an ISO string: the
+      // relaxed form carries no timezone, so it resolves against wherever
+      // this runs. Pinning the ISO would pass only in US Eastern.
+      const parsed = new Date(articles[0].publishedAt!);
+      expect([parsed.getFullYear(), parsed.getMonth(), parsed.getDate()]).toEqual([2026, 7, 23]);
+      expect([parsed.getHours(), parsed.getMinutes()]).toEqual([14, 30]);
+    });
+
+    it('leaves a well-formed date to the strict pass, timezone intact', async () => {
+      respondPerUrl({
+        'https://a.test/rss': { body: withDate('Sun, 23 Aug 2026 14:30:00 +0000') },
+      });
+
+      const { articles } = await fetchFeeds([source('a', 'https://a.test/rss')]);
+
+      expect(articles[0].publishedAt).toBe('2026-08-23T14:30:00.000Z');
+    });
+
+    it('still yields null for something that is not a date at all', async () => {
+      respondPerUrl({ 'https://a.test/rss': { body: withDate('coming soon') } });
+
+      const { articles } = await fetchFeeds([source('a', 'https://a.test/rss')]);
+
+      expect(articles[0].publishedAt).toBeNull();
+    });
+  });
+
   // The distinction this whole split exists to draw. A source that hands
   // back something unusable has to be *reported*, not silently counted as
   // a success with zero articles — that's what let seventeen Atom feeds

@@ -54,6 +54,32 @@ then fails.
 There's no fixed schedule. Worth doing when a source looks quiet in the app,
 before adding a source, and periodically otherwise.
 
+## Liveness is not correctness
+
+This report answers "is the source returning items", and that is all it
+answers. A feed can pass every check here and still hand the app a field it
+cannot read.
+
+Eleven Warriors did, from the day it was added until 2026-08-23. Its
+`<pubDate>` is `Sunday, August 23, 2026 - 14:30` — a rendered date rather
+than the RFC 822 one RSS specifies, and `new Date()` rejects it outright.
+Every item still had a headline, a link and an image, so the source was
+green in every run above. What it actually did was strip the dateline from
+every one of its cards *and* sink the whole feed to the bottom of the sort,
+because `sortByDate` puts undated items last — so the day's Ohio State
+stories ranked below a month-old one. It surfaced as two separate bug
+reports from a TestFlight tester, neither of which named the real cause.
+
+`parsePubDate` now falls back to a relaxed parse, and `feeds.test.ts` has a
+case on each side of it. The sweep that established the scope is worth
+repeating if a publisher ever looks oddly ordered: of all 82 feed URLs in
+the catalog on 2026-08-23, 81 parse strictly and Eleven Warriors was the
+only one that needed the fallback.
+
+The general lesson is the Atom one restated. **Whenever a check is added
+here, ask what it would still miss** — the columns tell you a source
+answered, not that the app understood the answer.
+
 ## Reports
 
 | File | What it is |
