@@ -114,7 +114,16 @@ export function ArticleCard({
           {article.title}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
-          {formatRelativeTime(article.publishedAt)} · {tierLabel(article.tier)}
+          {/*
+            Separator is conditional because formatRelativeTime returns '' for
+            a null date, and an unconditional ` · ` renders the tier with a
+            leading bullet and nothing before it. A tester caught it on Eleven
+            Warriors, whose dates parsed to null until parsePubDate learned its
+            format — the cause is fixed, but any item with no <pubDate> at all
+            still lands here. article.tsx guards the same pair the same way.
+          */}
+          {article.publishedAt ? `${formatRelativeTime(article.publishedAt)} · ` : ''}
+          {tierLabel(article.tier)}
         </ThemedText>
 
         {/*
