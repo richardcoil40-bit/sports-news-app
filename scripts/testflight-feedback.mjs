@@ -4,6 +4,7 @@
  *
  *   node scripts/testflight-feedback.mjs [--limit N] [--download] [--json]
  *                                        [--crashes] [--build N]
+ *                                        [--new] [--mark]
  *
  * This is the same feedback that shows up under TestFlight → Feedback in
  * App Store Connect — a tester's screenshot plus whatever they typed —
@@ -35,6 +36,28 @@
  * the raw r‖s pair; a DER signature here produces a 401 that reads like
  * a bad key rather than a bad encoding.
  *
+ * ## The triaged ledger
+ *
+ * Apple offers no "archive" and no "mark as read". The only management
+ * action on feedback is Delete, which is permanent and takes the tester's
+ * report with it. So "already dealt with" is tracked on this side instead,
+ * in docs/testflight-triaged.json: an id maps to the date it was triaged,
+ * and `--new` hides anything present. A present key is a decision, an
+ * absent key means nobody has looked yet — the same convention the team
+ * review tables use.
+ *
+ * `--mark` records exactly what the run just printed, so the flow is pull,
+ * review, then mark. Deliberately not one command that marks things you
+ * haven't read yet.
+ *
+ * The ledger is tracked in git for the reason __data__/reviewed-teams.json
+ * is: it's the record of what has been ruled on, and it's worth little if
+ * it lives on one machine. It is also the reason nothing here calls Apple's
+ * DELETE endpoint. The feedback stays where Apple put it, because that is
+ * the only copy of it that exists.
+ *
+ * `--json` is a raw passthrough of Apple's response and ignores both flags.
+ *
  * ## Why the app id isn't hardcoded
  *
  * It's resolved from the bundle identifier in app.json, so this keeps
@@ -46,12 +69,13 @@
 import { createSign } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const API = 'https://api.appstoreconnect.apple.com';
 const CONFIG_DIR = join(homedir(), '.appstoreconnect');
+const TRIAGED_PATH = join(REPO_ROOT, 'docs', 'testflight-triaged.json');
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(`--${name}`);
@@ -65,6 +89,8 @@ const DOWNLOAD = flag('download');
 const JSON_OUT = flag('json');
 const CRASHES = flag('crashes');
 const BUILD_FILTER = value('build', null);
+const NEW_ONLY = flag('new');
+const MARK = flag('mark');
 
 /** Credentials, from env or the config file. Fails loudly and specifically. */
 async function credentials() {
@@ -244,6 +270,26 @@ async function download(urls, outDir, prefix) {
   return saved;
 }
 
+/**
+ * The triaged ledger, or an empty one. A missing, unreadable or malformed
+ * file degrades to "nothing has been triaged" rather than throwing — the
+ * worst case is re-reading feedback you've already seen, and that beats
+ * refusing to show feedback at all.
+ */
+async function readTriaged() {
+  try {
+    const parsed = JSON.parse(await readFile(TRIAGED_PATH, 'utf8'));
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeTriaged(ledger) {
+  await mkdir(dirname(TRIAGED_PATH), { recursive: true });
+  await writeFile(TRIAGED_PATH, `${JSON.stringify(ledger, null, 2)}\n`);
+}
+
 function formatSubmission(item, included, index) {
   const a = item.attributes ?? {};
   const tester = resolve(included, item.relationships?.tester);
@@ -305,17 +351,29 @@ async function main() {
     });
   }
 
+  const ledgerKey = CRASHES ? 'crashes' : 'screenshots';
+  const ledger = await readTriaged();
+  const seen = ledger[ledgerKey] ?? {};
+  const hidden = items.filter((item) => seen[item.id]).length;
+  if (NEW_ONLY) items = items.filter((item) => !seen[item.id]);
+
   console.log(`${app.name} (${app.bundleId}) — app id ${app.id}`);
   console.log(
     `${items.length} ${CRASHES ? 'crash' : 'screenshot'} submission${items.length === 1 ? '' : 's'}` +
-      `${BUILD_FILTER ? ` for build ${BUILD_FILTER}` : ''}`,
+      `${NEW_ONLY ? ' not yet triaged' : ''}` +
+      `${BUILD_FILTER ? ` for build ${BUILD_FILTER}` : ''}` +
+      `${NEW_ONLY && hidden ? ` · ${hidden} already triaged, hidden` : ''}`,
   );
 
   if (!items.length) {
     console.log(
-      `\nNothing yet. Feedback only appears here once a tester submits it from\n` +
-        `the TestFlight app (screenshot → Share Beta Feedback, or the Send\n` +
-        `Feedback button on the build's page).`,
+      NEW_ONLY && hidden
+        ? `\nNothing new — all ${hidden} submission${hidden === 1 ? '' : 's'} Apple returned have\n` +
+            `already been triaged (${relative(REPO_ROOT, TRIAGED_PATH)}).\n` +
+            `Drop --new to see them again; nothing has been deleted.`
+        : `\nNothing yet. Feedback only appears here once a tester submits it from\n` +
+            `the TestFlight app (screenshot → Share Beta Feedback, or the Send\n` +
+            `Feedback button on the build's page).`,
     );
     return;
   }
@@ -341,6 +399,22 @@ async function main() {
     console.log(
       `\n${'─'.repeat(72)}\nCrash logs are a sub-resource: ` +
         `/v1/betaFeedbackCrashSubmissions/<id>/crashLog`,
+    );
+  }
+
+  if (MARK) {
+    // Local date, not toISOString() — the run that reviews an evening's
+    // feedback would otherwise stamp it with tomorrow's UTC date, which
+    // disagrees with the local timestamps printed above it.
+    const today = new Date().toLocaleDateString('en-CA');
+    for (const item of items) seen[item.id] = today;
+    ledger[ledgerKey] = seen;
+    await writeTriaged(ledger);
+    console.log(
+      `\n${'─'.repeat(72)}\n` +
+        `Marked ${items.length} submission${items.length === 1 ? '' : 's'} triaged ` +
+        `(${relative(REPO_ROOT, TRIAGED_PATH)}).\n` +
+        `Nothing was sent to App Store Connect — the feedback is untouched there.`,
     );
   }
 }
