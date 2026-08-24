@@ -135,20 +135,21 @@ the parts of the app's request it isn't given (see `worker/README.md`'s
 "What this service never sees").
 
 **What that doesn't cover, and why it's still worth saying out loud:**
-headlines are public news, already published by outlets with no
-expectation of privacy in the text itself — this isn't personal data by
-any reasonable definition. But **the request pattern is data**: which
-headlines a device asks about, and when, is a reasonable proxy for which
-teams that device follows, and the worker's request logs (to whatever
-extent Cloudflare's platform logging captures them) carry that pattern
-even though no field in the request names a team or a user. The mitigating
-facts: the worker is configured not to log request bodies (see
-`worker/src/index.ts`), verdicts are cached by a hash of the title text so
-a repeat request for the same headline doesn't even reach the model, and
-there is no user identifier anywhere in the request to correlate a pattern
-back to a person. But "no identifier" is not the same claim as "no
-transmission," and this file exists to keep those two claims from getting
-conflated again.
+headlines are public news, already published by outlets with no expectation
+of privacy in the text itself — this isn't personal data by any reasonable
+definition. But **the request pattern is data**: which headlines a device
+asks about, and when, is a reasonable proxy for which teams that device
+follows, and the worker's request logs carry that pattern even though no
+field in the request names a team or a user. That parenthetical used to
+read "to whatever extent Cloudflare's platform logging captures them"; as
+of 2026-08-23 the extent is known and written down two paragraphs below,
+because a hedge is not a retention policy. The mitigating facts: the worker
+is configured not to log request bodies (see `worker/src/index.ts`),
+verdicts are cached by a hash of the title text so a repeat request for the
+same headline doesn't even reach the model, and there is no user identifier
+anywhere in the request to correlate a pattern back to a person. But "no
+identifier" is not the same claim as "no transmission," and this file
+exists to keep those two claims from getting conflated again.
 
 **The catalog request is a different shape and worth separating:** the
 `GET /v1/leagues` call added on 2026-08-22 goes to the same Worker but sends
@@ -168,6 +169,36 @@ not a freshness one, since a verdict about a fixed piece of text never goes
 stale. Nothing else about a request is persisted on the worker: no logs of
 which title mapped to which app instance, no per-request history beyond
 KV's own bounded write pattern.
+
+**Platform logs are a second store, and now a deliberate one.** Workers
+Logs is enabled in `worker/wrangler.toml` at `head_sampling_rate = 1`,
+so Cloudflare records one event per invocation and keeps it for **3 days**
+on the free plan. That retention is Cloudflare's and is not tunable from
+here — the only knob this repo holds is the sampling rate, and turning the
+whole thing off.
+
+What an event carries is request *metadata*, not content: a timestamp, the
+method and path, the response status, the outcome, and CPU/wall timings.
+**No request body is logged** — that was already true and is the sentence
+that matters most now that the envelope around it is retained, because the
+body is the only place headline text appears. Nothing the Worker writes to
+the log names a team, a league, a user, or a title.
+
+The pattern caveat above applies here and is the honest cost of switching
+this on: three days of per-request timestamps against `/v1/classify` is a
+three-day window on when devices refreshed. It was switched on anyway, and
+the trade is worth naming rather than burying — with two users and no way
+to see a 500, the service was unobservable, and an outage nobody can
+diagnose is its own kind of user harm. Sampling is the dial if that trade
+ever stops being worth it.
+
+`scripts/worker-logs.mjs` pulls a window into `.worker-logs/` (gitignored)
+so it can be read here. **That local copy is the one piece of this whose
+retention is ours**, and the rule for it is the same one
+`.testflight-feedback/` follows: read it, act on it in a commit, delete
+it. Don't start a tracked archive of log windows — three days is what the
+platform keeps, and a repo that keeps more has quietly become a longer
+retention policy than the one documented here.
 
 **This section is no longer describing a hypothetical.** It originally
 ended by saying the default is "nothing is transmitted," on the grounds

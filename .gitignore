@@ -89,3 +89,8 @@ example
 # KV), created by the `worker` entry in .claude/launch.json. Build output, not
 # config — wrangler.toml is the tracked part.
 worker/.wrangler/
+
+# Worker logs pulled down by scripts/worker-logs.mjs. Cloudflare keeps these
+# 3 days and this is a local copy of a window someone looked at — same call as
+# .testflight-feedback/ above: read once, acted on in a commit, not a record.
+/.worker-logs/

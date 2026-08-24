@@ -23,6 +23,24 @@ compatibility_date = "2026-08-18"
 # what lets Wrangler bundle it for the Workers runtime.
 compatibility_flags = ["nodejs_compat"]
 
+# Workers Logs. Declared here rather than left to the platform default so
+# that a deploy from this file can't silently turn it off — this is the only
+# place the running service is observable from, and a setting that lives in
+# the dashboard is one nobody reads before deploying.
+#
+# `head_sampling_rate = 1` logs every invocation. That is the right number
+# while the audience is small enough to count; the free plan includes
+# 200,000 log events a day and keeps them for 3 days, and this Worker sees
+# a few hundred requests a day. Revisit the rate if that stops being true —
+# not the retention, which isn't tunable on this plan.
+#
+# Three days is a real constraint, not a detail: it means a log nobody
+# pulled is gone. `scripts/worker-logs.mjs` in the app repo is what pulls
+# them, and `docs/data-retention.md` records what they contain.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 [[kv_namespaces]]
 binding = "VERDICTS"
 id = "5bba8039a42f49418095e9e2e8c4a676"

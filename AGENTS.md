@@ -222,6 +222,24 @@ each with a reason: three are ordinary fetch-on-mount (`use-teams`,
 boilerplate. They're per-line rather than a rule-level "off" so the rule
 still fails the build on new code.
 
+## Reading what the service did
+
+The Worker is the one component with live users and no screen to look at.
+`[observability]` in `worker/wrangler.toml` turns Workers Logs on at full
+sampling; `scripts/worker-logs.mjs` pulls a window into `.worker-logs/`;
+`/log-triage` is the workflow that reads one.
+
+Two things to hold onto:
+
+- **Three days, then gone.** Free-plan retention, not tunable from here.
+  A window nobody pulled is not recoverable, which is why the script
+  writes to disk rather than only printing.
+- **Metadata only, and that's a published claim.** `docs/data-retention.md`
+  states that no request body is logged and that events carry method,
+  path, status, outcome and timings. A `console.log` of a title or an id
+  in `worker/src/index.ts` contradicts a document — if it's genuinely
+  needed, that document gets updated in the same change, per its own rule.
+
 ## Feature flags
 
 `src/constants/flags.ts` holds compile-time booleans for changes big
