@@ -73,6 +73,12 @@ example
 # local agent settings
 .claude/settings.local.json
 
+# Screenshots pulled down by scripts/testflight-feedback.mjs --download.
+# Tester-submitted images of their own screen, fetched to be looked at once
+# and not part of the app — unlike docs/evidence/, there's nothing here worth
+# keeping a record of.
+/.testflight-feedback/
+
 # Stray feed-checker output at the repo root. Reports under docs/evidence/
 # are deliberately tracked — they're the record of when each source was last
 # verified alive. Root-only pattern so scripts/check-feeds.sh output lands in

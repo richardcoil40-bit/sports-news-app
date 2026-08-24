@@ -1,0 +1,351 @@
+#!/usr/bin/env node
+/**
+ * Pulls TestFlight tester feedback out of App Store Connect.
+ *
+ *   node scripts/testflight-feedback.mjs [--limit N] [--download] [--json]
+ *                                        [--crashes] [--build N]
+ *
+ * This is the same feedback that shows up under TestFlight → Feedback in
+ * App Store Connect — a tester's screenshot plus whatever they typed —
+ * fetched over Apple's REST API so it can be read here instead of by
+ * squinting at the web UI and retyping it.
+ *
+ * ## Credentials
+ *
+ * Never in this repo, and never on the command line. Read from, in order:
+ *
+ *   1. env: ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY (path to the .p8)
+ *   2. ~/.appstoreconnect/config.json — {"keyId":…,"issuerId":…}
+ *
+ * with the key file defaulting to Apple's own documented location,
+ * ~/.appstoreconnect/private_keys/AuthKey_<keyId>.p8. That directory is
+ * outside the repo on purpose: `.gitignore` catches `*.p8`, but a rule
+ * you never have to rely on is better than one you do.
+ *
+ * The key ID and issuer ID are not secrets (they identify the key, they
+ * don't authorize it) and are printed on failure to make a typo visible.
+ * The private key is never printed, logged, or written anywhere.
+ *
+ * ## The token
+ *
+ * ES256, twenty-minute life, `aud: appstoreconnect-v1`. Signed with
+ * node:crypto rather than a JWT library so this stays dependency-free —
+ * the only subtlety is `dsaEncoding: 'ieee-p1363'`, which is not the
+ * default. Node signs ECDSA as DER unless told otherwise, and JWS wants
+ * the raw r‖s pair; a DER signature here produces a 401 that reads like
+ * a bad key rather than a bad encoding.
+ *
+ * ## Why the app id isn't hardcoded
+ *
+ * It's resolved from the bundle identifier in app.json, so this keeps
+ * working if the app is ever recreated in App Store Connect (which
+ * issues a new numeric id) and so there's one less number to keep in
+ * sync by hand.
+ */
+
+import { createSign } from 'node:crypto';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const API = 'https://api.appstoreconnect.apple.com';
+const CONFIG_DIR = join(homedir(), '.appstoreconnect');
+
+const args = process.argv.slice(2);
+const flag = (name) => args.includes(`--${name}`);
+const value = (name, fallback) => {
+  const i = args.indexOf(`--${name}`);
+  return i === -1 || i === args.length - 1 ? fallback : args[i + 1];
+};
+
+const LIMIT = Number(value('limit', '20'));
+const DOWNLOAD = flag('download');
+const JSON_OUT = flag('json');
+const CRASHES = flag('crashes');
+const BUILD_FILTER = value('build', null);
+
+/** Credentials, from env or the config file. Fails loudly and specifically. */
+async function credentials() {
+  let file = {};
+  try {
+    file = JSON.parse(await readFile(join(CONFIG_DIR, 'config.json'), 'utf8'));
+  } catch {
+    // Absent config file is fine — env may carry everything.
+  }
+
+  const keyId = process.env.ASC_KEY_ID ?? file.keyId;
+  const issuerId = process.env.ASC_ISSUER_ID ?? file.issuerId;
+  const keyPath =
+    process.env.ASC_PRIVATE_KEY ??
+    file.privateKeyPath ??
+    (keyId ? join(CONFIG_DIR, 'private_keys', `AuthKey_${keyId}.p8`) : null);
+
+  const missing = [
+    !keyId && 'key ID (ASC_KEY_ID)',
+    !issuerId && 'issuer ID (ASC_ISSUER_ID)',
+    !keyPath && 'private key path (ASC_PRIVATE_KEY)',
+  ].filter(Boolean);
+
+  if (missing.length) {
+    throw new Error(
+      `Missing ${missing.join(', ')}.\n\n` +
+        `Create a key at App Store Connect → Users and Access → Integrations →\n` +
+        `App Store Connect API, then either set the env vars or write\n` +
+        `${join(CONFIG_DIR, 'config.json')} as {"keyId":"…","issuerId":"…"}\n` +
+        `and drop the .p8 at ${join(CONFIG_DIR, 'private_keys')}/AuthKey_<keyId>.p8`,
+    );
+  }
+
+  let privateKey;
+  try {
+    privateKey = await readFile(keyPath, 'utf8');
+  } catch {
+    throw new Error(
+      `Can't read the private key at ${keyPath}\n` +
+        `Apple lets you download a .p8 exactly once — if it's lost, revoke the\n` +
+        `key in App Store Connect and generate a new one.`,
+    );
+  }
+
+  return { keyId, issuerId, privateKey };
+}
+
+const b64url = (input) =>
+  Buffer.from(input).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+function mintToken({ keyId, issuerId, privateKey }) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: 'ES256', kid: keyId, typ: 'JWT' }));
+  const payload = b64url(
+    JSON.stringify({ iss: issuerId, iat: now, exp: now + 1200, aud: 'appstoreconnect-v1' }),
+  );
+
+  const signer = createSign('SHA256');
+  signer.update(`${header}.${payload}`);
+  // JWS wants the raw r‖s pair; node's default DER encoding yields a 401.
+  const signature = signer.sign({ key: privateKey, dsaEncoding: 'ieee-p1363' });
+
+  return `${header}.${payload}.${b64url(signature)}`;
+}
+
+async function get(token, path, { keyId, issuerId }) {
+  const res = await fetch(path.startsWith('http') ? path : `${API}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    const detail = (() => {
+      try {
+        return JSON.parse(body).errors?.map((e) => `${e.title}: ${e.detail}`).join('\n') || body;
+      } catch {
+        return body;
+      }
+    })();
+
+    if (res.status === 401) {
+      throw new Error(
+        `401 Unauthorized (key ${keyId}, issuer ${issuerId})\n${detail}\n\n` +
+          `Check the key ID and issuer ID against App Store Connect, and that the\n` +
+          `key has a role that can see TestFlight feedback (Admin, App Manager,\n` +
+          `Developer or Marketing).`,
+      );
+    }
+    throw new Error(`${res.status} ${res.statusText} on ${path}\n${detail}`);
+  }
+
+  return res.json();
+}
+
+/** Resolve the numeric App Store Connect id from app.json's bundle identifier. */
+async function resolveApp(token, creds) {
+  const appJson = JSON.parse(await readFile(join(REPO_ROOT, 'app.json'), 'utf8'));
+  const bundleId = appJson?.expo?.ios?.bundleIdentifier;
+  if (!bundleId) throw new Error('No expo.ios.bundleIdentifier in app.json');
+
+  const json = await get(
+    token,
+    `/v1/apps?filter[bundleId]=${encodeURIComponent(bundleId)}&limit=1`,
+    creds,
+  );
+  const app = json?.data?.[0];
+  if (!app) {
+    throw new Error(
+      `No app in App Store Connect with bundle id ${bundleId}.\n` +
+        `If the key is scoped to specific apps, make sure this one is included.`,
+    );
+  }
+  return { id: app.id, name: app.attributes?.name ?? bundleId, bundleId };
+}
+
+/**
+ * List a feedback resource. Apple 400s on an unknown sort or include rather
+ * than ignoring it, and the exact spelling has moved since the API shipped —
+ * so degrade to a plainer query instead of failing the whole run.
+ */
+async function listFeedback(token, appId, resource, creds) {
+  const attempts = [
+    `?sort=-createdDate&limit=${LIMIT}&include=tester,build`,
+    `?sort=-createdDate&limit=${LIMIT}`,
+    `?limit=${LIMIT}`,
+  ];
+
+  let lastError;
+  for (const query of attempts) {
+    try {
+      return await get(token, `/v1/apps/${appId}/${resource}${query}`, creds);
+    } catch (err) {
+      lastError = err;
+      if (!/^4\d\d|^400/.test(String(err.message))) throw err;
+    }
+  }
+  throw lastError;
+}
+
+/** Index `included[]` by "type:id" so relationships can be resolved to names. */
+function indexIncluded(json) {
+  const map = new Map();
+  for (const item of json?.included ?? []) map.set(`${item.type}:${item.id}`, item);
+  return map;
+}
+
+function resolve(map, relationship) {
+  const ref = relationship?.data;
+  if (!ref) return null;
+  return map.get(`${ref.type}:${ref.id}`) ?? null;
+}
+
+function screenshotUrls(attributes) {
+  // Shape has drifted across releases; take whichever URL field is present.
+  return (attributes?.screenshots ?? [])
+    .map((shot) => shot?.url ?? shot?.imageAsset?.templateUrl ?? shot?.fileUrl)
+    .filter(Boolean);
+}
+
+async function download(urls, outDir, prefix) {
+  await mkdir(outDir, { recursive: true });
+  const saved = [];
+  for (const [i, url] of urls.entries()) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        saved.push(`  (failed: ${res.status} on screenshot ${i + 1})`);
+        continue;
+      }
+      const path = join(outDir, `${prefix}-${i + 1}.png`);
+      await writeFile(path, Buffer.from(await res.arrayBuffer()));
+      saved.push(path);
+    } catch (err) {
+      saved.push(`  (failed: ${err.message})`);
+    }
+  }
+  return saved;
+}
+
+function formatSubmission(item, included, index) {
+  const a = item.attributes ?? {};
+  const tester = resolve(included, item.relationships?.tester);
+  const build = resolve(included, item.relationships?.build);
+
+  const who =
+    [tester?.attributes?.firstName, tester?.attributes?.lastName].filter(Boolean).join(' ') ||
+    a.email ||
+    'unknown tester';
+
+  const when = a.createdDate ? new Date(a.createdDate).toLocaleString() : 'unknown date';
+  const buildNumber = build?.attributes?.version ?? a.buildBundleId ?? '?';
+
+  const lines = [
+    `\n${'─'.repeat(72)}`,
+    `[${index + 1}] ${who} — ${when}`,
+    `    build ${buildNumber} · ${a.deviceModel ?? '?'} · iOS ${a.osVersion ?? '?'} · ${a.locale ?? '?'}`,
+  ];
+
+  if (a.comment) lines.push(`\n    "${a.comment.replace(/\n/g, '\n     ')}"`);
+  else lines.push(`\n    (no comment — screenshot only)`);
+
+  if (a.batteryPercentage != null || a.connectionType) {
+    lines.push(
+      `\n    ${[
+        a.connectionType && `connection ${a.connectionType}`,
+        a.batteryPercentage != null && `battery ${a.batteryPercentage}%`,
+        a.appUptimeInMilliseconds != null &&
+          `up ${Math.round(a.appUptimeInMilliseconds / 1000)}s`,
+      ]
+        .filter(Boolean)
+        .join(' · ')}`,
+    );
+  }
+
+  return { lines, urls: screenshotUrls(a), id: item.id };
+}
+
+async function main() {
+  const creds = await credentials();
+  const token = mintToken(creds);
+  const app = await resolveApp(token, creds);
+
+  const resource = CRASHES ? 'betaFeedbackCrashSubmissions' : 'betaFeedbackScreenshotSubmissions';
+  const json = await listFeedback(token, app.id, resource, creds);
+
+  if (JSON_OUT) {
+    console.log(JSON.stringify(json, null, 2));
+    return;
+  }
+
+  const included = indexIncluded(json);
+  let items = json?.data ?? [];
+
+  if (BUILD_FILTER) {
+    items = items.filter((item) => {
+      const build = resolve(included, item.relationships?.build);
+      return build?.attributes?.version === BUILD_FILTER;
+    });
+  }
+
+  console.log(`${app.name} (${app.bundleId}) — app id ${app.id}`);
+  console.log(
+    `${items.length} ${CRASHES ? 'crash' : 'screenshot'} submission${items.length === 1 ? '' : 's'}` +
+      `${BUILD_FILTER ? ` for build ${BUILD_FILTER}` : ''}`,
+  );
+
+  if (!items.length) {
+    console.log(
+      `\nNothing yet. Feedback only appears here once a tester submits it from\n` +
+        `the TestFlight app (screenshot → Share Beta Feedback, or the Send\n` +
+        `Feedback button on the build's page).`,
+    );
+    return;
+  }
+
+  const outDir = join(REPO_ROOT, '.testflight-feedback');
+
+  for (const [i, item] of items.entries()) {
+    const { lines, urls, id } = formatSubmission(item, included, i);
+    console.log(lines.join('\n'));
+
+    if (!urls.length) continue;
+
+    if (DOWNLOAD) {
+      const saved = await download(urls, outDir, `${id.slice(0, 8)}`);
+      console.log(`\n    screenshots:`);
+      for (const path of saved) console.log(`      ${path}`);
+    } else {
+      console.log(`\n    ${urls.length} screenshot(s) — re-run with --download to save them`);
+    }
+  }
+
+  if (CRASHES) {
+    console.log(
+      `\n${'─'.repeat(72)}\nCrash logs are a sub-resource: ` +
+        `/v1/betaFeedbackCrashSubmissions/<id>/crashLog`,
+    );
+  }
+}
+
+main().catch((err) => {
+  console.error(`\n${err.message}\n`);
+  process.exit(1);
+});
