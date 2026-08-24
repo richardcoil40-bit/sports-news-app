@@ -120,15 +120,27 @@ export function DropdownPill({
   // doesn't hang off it. Right-aligned panels are positioned from the
   // right edge for the same reason the design does: the filter pill sits
   // against it, and measuring from the left would need the pill's width.
+  //
+  // Both branches clamp *both* edges, and the right-aligned one has to:
+  // an offset that lines the panel up with a pill near the left of the
+  // screen puts the panel's far edge past x=0. That is not hypothetical —
+  // in single-team view the two pills are narrow, so the claim pill's
+  // right edge sits ~144pt in, a 210pt panel starts at -66pt, and the
+  // row labels render off-screen. The cap is the largest offset that
+  // still leaves SCREEN_MARGIN on the opposite side.
   const panelTop = anchor ? anchor.y + anchor.height + PANEL_GAP : 0;
+  const farEdgeCap = screenWidth - panelWidth - SCREEN_MARGIN;
   const panelPosition = anchor
     ? align === 'right'
       ? {
-          right: Math.max(SCREEN_MARGIN, screenWidth - (anchor.x + anchor.width)),
+          right: Math.max(
+            SCREEN_MARGIN,
+            Math.min(screenWidth - (anchor.x + anchor.width), farEdgeCap),
+          ),
           top: panelTop,
         }
       : {
-          left: Math.max(SCREEN_MARGIN, Math.min(anchor.x, screenWidth - panelWidth - SCREEN_MARGIN)),
+          left: Math.max(SCREEN_MARGIN, Math.min(anchor.x, farEdgeCap)),
           top: panelTop,
         }
     : null;
