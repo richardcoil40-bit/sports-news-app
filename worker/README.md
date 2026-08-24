@@ -259,3 +259,9 @@ The request pattern (which teams a user's client asks about, and when)
 still reveals something about who's using the app, which is why
 `docs/data-retention.md` was updated in the same change that shipped this
 service — read that file, not this one, for the retention story.
+
+**The "no query" above is a constraint, not an incidental fact.** Workers
+Logs retains the full request URL for three days, so a query parameter is
+logged where a request body is not. That is why `/v1/classify` takes its
+title in a POST body, and why a new endpoint should not reach for `?q=`
+without reading the Workers Logs section of `docs/data-retention.md` first.

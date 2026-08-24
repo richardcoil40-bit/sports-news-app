@@ -178,11 +178,27 @@ here — the only knob this repo holds is the sampling rate, and turning the
 whole thing off.
 
 What an event carries is request *metadata*, not content: a timestamp, the
-method and path, the response status, the outcome, and CPU/wall timings.
-**No request body is logged** — that was already true and is the sentence
-that matters most now that the envelope around it is retained, because the
-body is the only place headline text appears. Nothing the Worker writes to
-the log names a team, a league, a user, or a title.
+method, the request URL, the response status, the outcome, and CPU/wall
+timings. **No request body is logged** — that was already true and is the
+sentence that matters most now that the envelope around it is retained,
+because the body is the only place headline text appears.
+
+The Worker contributes nothing to this. `worker/src/index.ts` contains no
+`console.log` at all, so every field above is Cloudflare's, generated from
+the request rather than written by us. That makes the claim easier to keep
+than it looks — there is no logging call anywhere to audit — but it also
+moves the thing that could break it somewhere less obvious than a stray
+log line.
+
+**What could break it is a query string.** The logged URL is the whole
+URL, not just the path, so anything a future endpoint accepts as a query
+parameter is retained for three days in a way a request body never is.
+Nothing does today: `/v1/classify` is a POST carrying its title in the
+body, and `worker/README.md` pins `/v1/leagues` as a GET with no body and
+no query. The metadata-only claim on this page rests on that staying true.
+An endpoint reading `?title=` would move headline text out of the body and
+into the log without touching a line of logging code — and this file would
+be wrong without anyone having edited it.
 
 The pattern caveat above applies here and is the honest cost of switching
 this on: three days of per-request timestamps against `/v1/classify` is a

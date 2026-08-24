@@ -279,10 +279,14 @@ Two things to hold onto:
   A window nobody pulled is not recoverable, which is why the script
   writes to disk rather than only printing.
 - **Metadata only, and that's a published claim.** `docs/data-retention.md`
-  states that no request body is logged and that events carry method,
-  path, status, outcome and timings. A `console.log` of a title or an id
-  in `worker/src/index.ts` contradicts a document — if it's genuinely
-  needed, that document gets updated in the same change, per its own rule.
+  states that no request body is logged and that events carry the method,
+  the URL, status, outcome and timings. There are two ways to contradict
+  it, and only the first looks like logging: a `console.log` of a title or
+  an id in `worker/src/index.ts`, or an endpoint that takes request data in
+  a **query string**. The logged URL is the whole URL, so a `?title=` puts
+  headline text into a three-day store without any logging code involved.
+  If either is genuinely needed, that document gets updated in the same
+  change, per its own rule.
 
 ## Feature flags
 
