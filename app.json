@@ -2,7 +2,7 @@
   "expo": {
     "name": "NoFrills",
     "slug": "sports-news-app",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "nofrills",
@@ -10,7 +10,7 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.rico1440.nofrills",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "CFBundleDisplayName": "Fieldwork"
       },
@@ -27,7 +27,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.rico1440.nofrills",
-      "versionCode": 3
+      "versionCode": 4
     },
     "web": {
       "output": "static",
