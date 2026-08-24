@@ -222,6 +222,50 @@ each with a reason: three are ordinary fetch-on-mount (`use-teams`,
 boilerplate. They're per-line rather than a rule-level "off" so the rule
 still fails the build on new code.
 
+## Continuous integration
+
+Three separate things run outside this machine, and they fail in
+different places:
+
+- **`.github/workflows/ci.yml`** — lint and tests on every push to `main`
+  and every PR. **`feed-check.yml`** is manual only (`workflow_dispatch`),
+  deliberately not tied to PRs: a flaky third-party feed shouldn't block a
+  change that has nothing to do with it.
+- **Xcode Cloud** builds and archives to TestFlight, and reports by email.
+- **The Worker** is the only piece with users on the other end of it. See
+  the logging section below.
+
+### Xcode Cloud needs `ci_scripts/ci_post_clone.sh`, and `/ios` is why
+
+`/ios` and `/android` are gitignored (generated native folders). Xcode
+Cloud clones the repo, looks for the workspace its workflow names, finds
+nothing, and fails with `Workspace NoFrills.xcworkspace does not exist at
+ios/NoFrills.xcworkspace`. That reads like a project or signing problem
+and is neither — there is simply no native project in a fresh clone.
+
+`ci_scripts/ci_post_clone.sh` generates one. Three things in it are load-
+bearing and none of them are obvious from the failure they prevent:
+
+- **Prebuild is safe here, unlike locally.** The Environment-specific
+  constraints section warns at length that prebuild is destructive to
+  `ios/` because it wipes `DEVELOPMENT_TEAM` out of `project.pbxproj`.
+  That warning does not transfer: a clone has no `ios/` to destroy, and
+  Xcode Cloud signs with its own managed certificate. Don't "fix" the CI
+  script to avoid prebuild.
+- **`ios/.xcode.env.local` has to be written after prebuild.** The
+  "Bundle React Native code and images" phase runs in its own shell and
+  resolves node through `.xcode.env(.local)`, not `PATH`, so a
+  brew-installed node is invisible to it. Without that line the archive
+  fails much later with a bare `node: command not found`.
+- **`.env.local` doesn't travel.** `.env` is tracked and carries
+  `EXPO_PUBLIC_VERDICT_URL` / `_CATALOG_URL`; `.env*.local` is ignored and
+  is where `EXPO_PUBLIC_VERDICT_TOKEN` lives. Expo inlines `EXPO_PUBLIC_*`
+  at bundle time, which happens in CI — so a build made anywhere but the
+  usual machine ships without the token, gets a 401 from every
+  `/v1/classify`, and **degrades to local verdict rules with nothing on
+  screen to say so**. The script writes it from an Xcode Cloud secret
+  environment variable of the same name and warns when it can't.
+
 ## Reading what the service did
 
 The Worker is the one component with live users and no screen to look at.
