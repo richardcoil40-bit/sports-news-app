@@ -1,4 +1,4 @@
-import { Article } from '@/lib/feeds';
+import type { Article } from '@/lib/feeds';
 import { wordBoundaryMatch } from '@/lib/text-match';
 
 /**

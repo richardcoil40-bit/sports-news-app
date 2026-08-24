@@ -272,7 +272,7 @@ facts. Not currently ingested; noted so the boundary is explicit.
 actually return items. Run it before adding any source, and re-run
 periodically — feeds move and get retired.
 
-Two cautions learned the hard way:
+Three cautions learned the hard way:
 
 - **Don't trust a single client.** During research, feeds that are
   demonstrably live returned empty or unreadable responses to one fetching
@@ -284,6 +284,46 @@ Two cautions learned the hard way:
   They call for different responses: give up, guess again, and give up
   respectively. ESPN returns 202 to curl while serving the app fine, so a
   non-200 isn't automatically fatal either.
+- **Liveness is not usefulness.** A feed can answer 200 with fifty items
+  and contribute *nothing* to the team it was added for. That is not a
+  hypothetical: it was true of four sources in the shipping catalog for
+  months. `scripts/review/yield.mjs` is the report that asks the second
+  question — see below.
+
+### A live feed that contributes nothing
+
+`check-feeds.sh` asks whether a URL returns items. Everything that decides
+whether an item reaches the reader — the team-name match, `off-topic.ts`,
+`off-sport.ts` — runs afterwards, so a source can pass every check here and
+still be invisible in the app. Run
+`node scripts/review/yield.mjs [leagueId ...]` for that question; it runs
+the app's own filters over the app's own parser and reports
+`items → named → kept` per source.
+
+Two causes found so far, and they want different fixes:
+
+- **The wrong section of the right paper.** The TownNews/BLOX root
+  `c=sports` category is where the syndicated wire lands — AP copy, daily
+  agate, Little League regionals, sportsbook affiliate posts — and at
+  `l=50` it fills the entire response, pushing the beat writer's work off
+  the end. The Tulsa World, the St. Louis Post-Dispatch and The Eagle each
+  returned **zero** articles naming their team; the Waco Tribune-Herald
+  returned one. Reading the paper's own section instead
+  (`sports/college/mizzou`, `sports/college/aggiesports`,
+  `k_state_sports/football`) took those four from 0/0/0/1 to 43/25/19/30.
+  The section is research per paper, not a pattern: find it in the paper's
+  navigation, and note The Manhattan Mercury files K-State *outside*
+  `sports/` altogether. The same failure exists off this CMS — the LA Times
+  sports front gave USC two articles where `sports/usc/rss2.0.xml` gives 18.
+- **The outlet is gone and the domain isn't.** The CU Independent stopped
+  being the CU Boulder student paper: its news feed ends in July 2024, the
+  site now describes itself as covering "celebrity news, art, sexuality,
+  sports, and lifestyle", and its sports category is casino-affiliate and
+  listicle copy. It answered 200 with ten items throughout, so no liveness
+  check would ever have flagged it. This is criterion 7
+  (business-model hygiene) failing after admission, which is the case for
+  re-reading the criteria against a source periodically and not only once.
+  Removed rather than retuned — there was no section of it left to point at.
 
 ### Owners already ruled out
 
@@ -300,8 +340,8 @@ re-tested once per team it owns.
 | Vox / SB Nation (California) | Sites shut down after AB5 | Gone. UCLA and USC have no blog. |
 | Vox / SB Nation (elsewhere) | Domain resets rather than 404s | Gone, not moved. |
 | USA Today "Wire" | 404 including the control site | Network folded in. |
-| Advance | Live on `/arc/outboundfeeds/rss/category/sports/` | Works. Try this path first. |
-| Lee | Live on `/search/?f=rss&t=article&c=sports&l=50` | Works. Try this path first. |
+| Advance | Live on `/arc/outboundfeeds/rss/category/sports/` | Works, and that is the only category it serves. |
+| Lee / TownNews | Live on `/search/?f=rss&t=article&c=<section>&l=50` | Works. Probe with `c=sports`, then **subscribe to a section below it**. |
 
 The dead ones are also `DEAD_FEED_OWNERS` in
 `src/lib/community-sources.ts`, composed into the per-team reason each

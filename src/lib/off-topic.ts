@@ -1,4 +1,4 @@
-import { Article } from '@/lib/feeds';
+import type { Article } from '@/lib/feeds';
 
 /**
  * Content that isn't sports news at all, and is dropped rather than labeled.

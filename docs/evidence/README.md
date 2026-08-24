@@ -9,6 +9,30 @@ of that fails loudly in the app — the source just stops contributing. Having
 dated reports means you can diff against the last one instead of re-deriving
 the whole picture from scratch.
 
+## Two reports, two questions
+
+`feed-status-*.txt` answers **is this URL still returning items** —
+`scripts/check-feeds.sh`, described below.
+
+`source-yield-*.txt` answers **does any of it reach the reader** —
+`node scripts/review/yield.mjs [leagueId ...]`. A feed can pass every
+check the first report makes and contribute nothing, because the
+team-name match, `off-topic.ts` and `off-sport.ts` all run afterwards. It
+prints `items → named → kept` per source and flags a team whose feed ends
+below `--min` (default 3).
+
+That gap was not hypothetical. Four sources in the shipping catalog were
+live, healthy and contributing nothing when the report was first run on
+2026-08-24: the Tulsa World, the St. Louis Post-Dispatch, The Eagle and
+the Waco Tribune-Herald were all subscribed to the TownNews root
+`c=sports` category, which serves syndicated wire and daily agate rather
+than the beat. Cincinnati — the report that prompted this — was showing
+one article about the dance team. See `docs/source-reliability.md` for
+the write-up and the fix.
+
+Run it from a laptop, like `check-feeds.sh`: it makes the same requests to
+the same rate-limiting papers.
+
 ## Re-running
 
 ```

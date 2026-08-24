@@ -66,6 +66,19 @@ const USA_TODAY_WIRE =
   "USA Today's Wire team sites are all 404, including the control " +
   '(Fighting Irish Wire), so the network was folded in rather than moved';
 
+/**
+ * Not an owner ruling — one domain, and the only failure of this kind in
+ * the catalog so far. Kept up here anyway because it is the shape a source
+ * dies in that no liveness check can see: the feed answers 200 with ten
+ * items and always will.
+ */
+const CU_INDEPENDENT_SOLD =
+  'The CU Independent is no longer the CU Boulder student paper: its own ' +
+  'news feed stops in July 2024, the domain now describes itself as ' +
+  'covering "celebrity news, art, sexuality, sports, and lifestyle", and ' +
+  'its sports category is casino-affiliate and listicle copy. Removed ' +
+  'rather than retuned — there is no section of it left to point at.';
+
 /** The same rulings by owner, for anything that wants to read them. */
 export const DEAD_FEED_OWNERS: Record<string, string> = {
   gannett: GANNETT,
@@ -92,10 +105,14 @@ export const DEAD_FEED_OWNERS: Record<string, string> = {
  * this table would produce for a candidate host, rather than a second
  * guess at the same path. The live/dead findings behind them are the owner
  * table in docs/source-reliability.md.
+ *
+ * `lee` takes a section as well as a host, and defaults it to `sports`
+ * only for the probe: `c=sports` proves a host runs this CMS, and is the
+ * wrong feed to then subscribe to. See the LEE() helper below for why.
  */
-export const OWNER_FEED_URL: Record<string, (host: string) => string> = {
+export const OWNER_FEED_URL: Record<string, (host: string, section?: string) => string> = {
   advance: (host) => `https://${host}/arc/outboundfeeds/rss/category/sports/?outputType=xml`,
-  lee: (host) => `https://${host}/search/?f=rss&t=article&c=sports&l=50`,
+  lee: (host, section = 'sports') => `https://${host}/search/?f=rss&t=article&c=${section}&l=50`,
   'sb-nation': (host) => `https://${host}/rss/index.xml`,
 };
 
@@ -126,16 +143,49 @@ const ADVANCE = (id: string, name: string, host: string): FeedSource => ({
  * The tier is a parameter because the CMS spans both: a metro daily is
  * tier 1 and a campus newsroom is tier 3, and they are otherwise identical
  * down to the query string.
+ *
+ * **`section` is required, and used to be an implicit `sports`.** That
+ * default was wrong on nearly every paper here and wrong invisibly, which
+ * is the reason it is now a parameter nobody can forget. On this CMS the
+ * root `sports` category is where the syndicated wire lands — AP copy,
+ * daily agate ("For the Record: Scores, results, boxscores"), Little
+ * League regionals, sportsbook affiliate posts — while the beat writer who
+ * actually covers the program files to a section below it. With `l=50` the
+ * wire alone fills the whole response, so the local coverage is not merely
+ * diluted, it is off the end of the feed.
+ *
+ * Measured on the shipping catalog, `c=sports` returned *zero* articles
+ * naming the team for the Tulsa World, the St. Louis Post-Dispatch and The
+ * Eagle, and one for the Waco Tribune-Herald. Every one of them is a live
+ * feed answering 200 with fifty items, so scripts/check-feeds.sh passes
+ * them and always did — see scripts/review/yield.mjs, which is the report
+ * that asks the question that catches this.
+ *
+ * The sections themselves are research, not a pattern: papers on one CMS
+ * still name their own sections. `sports/college/<team>` is the most
+ * common (Waco, Tulsa, Opelika, St. Louis), student papers file by sport
+ * (`sports/football`), and The Manhattan Mercury puts K-State at the top
+ * level in `k_state_sports/` — outside `sports/` altogether. Read the
+ * paper's own navigation rather than guessing.
+ *
+ * None of which was unknown here: The Advocate has carried
+ * `c=sports/lsu` and a comment saying why since the SEC went in. It was
+ * read as one paper's quirk instead of as the chain's shape, and the
+ * other twenty-two kept the default. A finding recorded at one call site
+ * is a finding until someone hits it again — which is the argument for
+ * pushing it into the helper's signature rather than into a third
+ * comment.
  */
 const LEE = (
   id: string,
   name: string,
   host: string,
+  section: string,
   tier: FeedSource['tier'] = 1,
 ): FeedSource => ({
   id,
   name,
-  url: OWNER_FEED_URL.lee(host),
+  url: OWNER_FEED_URL.lee(host, section),
   tier,
   scope: 'broad',
 });
@@ -146,7 +196,7 @@ const AL_COM: FeedSource = ADVANCE('al-com', 'AL.com', 'www.al.com');
 const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   illinois: [
     SB_NATION('champaign-room', 'The Champaign Room', 'thechampaignroom.com'),
-    LEE('news-gazette', 'The News-Gazette', 'www.news-gazette.com'),
+    LEE('news-gazette', 'The News-Gazette', 'www.news-gazette.com', 'sports/illini-sports'),
   ],
   indiana: [SB_NATION('crimson-quarry', 'The Crimson Quarry', 'crimsonquarry.com')],
   iowa: [SB_NATION('bhgp', 'Black Heart Gold Pants', 'blackheartgoldpants.com')],
@@ -173,9 +223,9 @@ const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   ],
   nebraska: [
     SB_NATION('corn-nation', 'Corn Nation', 'cornnation.com'),
-    LEE('lincoln-journal-star', 'Lincoln Journal Star', 'journalstar.com'),
-    LEE('omaha-world-herald', 'Omaha World-Herald', 'omaha.com'),
-    LEE('daily-nebraskan', 'Daily Nebraskan', 'www.dailynebraskan.com', 3),
+    LEE('lincoln-journal-star', 'Lincoln Journal Star', 'journalstar.com', 'sports/huskers'),
+    LEE('omaha-world-herald', 'Omaha World-Herald', 'omaha.com', 'sports/huskers'),
+    LEE('daily-nebraskan', 'Daily Nebraskan', 'www.dailynebraskan.com', 'sports/football', 3),
   ],
   northwestern: [SB_NATION('inside-nu', 'Inside NU', 'insidenu.com')],
   'ohio-state': [
@@ -202,37 +252,48 @@ const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
     SB_NATION('on-the-banks', 'On the Banks', 'onthebanks.com'),
     ADVANCE('nj-com', 'NJ.com', 'www.nj.com'),
   ],
+  // The LA Times publishes a per-program feed on the same path shape as its
+  // sports front, so UCLA and USC each read their own rather than sharing
+  // one and name-filtering it down. That paper covers two college programs
+  // and five pro teams, and the shared front gave USC two articles and UCLA
+  // four; the sections give 18 and 15. Same failure as the TownNews front
+  // page (see LEE()), different CMS — which is why the yield report is
+  // owner-agnostic and this one keeps its own id per section: they really
+  // are two beats, not one paper read twice.
   ucla: [
     {
-      id: 'la-times',
+      id: 'la-times-ucla',
       name: 'Los Angeles Times',
-      url: 'https://www.latimes.com/sports/rss2.0.xml',
+      url: 'https://www.latimes.com/sports/ucla/rss2.0.xml',
       tier: 1,
       scope: 'broad',
     },
   ],
   usc: [
     {
-      id: 'la-times',
+      id: 'la-times-usc',
       name: 'Los Angeles Times',
-      url: 'https://www.latimes.com/sports/rss2.0.xml',
+      url: 'https://www.latimes.com/sports/usc/rss2.0.xml',
       tier: 1,
       scope: 'broad',
     },
   ],
   washington: [
     SB_NATION('uw-dawg-pound', 'UW Dawg Pound', 'uwdawgpound.com'),
+    // WordPress, and the section feed is the program's own beat: the sports
+    // front gave six articles against this one's 29, because Seattle has
+    // two pro teams that outproduce the Huskies in the offseason.
     {
       id: 'seattle-times',
       name: 'The Seattle Times',
-      url: 'https://www.seattletimes.com/sports/feed/',
+      url: 'https://www.seattletimes.com/sports/uw-husky-football/feed/',
       tier: 1,
       scope: 'broad',
     },
   ],
   wisconsin: [
     SB_NATION('buckys-5th-quarter', "Bucky's 5th Quarter", 'buckys5thquarter.com'),
-    LEE('wisconsin-state-journal', 'Wisconsin State Journal', 'madison.com'),
+    LEE('wisconsin-state-journal', 'Wisconsin State Journal', 'madison.com', 'sports/college'),
   ],
 };
 
@@ -298,12 +359,12 @@ const SEC_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
       tier: 1,
       scope: 'broad',
     },
-    LEE('arkansas-traveler', 'The Arkansas Traveler', 'www.uatrav.com', 3),
+    LEE('arkansas-traveler', 'The Arkansas Traveler', 'www.uatrav.com', 'sports/football', 3),
   ],
   // No blog left, so Auburn runs on its own small-city daily plus the
   // statewide one it shares with Alabama.
   auburn: [
-    LEE('opelika-auburn-news', 'Opelika-Auburn News', 'oanow.com'),
+    LEE('opelika-auburn-news', 'Opelika-Auburn News', 'oanow.com', 'sports/college/auburn'),
     AL_COM,
   ],
   florida: [
@@ -317,7 +378,7 @@ const SEC_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   ],
   georgia: [
     SB_NATION('dawg-sports', 'Dawg Sports', 'dawgsports.com'),
-    LEE('red-and-black', 'The Red & Black', 'www.redandblack.com', 3),
+    LEE('red-and-black', 'The Red & Black', 'www.redandblack.com', 'sports/football', 3),
   ],
   kentucky: [SB_NATION('a-sea-of-blue', 'A Sea of Blue', 'aseaofblue.com')],
   lsu: [
@@ -340,31 +401,34 @@ const SEC_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
     },
   ],
   'mississippi-state': [
-    LEE('starkville-daily-news', 'Starkville Daily News', 'www.starkvilledailynews.com'),
+    LEE('starkville-daily-news', 'Starkville Daily News', 'www.starkvilledailynews.com', 'sports'),
   ],
   missouri: [
     SB_NATION('rock-m-nation', 'Rock M Nation', 'rockmnation.com'),
-    LEE('st-louis-post-dispatch', 'St. Louis Post-Dispatch', 'www.stltoday.com'),
+    LEE('st-louis-post-dispatch', 'St. Louis Post-Dispatch', 'www.stltoday.com', 'sports/college/mizzou'),
     // Operated by the Missouri School of Journalism, which is a real
     // affiliation to the university it covers — but the same one the Daily
     // Nebraskan already carries, and tier 3 is where this app has
     // consistently filed student and campus newsrooms. Tier 4 is for
     // athletics-department output, not for a newsroom with an editor.
-    LEE('columbia-missourian', 'Columbia Missourian', 'www.columbiamissourian.com', 3),
+    LEE('columbia-missourian', 'Columbia Missourian', 'www.columbiamissourian.com', 'sports/mizzou_football', 3),
   ],
   'ole-miss': [SB_NATION('red-cup-rebellion', 'Red Cup Rebellion', 'redcuprebellion.com')],
   oklahoma: [
-    LEE('tulsa-world', 'Tulsa World', 'tulsaworld.com'),
-    LEE('ou-daily', 'The OU Daily', 'www.oudaily.com', 3),
+    // The statewide paper, read through OU's own section rather than its
+    // sports front — see the Big 12 table's note on the shared id, and the
+    // LEE() helper on why the front is the wire.
+    LEE('tulsa-world', 'Tulsa World', 'tulsaworld.com', 'sports/college/ou'),
+    LEE('ou-daily', 'The OU Daily', 'www.oudaily.com', 'sports/football', 3),
   ],
   'south-carolina': [
-    LEE('post-and-courier', 'The Post and Courier', 'www.postandcourier.com'),
+    LEE('post-and-courier', 'The Post and Courier', 'www.postandcourier.com', 'sports/college'),
   ],
   tennessee: [SB_NATION('rocky-top-talk', 'Rocky Top Talk', 'rockytoptalk.com')],
   texas: [SB_NATION('burnt-orange-nation', 'Burnt Orange Nation', 'burntorangenation.com')],
   'texas-am': [
     SB_NATION('good-bull-hunting', 'Good Bull Hunting', 'goodbullhunting.com'),
-    LEE('the-eagle', 'The Eagle', 'theeagle.com'),
+    LEE('the-eagle', 'The Eagle', 'theeagle.com', 'sports/college/aggiesports'),
   ],
   vanderbilt: [SB_NATION('anchor-of-gold', 'Anchor Of Gold', 'anchorofgold.com')],
 };
@@ -422,24 +486,17 @@ const SEC_NO_SOURCE_REASONS: Record<string, string> = {
 const BIG_12_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   arizona: [
     SB_NATION('az-desert-swarm', 'AZ Desert Swarm', 'azdesertswarm.com'),
-    LEE('arizona-daily-star', 'Arizona Daily Star', 'tucson.com'),
+    LEE('arizona-daily-star', 'Arizona Daily Star', 'tucson.com', 'sports/arizonawildcats'),
   ],
   // Reviewed and deliberately empty: nothing this school has publishes a
   // feed. See BIG_12_NO_SOURCE_REASONS.
   'arizona-state': [],
-  baylor: [LEE('waco-tribune-herald', 'Waco Tribune-Herald', 'wacotrib.com')],
+  baylor: [LEE('waco-tribune-herald', 'Waco Tribune-Herald', 'wacotrib.com', 'sports/college/baylor')],
   byu: [SB_NATION('vanquish-the-foe', 'Vanquish The Foe', 'vanquishthefoe.com')],
-  cincinnati: [LEE('news-record', 'The News Record', 'www.newsrecord.org', 3)],
-  colorado: [
-    SB_NATION('ralphie-report', 'The Ralphie Report', 'ralphiereport.com'),
-    {
-      id: 'cu-independent',
-      name: 'CU Independent',
-      url: 'https://cuindependent.com/feed/',
-      tier: 3,
-      scope: 'broad',
-    },
-  ],
+  cincinnati: [LEE('news-record', 'The News Record', 'www.newsrecord.org', 'sports/football', 3)],
+  // The CU Independent was here and was removed rather than retuned — see
+  // BIG_12_NO_SOURCE_REASONS. The blog carries the program alone now.
+  colorado: [SB_NATION('ralphie-report', 'The Ralphie Report', 'ralphiereport.com')],
   houston: [
     {
       id: 'daily-cougar',
@@ -454,11 +511,11 @@ const BIG_12_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   ],
   kansas: [
     SB_NATION('rock-chalk-talk', 'Rock Chalk Talk', 'rockchalktalk.com'),
-    LEE('the-kansan', 'The University Daily Kansan', 'www.kansan.com', 3),
+    LEE('the-kansan', 'The University Daily Kansan', 'www.kansan.com', 'sports/football', 3),
   ],
   'kansas-state': [
     SB_NATION('bring-on-the-cats', 'Bring On The Cats', 'bringonthecats.com'),
-    LEE('manhattan-mercury', 'The Manhattan Mercury', 'themercury.com'),
+    LEE('manhattan-mercury', 'The Manhattan Mercury', 'themercury.com', 'k_state_sports/football'),
   ],
   // No blog left, so Oklahoma State runs on the statewide paper plus its
   // own small-city daily — the shape Auburn has in the SEC.
@@ -469,7 +526,10 @@ const BIG_12_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   //
   // It is why scripts/check-feeds.sh reports 21 new sources here and not 22
   // — the report dedupes by URL, so a paper already in the catalog is
-  // checked once however many teams claim it.
+  // checked once however many teams claim it. That dedupe no longer applies
+  // to this pair, because the two entries now read different *sections* of
+  // the paper: `sports/college/osu` here and `sports/college/ou` there. The
+  // paper is one subscription; the beat is not.
   //
   // And **the id must be identical in both tables**, which is why this one
   // is copied rather than renamed. nickname-safety.ts decides whether a
@@ -479,9 +539,14 @@ const BIG_12_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   // gate would pass a collision it exists to catch. Nothing costs anything
   // today because Oklahoma State claims no nicknames at all — but the day
   // it does, this is what makes the check work.
+  //
+  // The differing sections do not weaken that and must not be taken as a
+  // reason to split the id: one newsroom writes both sections and columns
+  // run across them, so two schools sharing this paper is exactly the
+  // overlap the hazard is about. The id tracks the newsroom, not the URL.
   'oklahoma-state': [
-    LEE('tulsa-world', 'Tulsa World', 'tulsaworld.com'),
-    LEE('stillwater-news-press', 'Stillwater News Press', 'www.stwnewspress.com'),
+    LEE('tulsa-world', 'Tulsa World', 'tulsaworld.com', 'sports/college/osu'),
+    LEE('stillwater-news-press', 'Stillwater News Press', 'www.stwnewspress.com', 'sports/osu_sports'),
   ],
   tcu: [SB_NATION('frogs-o-war', "Frogs O' War", 'frogsowar.com')],
   // Reviewed and deliberately empty, like Arizona State above.
@@ -500,7 +565,7 @@ const BIG_12_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   // again — see BIG_12_NO_SOURCE_REASONS.
   'west-virginia': [
     SB_NATION('the-smoking-musket', 'The Smoking Musket', 'smokingmusket.com'),
-    LEE('charleston-gazette-mail', 'Charleston Gazette-Mail', 'wvgazettemail.com'),
+    LEE('charleston-gazette-mail', 'Charleston Gazette-Mail', 'wvgazettemail.com', 'sports/wvu'),
   ],
 };
 
@@ -510,14 +575,14 @@ const BIG_12_NO_SOURCE_REASONS: Record<string, string> = {
   baylor: `Our Daily Bears is gone: ${VOX_SHUTDOWN} The Waco Tribune-Herald carries the program.`,
   byu: 'Neither Salt Lake daily publishes a feed: the Deseret News and the Salt Lake Tribune both 404 at every path tried. Vanquish The Foe carries the program, and is the reason BYU has no broad-scoped source at all.',
   cincinnati: `Down The Drive is gone: ${VOX_SHUTDOWN} Cincinnati Enquirer: ${GANNETT} The student paper carries the program.`,
-  colorado: 'The Daily Camera and the Denver Post both answer 403 to a programmatic request — a block rather than a retirement, so worth re-checking rather than writing off.',
+  colorado: `The Daily Camera and the Denver Post both answer 403 to a programmatic request — a block rather than a retirement, so worth re-checking rather than writing off. ${CU_INDEPENDENT_SOLD} The Ralphie Report carries the program alone.`,
   houston: 'The Houston Chronicle is Hearst and publishes no public sports feed at any path tried. No SB Nation blog ever covered Houston.',
   'iowa-state': `Des Moines Register and Ames Tribune: ${GANNETT} The same finding Iowa already carries in the Big Ten table, for the same two papers.`,
   kansas: `The Lawrence Journal-World returns 200 with no items at both feed paths. Kansas City Star: ${MCCLATCHY}`,
   'oklahoma-state': `Cowboys Ride For Free is gone: ${VOX_SHUTDOWN}`,
   tcu: `Fort Worth Star-Telegram: ${MCCLATCHY}`,
   'texas-tech': `Viva The Matadors is gone: ${VOX_SHUTDOWN} The Daily Toreador runs TownNews and returns no items at any category slug tried. Lubbock Avalanche-Journal: ${GANNETT}`,
-  ucf: `Orlando Sentinel: ${TRIBUNE}`,
+  ucf: `Orlando Sentinel: ${TRIBUNE} Black And Gold Banneret is kept but has published nothing since 2026-03-01, and its last ten posts are all other sports — so UCF currently ends with an empty feed. Left in rather than removed: a quiet publisher is not a broken source, and a football blog going quiet in March is a season, not a shutdown. Re-check it once the season starts; if it is still silent it belongs out, the way the CU Independent went.`,
   'west-virginia':
     'WV MetroNews answers, and takes 16-20s to do it — measured five times '  +
     'in a row. That is inside check-feeds.sh\'s 20s curl budget and outside '  +

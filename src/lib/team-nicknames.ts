@@ -84,7 +84,21 @@ const NICKNAMES_BY_SLUG: Record<string, string[]> = {
   // Shared with Houston below, and safe by circumstance rather than by
   // the word: BYU has no broad-scoped source, so these never run.
   byu: ['Cougar', 'Cougars'],
-  cincinnati: ['Bearcat', 'Bearcats'],
+  // "UC" is the campus abbreviation, and dropping it dropped 30 of the 50
+  // items in the school paper's football section — the whole 2025 season
+  // and the coaching news after it, all filed as "UC football hires...",
+  // "UC vs. BYU takeaways". The paper writes for people standing on the
+  // campus, so it almost never prints "Cincinnati" or "Bearcats".
+  //
+  // Two letters is a lower bar than this table normally accepts, and it
+  // clears here on provenance rather than on the word: Cincinnati's only
+  // broad source is The News Record, UC's *own* student paper, and a
+  // campus paper covers one school by definition — a stronger guarantee
+  // than the metro-sports-section rule the rest of the table is held to.
+  // Elsewhere "UC" is the University of California system, which is why
+  // this must be re-read the day Cincinnati gains a source that isn't its
+  // own newsroom. `\bUC\b` does not match UCLA, UCF or UConn.
+  cincinnati: ['Bearcat', 'Bearcats', 'UC'],
   // "Buffalo" singular is out — a city and a pro team before a mascot.
   colorado: ['Buffs', 'Buffaloes'],
   florida: ['Gator', 'Gators'],

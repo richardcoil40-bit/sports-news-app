@@ -360,6 +360,19 @@ code comments:
   the seventeen-dead-Atom-feeds problem visible, and its README writes up
   that whole episode, which is worth reading before trusting any source
   that merely *looks* healthy.
+  - **A live feed is not a contributing one, and only the second report
+    can tell you which you have.** `scripts/review/yield.mjs` runs the
+    app's own filters over the app's own parser and prints
+    `items → named → kept` per source, because everything that decides
+    whether an item reaches the reader — the team-name match,
+    `off-topic.ts`, `off-sport.ts` — runs *after* the liveness question is
+    settled. Four sources sat in the catalog for months answering 200 with
+    fifty items and contributing nothing: the TownNews/BLOX root
+    `c=sports` category is syndicated wire and daily agate, and at `l=50`
+    it fills the whole response before the beat writer's work gets in.
+    That is why `LEE()` now takes a required `section`. Run it after
+    adding a source, not just `check-feeds.sh`, and write the report next
+    to the others.
 - `docs/dependency-risk.md` — the advisories in the dependency tree that
   are knowingly accepted rather than fixed, and the scope of that
   acceptance. Read it before acting on an `npm audit` result: the current

@@ -151,16 +151,27 @@ function nicknameCandidates(team) {
   return candidates;
 }
 
-/** Which chain a URL belongs to, asked of the builders the table uses. */
+/**
+ * Which chain a URL belongs to, asked of the builders the table uses.
+ *
+ * A builder may take a section as well as a host (TownNews does — see the
+ * LEE() helper), so the section is read back off the URL under test and
+ * handed to every builder. The ones that don't take a section ignore it,
+ * which keeps this a single loop and, more to the point, keeps the answer
+ * coming from the builders rather than from a pattern written twice. An
+ * exact-match-on-host-alone version of this quietly reported every
+ * sectioned TownNews paper as an unknown owner.
+ */
 function ownerOf(url, ownerFeedUrl) {
-  let host;
+  let parsed;
   try {
-    host = new URL(url).host;
+    parsed = new URL(url);
   } catch {
     return null;
   }
+  const section = parsed.searchParams.get('c') ?? undefined;
   for (const [owner, build] of Object.entries(ownerFeedUrl)) {
-    if (build(host) === url) return owner;
+    if (build(parsed.host, section) === url) return owner;
   }
   return null;
 }

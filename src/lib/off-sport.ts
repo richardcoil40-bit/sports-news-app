@@ -1,5 +1,5 @@
-import { Article } from '@/lib/feeds';
-import { League } from '@/lib/leagues';
+import type { Article } from '@/lib/feeds';
+import type { League } from '@/lib/leagues';
 
 /**
  * Coverage of a *different sport* than the league you're following.
