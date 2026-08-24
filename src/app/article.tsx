@@ -4,7 +4,6 @@ import * as WebBrowser from 'expo-web-browser';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Logo } from '@/components/logo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { claimBadgeColors, Spacing } from '@/constants/theme';
@@ -34,9 +33,15 @@ export default function ArticleScreen() {
 
   return (
     <ThemedView style={styles.flex}>
-      <Stack.Screen
-        options={{ title: '', headerBackTitle: 'Back', headerRight: () => <Logo size={18} /> }}
-      />
+      {/*
+        No headerRight. The logo used to sit there, and a tester reported
+        it as a button that does nothing — correctly, since it was a bare
+        <Logo> with no handler occupying the corner iOS reserves for the
+        screen's action. There is nothing for it to do here (the one
+        outbound action is the CTA below, where the premise wants it), so
+        the affordance goes rather than gaining a behaviour to justify it.
+      */}
+      <Stack.Screen options={{ title: '', headerBackTitle: 'Back' }} />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <ScrollView>
           {params.imageUrl ? (
