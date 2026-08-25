@@ -35,7 +35,7 @@ least-recently-used on insert.
 
 | Cache | File | Key | `maxEntries` | TTL |
 |---|---|---|---|---|
-| National feed pool | `lib/source-catalog.ts` | League — one entry per league that has curated feeds, 2 today (Big Ten, SEC). The NFL has none yet, and `fetchLeagueFeeds` returns without caching in that case, so it takes no slot | 50 | 3 minutes |
+| National feed pool | `lib/source-catalog.ts` | League — one entry per league with a national pool (curated RSS feeds plus ESPN's league-wide news API, merged), 4 today (Big Ten, SEC, Big 12, NFL). A league with neither returns uncached and takes no slot | 50 | 3 minutes |
 | Per-team news pool | `lib/team-news-pool.ts` | Sport + league path + team ID | 50 | 3 minutes |
 | Team schedules | `lib/schedule.ts` | Sport + league path + team ID | 100 | 3 minutes |
 | Team list | `lib/teams.ts` | League — 3 entries today | None needed (see below) | 30 minutes |

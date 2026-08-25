@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import rssValidXml from '@/lib/__fixtures__/rss-valid.xml?raw';
 import { DEFAULT_LEAGUE, getLeague } from '@/lib/league-catalog';
 import { League } from '@/lib/leagues';
 import {
+  espnLeagueNewsFor,
   fetchLeagueFeeds,
   leaguesWithNationalFeeds,
   nationalFeedsFor,
@@ -35,6 +37,10 @@ describe('a league with no curated sources', () => {
     expect(teamSourcesFor(UNCURATED, 'Lakers')).toEqual([]);
   });
 
+  it('does not get ESPN league news either — a present key is a decision', () => {
+    expect(espnLeagueNewsFor(UNCURATED)).toBe(false);
+  });
+
   it('resolves to an empty pool without touching the network', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
@@ -63,7 +69,7 @@ describe('two curated leagues', () => {
   it('share the sport-wide feeds', () => {
     const bigTen = new Set(nationalFeedsFor(DEFAULT_LEAGUE).map((s) => s.id));
     expect(nationalFeedsFor(SEC).filter((s) => bigTen.has(s.id)).map((s) => s.id)).toContain(
-      'espn-cfb',
+      'cbs-cfb',
     );
   });
 
@@ -120,5 +126,109 @@ describe('the curated league', () => {
 
   it('is included in the periodic refresh', () => {
     expect(leaguesWithNationalFeeds().map((l) => l.id)).toContain(DEFAULT_LEAGUE.id);
+  });
+});
+
+/**
+ * The national pool is two halves — the curated RSS list and ESPN's
+ * league-wide JSON news, merged. (ESPN's RSS entry answered 202 with an
+ * empty body more often than not; see docs/evidence/README.md.) Each
+ * scenario below uses a different real league id because the pool caches
+ * per league at module scope with no reset hook.
+ */
+const NFL = getLeague('nfl')!;
+const BIG_12 = getLeague('big-12')!;
+
+const ESPN_JSON = {
+  articles: [
+    {
+      id: 99001,
+      headline: 'League-wide story from ESPN',
+      links: { web: { href: 'https://www.espn.com/story/99001' } },
+      published: '2026-08-25T12:00:00Z',
+    },
+  ],
+};
+
+const isEspnJson = (url: string) => url.includes('site.api.espn.com');
+
+/** Serves text() for the RSS half and json() for the ESPN half. */
+function respondByUrl(rule: (url: string) => { status: number; body: string | object }) {
+  const fetchMock = vi.fn(async (url: string) => {
+    const { status, body } = rule(String(url));
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+      json: async () => (typeof body === 'string' ? JSON.parse(body) : body),
+    };
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+describe('espnLeagueNewsFor', () => {
+  it('is on for every shipped league', () => {
+    for (const id of ['big-ten', 'sec', 'big-12', 'nfl']) {
+      expect(espnLeagueNewsFor(getLeague(id)!)).toBe(true);
+    }
+  });
+});
+
+describe('the merged national pool', () => {
+  it('serves RSS and ESPN league news together — the NFL was ESPN-less before', async () => {
+    const fetchMock = respondByUrl((url) =>
+      isEspnJson(url) ? { status: 200, body: ESPN_JSON } : { status: 200, body: rssValidXml },
+    );
+
+    const { articles, failedSources } = await fetchLeagueFeeds(NFL, { force: true });
+
+    expect(failedSources).toEqual([]);
+    expect(articles.some((a) => a.source === 'ESPN')).toBe(true);
+    expect(articles.some((a) => a.source !== 'ESPN')).toBe(true);
+    const espnCall = fetchMock.mock.calls.map((c) => String(c[0])).find(isEspnJson);
+    expect(espnCall).toContain('/football/nfl/news?limit=');
+  });
+
+  it('keeps the RSS half and reports ESPN when the JSON side fails', async () => {
+    respondByUrl((url) =>
+      isEspnJson(url) ? { status: 500, body: '' } : { status: 200, body: rssValidXml },
+    );
+
+    const { articles, failedSources } = await fetchLeagueFeeds(SEC, { force: true });
+
+    expect(articles.length).toBeGreaterThan(0);
+    expect(articles.every((a) => a.source !== 'ESPN')).toBe(true);
+    // The exact name the retired RSS entry reported under, so downstream
+    // display of failed sources is unchanged.
+    expect(failedSources).toEqual(['ESPN']);
+  });
+
+  it('keeps the ESPN half when every RSS source fails', async () => {
+    respondByUrl((url) =>
+      isEspnJson(url) ? { status: 200, body: ESPN_JSON } : { status: 500, body: '' },
+    );
+
+    const { articles, failedSources } = await fetchLeagueFeeds(DEFAULT_LEAGUE, { force: true });
+
+    expect(articles.map((a) => a.source)).toEqual(['ESPN']);
+    expect([...failedSources].sort()).toEqual([
+      'CBS Sports',
+      'Extra Points',
+      'Off Tackle Empire',
+      'Yahoo Sports',
+    ]);
+  });
+
+  it('caches the merged result as one pool entry', async () => {
+    const fetchMock = respondByUrl((url) =>
+      isEspnJson(url) ? { status: 200, body: ESPN_JSON } : { status: 200, body: rssValidXml },
+    );
+
+    await fetchLeagueFeeds(BIG_12);
+    const callsAfterFirst = fetchMock.mock.calls.length;
+    await fetchLeagueFeeds(BIG_12);
+
+    expect(fetchMock.mock.calls.length).toBe(callsAfterFirst);
   });
 });

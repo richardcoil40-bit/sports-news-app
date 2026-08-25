@@ -282,8 +282,10 @@ Three cautions learned the hard way:
 - **Read the failure mode.** HTTP 403 means actively blocked, 404 means
   wrong path, and 200-with-no-items usually means the feature was retired.
   They call for different responses: give up, guess again, and give up
-  respectively. ESPN returns 202 to curl while serving the app fine, so a
-  non-200 isn't automatically fatal either.
+  respectively. And a non-200 isn't automatically fatal: The Seattle Times
+  answers 202 to a datacenter address and 200 to a laptop. (ESPN's RSS
+  answered 202 to everyone, laptop included, which is why it's no longer in
+  the catalog — see the addendum in `../evidence/README.md`.)
 - **Liveness is not usefulness.** A feed can answer 200 with fifty items
   and contribute *nothing* to the team it was added for. That is not a
   hypothetical: it was true of four sources in the shipping catalog for
@@ -428,16 +430,19 @@ what stops them being done from memory at 900 teams.
 | Texas A&M | The Eagle | — | Good Bull Hunting |
 | Vanderbilt | — | — | Anchor Of Gold |
 
-Plus ESPN, CBS Sports, and Yahoo (Tier 1) and Extra Points (Tier 2) across
-college football, and one conference-wide blog each: Off Tackle Empire
-(Tier 3) for the Big Ten, Saturday Down South (Tier 3) for the SEC.
+Plus ESPN (Tier 1, via its JSON news API rather than RSS — see below), CBS
+Sports and Yahoo (Tier 1) and Extra Points (Tier 2) across college
+football, and one conference-wide blog each: Off Tackle Empire (Tier 3)
+for the Big Ten, Saturday Down South (Tier 3) for the SEC.
 
 The NFL has no per-team table at all yet and runs on ESPN's team feed plus
-CBS Sports, Yahoo Sports and ProFootballTalk (all Tier 1). ESPN's own NFL
-RSS is deliberately not among them — it answers 202 with an empty body.
-So does its college equivalent, in every report in `../evidence/` since
-2026-08-11; that one is still in the catalog and is worth a decision of its
-own.
+CBS Sports, Yahoo Sports and ProFootballTalk (all Tier 1), with ESPN's
+league-wide news merged into the national pool. Neither of ESPN's RSS
+paths is anywhere in the catalog anymore: both answered 202 with an empty
+body — the college one in every report in `../evidence/` from 2026-08-11
+until it was removed on 2026-08-25 — so ESPN's league-wide coverage
+arrives through the same JSON news API its team feed already uses. The
+write-up is the addendum in `../evidence/README.md`.
 Backfilling the 32 local newsrooms is the largest single piece of source
 research outstanding, and none of it blocks the league: names were reviewed,
 sources were not, and only the first of those is a gate.

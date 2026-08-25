@@ -1,8 +1,9 @@
 import { createEntityCache } from '@/lib/cache';
 import { big12SourcesForTeam, bigTenSourcesForTeam, secSourcesForTeam } from '@/lib/community-sources';
-import { FeedSource, FetchAllResult, fetchFeeds } from '@/lib/feeds';
+import { Article, dedupeAndSort, FeedSource, FetchAllResult, fetchFeeds } from '@/lib/feeds';
 import { getLeagues } from '@/lib/league-catalog';
 import { League } from '@/lib/leagues';
+import { fetchLeagueArticles } from '@/lib/team-news';
 
 /**
  * Which curated sources belong to which league.
@@ -28,9 +29,12 @@ import { League } from '@/lib/leagues';
  * Every conference in a sport shares these. They're one array rather than
  * copied per league so a URL fix lands everywhere at once — and so the
  * conference-wide blog below stays visibly the only part that differs.
+ *
+ * ESPN leads the pool but is not in this list: it arrives through the
+ * `espnLeagueNews` flag below, via its JSON news API rather than RSS.
+ * (Its RSS entry lived here until 2026-08-25 — see the flag's comment.)
  */
 const NATIONAL_CFB_FEEDS: FeedSource[] = [
-  { id: 'espn-cfb', name: 'ESPN', url: 'https://www.espn.com/espn/rss/ncf/news', tier: 1, scope: 'broad', reach: 'national' },
   { id: 'cbs-cfb', name: 'CBS Sports', url: 'https://www.cbssports.com/rss/headlines/college-football/', tier: 1, scope: 'broad', reach: 'national' },
   { id: 'yahoo-cfb', name: 'Yahoo Sports', url: 'https://sports.yahoo.com/college-football/rss.xml', tier: 1, scope: 'broad', reach: 'national' },
   { id: 'extra-points', name: 'Extra Points', url: 'https://extrapoints.substack.com/feed', tier: 2, scope: 'broad', reach: 'national' },
@@ -53,15 +57,13 @@ const SATURDAY_DOWN_SOUTH: FeedSource = { id: 'saturday-down-south', name: 'Satu
  * of it either — the two lists share no URL, because every one of these
  * publishers splits college and pro into separate feeds.
  *
- * ESPN is the conspicuous absence. `espn.com/espn/rss/nfl/news` answers
- * 202 with an empty body, which is the failure feeds.ts was taught to
- * treat as a failure rather than a quiet day — so adding it would
- * contribute nothing and report a dead source on every fetch. (Its college
- * equivalent above has answered the same way in every report in
- * docs/evidence/ since 2026-08-11 — this is the 202 case feeds.ts was
- * taught about, still sitting in a shipped league. Removing it is a
- * curation decision with its own evidence trail, not something to do in
- * passing while adding a different league.)
+ * ESPN arrives via `espnLeagueNews` rather than this list. Its RSS path
+ * (`espn.com/espn/rss/nfl/news`) answers 202 with an empty body — the
+ * failure feeds.ts was taught to report rather than mistake for a quiet
+ * day — so an RSS entry here would report a dead source on most fetches.
+ * The college equivalent did exactly that from every report in
+ * docs/evidence/ since 2026-08-11 until it was removed on 2026-08-25;
+ * the write-up is the addendum in docs/evidence/README.md.
  *
  * ProFootballTalk stands where Extra Points does for the college list — a
  * vertical wider than any one team — except that it is NBC Sports' own
@@ -90,27 +92,44 @@ interface LeagueSources {
    * of schools has no reason to be shaped the same way.
    */
   teamSources?: (teamShortName: string) => FeedSource[];
+  /**
+   * Merge ESPN's league-wide JSON news (team-news.ts) into the national
+   * pool. A flag rather than a FeedSource entry because the endpoint
+   * isn't RSS: keeping it out of `nationalFeeds` keeps that list all-RSS
+   * — which is what check-feeds.sh probes — and routes the fetch through
+   * the parser team-news.ts already runs per team. The CFB conferences
+   * share one underlying URL and each cache its own copy per league id;
+   * accepted, since the RSS entry they shared had the same property.
+   *
+   * A present key is a decision: a new league opts in here after the
+   * endpoint is verified for its sport, it doesn't inherit ESPN for free.
+   */
+  espnLeagueNews?: boolean;
 }
 
 const CATALOG: Record<string, LeagueSources> = {
   'big-ten': {
     nationalFeeds: [...NATIONAL_CFB_FEEDS, OFF_TACKLE_EMPIRE],
     teamSources: bigTenSourcesForTeam,
+    espnLeagueNews: true,
   },
   'sec': {
     nationalFeeds: [...NATIONAL_CFB_FEEDS, SATURDAY_DOWN_SOUTH],
     teamSources: secSourcesForTeam,
+    espnLeagueNews: true,
   },
   // No conference-wide blog: SB Nation's Big 12 equivalent went the way of
   // Team Speed Kills, and nothing independent covers the conference the way
-  // Saturday Down South covers the SEC. The national four carry it.
+  // Saturday Down South covers the SEC. The national three plus ESPN's
+  // league news carry it.
   'big-12': {
     nationalFeeds: NATIONAL_CFB_FEEDS,
     teamSources: big12SourcesForTeam,
+    espnLeagueNews: true,
   },
   // No teamSources: see NATIONAL_NFL_FEEDS. A league with no per-team table
   // is the graceful path, not a gap to fill before shipping.
-  'nfl': { nationalFeeds: NATIONAL_NFL_FEEDS },
+  'nfl': { nationalFeeds: NATIONAL_NFL_FEEDS, espnLeagueNews: true },
 };
 
 export function nationalFeedsFor(league: League): FeedSource[] {
@@ -119,6 +138,10 @@ export function nationalFeedsFor(league: League): FeedSource[] {
 
 export function teamSourcesFor(league: League, teamShortName: string): FeedSource[] {
   return CATALOG[league.id]?.teamSources?.(teamShortName) ?? [];
+}
+
+export function espnLeagueNewsFor(league: League): boolean {
+  return CATALOG[league.id]?.espnLeagueNews ?? false;
 }
 
 /**
@@ -138,23 +161,68 @@ const nationalPoolCache = createEntityCache<string, FetchAllResult>({ ttlMs: CAC
 
 const EMPTY_RESULT: FetchAllResult = { articles: [], failedSources: [] };
 
+/**
+ * The two halves of a league's national pool: the curated RSS list and
+ * ESPN's league-wide JSON news. A fixed two-wide heterogeneous fan-out,
+ * so — like team-news-pool.ts's four source groups — it stays on
+ * Promise.allSettled rather than mapWithConcurrency: two is not a number
+ * that grows, and the sockets come from fetchFeeds' own expansion, which
+ * is already bounded.
+ */
+async function fetchNationalPool(
+  league: League,
+  sources: FeedSource[],
+  includeEspn: boolean,
+): Promise<FetchAllResult> {
+  const [rss, espn] = await Promise.allSettled([
+    fetchFeeds(sources),
+    includeEspn ? fetchLeagueArticles(league) : Promise.resolve<Article[]>([]),
+  ]);
+
+  const articleLists: Article[][] = [];
+  const failedSources: string[] = [];
+
+  // fetchFeeds is total — it settles per source and always resolves — so
+  // the rejected branch is defensive rather than expected.
+  if (rss.status === 'fulfilled') {
+    articleLists.push(rss.value.articles);
+    failedSources.push(...rss.value.failedSources);
+  } else {
+    failedSources.push(...sources.map((s) => s.name));
+  }
+
+  if (espn.status === 'fulfilled') articleLists.push(espn.value);
+  // The name the retired RSS entry reported under, so a failed fetch
+  // surfaces downstream exactly as it always did.
+  else failedSources.push('ESPN');
+
+  return { articles: dedupeAndSort(articleLists), failedSources };
+}
+
 export async function fetchLeagueFeeds(
   league: League,
   options?: { force?: boolean },
 ): Promise<FetchAllResult> {
   const sources = nationalFeedsFor(league);
+  const includeEspn = espnLeagueNewsFor(league);
   // Not cached, because there is nothing to cache and no request to share.
-  // A league with no curated feeds is a normal state, not a failure.
-  if (sources.length === 0) return EMPTY_RESULT;
+  // A league with neither curated feeds nor ESPN's league news is a
+  // normal state, not a failure.
+  if (sources.length === 0 && !includeEspn) return EMPTY_RESULT;
 
-  return nationalPoolCache.get(league.id, () => fetchFeeds(sources), { force: options?.force });
+  return nationalPoolCache.get(league.id, () => fetchNationalPool(league, sources, includeEspn), {
+    force: options?.force,
+  });
 }
 
 /**
- * Every league that actually has a national pool. Used by the periodic
- * refresh, which has no single league to speak of — it just wants whatever
- * shared pools exist to be fresh before the user looks at anything.
+ * Every league that actually has a national pool — curated RSS, ESPN's
+ * league news, or both. Used by the periodic refresh, which has no single
+ * league to speak of — it just wants whatever shared pools exist to be
+ * fresh before the user looks at anything.
  */
 export function leaguesWithNationalFeeds(): League[] {
-  return getLeagues().filter((league) => nationalFeedsFor(league).length > 0);
+  return getLeagues().filter(
+    (league) => nationalFeedsFor(league).length > 0 || espnLeagueNewsFor(league),
+  );
 }

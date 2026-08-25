@@ -14,7 +14,7 @@ import { fetchTeamRoster } from '@/lib/roster';
 import { fetchGameOdds, fetchTeamSchedule } from '@/lib/schedule';
 import { fetchTeamColor } from '@/lib/team-color';
 import { fetchTeamStatLeaders } from '@/lib/team-leaders';
-import { fetchTeamArticles } from '@/lib/team-news';
+import { fetchLeagueArticles, fetchTeamArticles } from '@/lib/team-news';
 import { fetchTeams } from '@/lib/teams';
 
 function respondWith(body: unknown, { ok = true, status = 200 } = {}) {
@@ -67,6 +67,9 @@ describe('ESPN parsers degrade to empty on a malformed response', () => {
     ['fetchTeamRoster', fetchTeamRoster],
     ['fetchTeamSchedule', fetchTeamSchedule],
     ['fetchTeamArticles', fetchTeamArticles],
+    // League-wide takes no entity id; it shares the id-taking shape here so
+    // it runs the same gauntlet. Uncached, so no freshId is needed either.
+    ['fetchLeagueArticles', (_id, league) => fetchLeagueArticles(league)],
     ['fetchTeamStatLeaders', fetchTeamStatLeaders],
     ['fetchPlayerSeasonStats', fetchPlayerSeasonStats],
   ];
@@ -239,6 +242,24 @@ describe('ESPN parsers on a well-formed response', () => {
     );
   });
 
+  it('fetchLeagueArticles parses the same shape league-wide and asks for a real limit', async () => {
+    respondWith(teamNewsFixture);
+
+    const articles = await fetchLeagueArticles(DEFAULT_LEAGUE);
+
+    // Same response shape as the team-scoped endpoint, same rules: the
+    // linkless article is dropped, dates normalise, metadata is ESPN's.
+    expect(articles).toHaveLength(2);
+    expect(articles[0]).toMatchObject({ source: 'ESPN', tier: 1, reach: 'national', scope: 'broad' });
+    expect(articles.map((a) => a.title)).not.toContain(
+      'This one has no web link and should be dropped',
+    );
+    // The no-limit default is only 6 items — the explicit limit is what
+    // restores parity with the retired RSS feed, so pin its presence.
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/football/college-football/news?limit=');
+  });
+
   it('fetchTeamColor prefixes the hex and rejects white', async () => {
     respondWith(teamFixture);
     await expect(fetchTeamColor(freshId(), DEFAULT_LEAGUE)).resolves.toBe('#bb0000');
@@ -277,6 +298,7 @@ describe('ESPN parsers on a non-OK response', () => {
     ['fetchTeamRoster', () => fetchTeamRoster(freshId(), DEFAULT_LEAGUE)],
     ['fetchTeamSchedule', () => fetchTeamSchedule(freshId(), DEFAULT_LEAGUE)],
     ['fetchTeamArticles', () => fetchTeamArticles(freshId(), DEFAULT_LEAGUE)],
+    ['fetchLeagueArticles', () => fetchLeagueArticles(DEFAULT_LEAGUE)],
   ])('%s throws so the caller can show an error state', async (_name, call) => {
     respondWith(null, { ok: false, status: 503 });
     await expect(call()).rejects.toThrow(/responded 503/);

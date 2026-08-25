@@ -504,7 +504,13 @@ export interface FetchAllResult {
   failedSources: string[];
 }
 
-function dedupeAndSort(articleLists: Article[][]): Article[] {
+/**
+ * Merge article lists into one pool: dedupe by link (first occurrence
+ * wins), newest first, undated last. Exported for the one caller that
+ * merges a non-RSS source into a pool (source-catalog.ts); everything
+ * RSS-shaped gets it via fetchFeeds.
+ */
+export function dedupeAndSort(articleLists: Article[][]): Article[] {
   const articles: Article[] = [];
   const seenLinks = new Set<string>();
 

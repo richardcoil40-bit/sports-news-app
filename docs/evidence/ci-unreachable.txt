@@ -17,11 +17,6 @@
 # Measured 2026-08-21 across four dispatch runs (32532904159, 32533626897,
 # 32533974955, 32534721347).
 
-# --- Genuinely broken, and known ---
-# Answers 202 with an empty body from anywhere, laptop included. See the
-# write-up in docs/evidence/README.md.
-ESPN
-
 # --- Refuse datacenter IPs (403) ---
 Extra Points
 Eleven Warriors

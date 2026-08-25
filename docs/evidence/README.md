@@ -117,6 +117,7 @@ answered, not that the app understood the answer.
 | `feed-status-20260823-015042.txt` | 2026-08-23, the first run of the parallelized script. Same 60 sources, same 59/1 as the two runs before it — which is the point of it: grouping by operator and running the groups concurrently changed the runtime from ~3min to ~35s and changed nothing else. First run with a `.json` sidecar. |
 | `feed-status-20260823-022754.txt` | 2026-08-23, the same script against the catalog the NFL and the Big 12 left behind: **83 sources, 82/1**, in ~61s. Identical line for line to the serial run earlier that day. The runtime is now the largest operator group rather than the list — SB Nation is 36 of the 83, and 36 paced requests is what the minute is. |
 | `feed-status-20260823-024250.txt` | 2026-08-23, first run that times each fetch and flags a source the app would give up on. 82 sources, 81/1, no SLOW flags — the one that would have tripped it, WV MetroNews at 16-20s, was removed in the same change. The `.json` carries `ms` per source; the slowest thing left in the catalog is under a second. |
+| `feed-status-20260825-132750.txt` | 2026-08-25, the run after ESPN's RSS entry left the catalog for the JSON news API (which this script doesn't probe — see the addendum below). **82 passing, 0 failing** — the first clean report, because the one perpetual failure was ESPN's 202. |
 
 The two 2026-08-11 files predate the timestamping in the current script — those
 timestamps come from the files' modification times, which is exactly the
@@ -128,7 +129,7 @@ Not a report — the list of sources that fail from a GitHub Actions runner but
 not from a laptop, used by `.github/workflows/feed-check.yml` to tell a new
 failure apart from the runner's address.
 
-Twenty of the sixty sources are on it, and sixteen of those twenty are one
+Nineteen sources are on it, and sixteen of those nineteen are one
 story: the local papers sharing the TownNews/BLOX CMS (the `search/?f=rss`
 URLs) refuse datacenter IPs with a 429. Pacing requests ten times further
 apart was measured across four dispatch runs and changed nothing outside noise
@@ -183,6 +184,23 @@ What changed:
 - The script prints the detected format (`rss` / `atom`) on every OK line, so
   any future gap between "the script can read it" and "the app can read it" is
   visible in the report rather than hidden by it.
+
+**Addendum, 2026-08-25: the 202 source is out of the catalog.** Detection
+was the 2026-08-18 fix; this is the curation decision it left open. The RSS
+entry (`espn-cfb`) answered 202 in every report below since 2026-08-11,
+while the JSON news API on `site.api.espn.com` — the family every other
+ESPN fetch in the app uses — stayed healthy the whole time. So the RSS
+entry is gone, and ESPN reaches the national pools through that JSON
+endpoint instead (`fetchLeagueArticles` in `team-news.ts`, merged into the
+pool in `source-catalog.ts`) — for all four leagues, including the NFL,
+which had shipped with no ESPN at all because its RSS path 202s the same
+way. Two consequences worth knowing: the endpoint sits outside
+`check-feeds.sh`'s liveness report, exactly as the per-team JSON news
+always has; and a well-formed 200 whose shape has drifted degrades to
+empty rather than reporting, per the contract every ESPN JSON parser holds
+(`espn-parsers.test.ts`). An empty body still reports loudly — 
+`response.json()` throws on it — so the failure mode this section is about
+cannot go quiet again.
 
 Still open: nothing here rates the outlets *inside* an aggregating feed. Yahoo
 Sports' 50 items came from 31 different outlets on 2026-08-18 (HEAVY, SB

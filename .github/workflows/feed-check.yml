@@ -15,12 +15,16 @@ permissions:
 #
 # WHAT THIS CHECKS, AND WHAT IT CANNOT
 #
-# From a laptop the catalog reports 59 passing / 1 failing. From a GitHub
-# runner it reports 43-47 / 13-17, and all but one of those failures is the
-# runner's address rather than a dead source: two 202s, two 403s, and the
-# sixteen TownNews/BLOX papers (the search/?f=rss URLs), which refuse
-# datacenter IPs with a 429. Which subset of the sixteen fails moves around
-# run to run. Pacing requests ten times further apart was measured and
+# From a laptop the catalog reports 82 passing / 0 failing (2026-08-25 —
+# the first clean run, because the one perpetual failure was ESPN's RSS,
+# since replaced by its JSON news API, which this check doesn't probe).
+# From a GitHub runner the failures are the runner's address rather than
+# dead sources: one 202 (The Seattle Times), two 403s, and the sixteen
+# TownNews/BLOX papers (the search/?f=rss URLs), which refuse datacenter
+# IPs with a 429. Which subset of the sixteen fails moves around run to
+# run, and the measured runner baseline (43-47 passing, of the 60-source
+# catalog) predates the NFL/Big 12 additions — the next dispatch
+# re-anchors it. Pacing requests ten times further apart was measured and
 # changed nothing outside noise — see scripts/check-feeds.sh before retrying.
 #
 # That baseline is why this doesn't use a failure count. A count threshold

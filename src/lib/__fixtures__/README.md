@@ -16,7 +16,7 @@ deliberate edge case:
 | `espn-team-leaders.json` | `team-leaders.ts` | A `$ref` with no extractable athlete id |
 | `espn-player-stats.json` | `player-stats.ts` | An all-zero category, and an off-season year |
 | `espn-schedule.json` | `schedule.ts` | A neutral-site game, and an event with no opponent |
-| `espn-team-news.json` | `team-news.ts` | An unparseable date, and an article with no web link |
+| `espn-team-news.json` | `team-news.ts` — both the team-scoped and league-wide fetchers, which share one endpoint shape | An unparseable date, and an article with no web link |
 | `espn-team.json` | `team-color.ts` | — (the white-color case is inline in the test) |
 | `rss-valid.xml` | `feeds.ts` | CDATA with pre-encoded entities, and an item with no link |
 | `rss-malformed.xml` | `feeds.ts` | Truncated mid-document, as a dying CDN returns |
