@@ -1,4 +1,7 @@
-import { Article } from '@/lib/feeds';
+// `type` matters: Node's type-stripping (scripts/lib/app-modules.mjs) emits
+// a real import for a bare `import {...}`, which fails at runtime because
+// Article has no value export — and it would drag fast-xml-parser in besides.
+import type { Article } from '@/lib/feeds';
 
 /**
  * What kind of claim a headline is making — the app's second axis of
@@ -11,11 +14,16 @@ import { Article } from '@/lib/feeds';
  * — a rumor from a newsroom and a rumor from a fan blog are different
  * things, and neither badge alone says so.
  *
- * Three values, matching what the UI shows so code and product share one
+ * Four values, matching what the UI shows so code and product share one
  * vocabulary:
- *   reported — something happened
- *   rumor    — speculation, or sourced only to anonymous people
- *   take     — opinion: columns, rankings, grades, predictions
+ *   reported  — something happened
+ *   rumor     — speculation, or sourced only to anonymous people
+ *   take      — opinion: columns, rankings, grades, predictions
+ *   unlabeled — neither classifier had a signal, and the badge says so
+ *               instead of guessing. Only ever produced by the merge in
+ *               `withClaimTypes` (no local lexicon evidence AND no remote
+ *               verdict); `classifyClaim` itself never returns it, so its
+ *               offline default stays `reported`.
  *
  * ## What this is and isn't
  *
@@ -42,13 +50,19 @@ import { Article } from '@/lib/feeds';
  * lying about a story — and it damages beat reporting worst, because a
  * local writer's own scoop is more likely to be phrased with hedges than an
  * ESPN wire piece is. Bias every rule toward leaving things alone.
+ *
+ * The same asymmetry governs `unlabeled`: it surfaces wherever `reported`
+ * does (see brief.ts), because the no-signal pile is mostly real news —
+ * routing it to chatter would recreate the misfiled-scoop error at scale.
+ * It changes what the badge claims, never what gets shown.
  */
-export type ClaimType = 'reported' | 'rumor' | 'take';
+export type ClaimType = 'reported' | 'rumor' | 'take' | 'unlabeled';
 
 const LABELS: Record<ClaimType, string> = {
   reported: 'Reported',
   rumor: 'Rumor',
   take: 'Take',
+  unlabeled: 'Unlabeled',
 };
 
 export function claimTypeLabel(type: ClaimType): string {
@@ -287,7 +301,42 @@ const TAKE_FORMS = phraseRegex([
   'must-win', 'keys to the game', 'what to watch', 'biggest storylines',
   'staff picks', 'expert picks', 'picks and predictions', 'against the spread',
   'best bets', 'sleeper', 'predictions', 'predicting', 'analyzing', 'position preview',
+  // The preview family, phrase forms only. Bare `preview` stays out of
+  // here on the same doctrine as every bare word (see CHATTER's note) —
+  // and it already has a different job below, in SERVICE_JOURNALISM,
+  // where it *suppresses* the question-mark rule for listings pages. The
+  // two never collide: these phrases decide a headline is a take before
+  // the question rule runs, and a "how to watch ... preview?" headline
+  // contains none of them.
+  'opponent preview', 'game preview', 'season preview', 'matchup preview',
   'players to watch', 'player to watch', 'risers', 'pros and cons', 'roundtable',
+]);
+
+/**
+ * Evaluative judgments — opinions with no prescriptive word in them.
+ * "Green Bay won the trade" asserts a verdict, not an event, but STANCE
+ * below only knows should/must. Phrase forms only, per the bare-word
+ * doctrine; and gated on ATTRIBUTED at the call site exactly like STANCE,
+ * because "Arrington says Green Bay won the trade" is a quote about
+ * someone else's evaluation — whether *that* deserves a take badge is a
+ * semantic call about who is speaking, which is the remote classifier's
+ * job (see withClaimTypes).
+ *
+ * A second, quieter job in classifyClaimDetailed: when one of these
+ * phrases is present, the completed-event reading of its verb is off the
+ * table — the "won" in "won the trade" is a verdict, not a score — so it
+ * suppresses hasCompletedEvidence. Without that, an attributed trade
+ * verdict would count as positive `reported` evidence and the merge would
+ * never let the remote classifier near the one case it exists to fix.
+ */
+const EVALUATIVE = phraseRegex([
+  // Article-less forms too: headline-ese drops "the" ("says Green Bay won
+  // trade for Parsons"), and the with-article form alone misses it.
+  'won the trade', 'lost the trade', 'wins the trade', 'loses the trade',
+  'won trade', 'lost trade', 'wins trade', 'loses trade',
+  'won the deal', 'lost the deal', 'winner of the trade', 'loser of the trade',
+  'biggest winner', 'biggest winners', 'biggest loser', 'biggest losers',
+  'biggest snub', 'biggest snubs', 'deserved better', 'deserves better',
 ]);
 
 /**
@@ -340,6 +389,8 @@ function looksLikeTake(rawTitle: string, strippedTitle: string): boolean {
   if (TAKE_FORMS.test(strippedTitle) && !POLL_RELEASE.test(rawTitle)) return true;
   // "Day says Michigan should be ranked higher" is a quote, not a column.
   if (STANCE.test(strippedTitle) && !ATTRIBUTED.test(rawTitle)) return true;
+  // Same attribution gate as STANCE — see EVALUATIVE's comment.
+  if (EVALUATIVE.test(strippedTitle) && !ATTRIBUTED.test(rawTitle)) return true;
   return false;
 }
 
@@ -358,7 +409,23 @@ function looksLikeRumor(strippedTitle: string, description: string): boolean {
 }
 
 /**
- * Classifies a headline.
+ * Whether a classification came from a lexicon actually firing, or from
+ * falling through to the default. The two used to be indistinguishable —
+ * `reported` was returned identically for "positive completed-event
+ * evidence" and "nothing matched at all" — and the difference is exactly
+ * what the merge policy in `withClaimTypes` turns on.
+ */
+export type ClaimBasis = 'evidence' | 'default';
+
+export interface LocalClaim {
+  type: ClaimType;
+  basis: ClaimBasis;
+}
+
+/**
+ * Classifies a headline, reporting whether the answer is evidence or the
+ * default. Never returns `unlabeled` — that is the merge's word for "no
+ * signal from anyone", and this function is only one of the two anyones.
  *
  * Order is deliberate:
  *   1. `take` first. Format markers ("Mailbag:", "power rankings") are far
@@ -370,24 +437,34 @@ function looksLikeRumor(strippedTitle: string, description: string): boolean {
  *      happened, it is merely single-sourced, and how much to trust a
  *      single source is the tier badge's job. Conflating those two axes is
  *      the mistake docs/source-reliability.md exists to prevent.
- *   3. `reported` otherwise.
+ *   3. `reported` otherwise — as the default, not as a finding.
  */
-export function classifyClaim(article: Pick<Article, 'title' | 'description'>): ClaimType {
+export function classifyClaimDetailed(
+  article: Pick<Article, 'title' | 'description'>,
+): LocalClaim {
   const title = typeof article.title === 'string' ? article.title : '';
   const description = typeof article.description === 'string' ? article.description : '';
-  if (!title.trim()) return 'reported';
+  if (!title.trim()) return { type: 'reported', basis: 'default' };
 
   const stripped = stripQuotes(title);
 
-  if (looksLikeTake(title, stripped)) return 'take';
+  if (looksLikeTake(title, stripped)) return { type: 'take', basis: 'evidence' };
 
   // Evidence that something happened wins over everything below, including
   // a question mark. Measured against a live corpus: without this, "1st AP
   // Poll of 2026 is here. Where does Penn State rank?" — a published result
   // — came back as a rumor purely because of its trailing question.
-  if (hasCompletedEvidence(title)) return 'reported';
+  //
+  // Except when an evaluative phrase reaches here (which means it was
+  // attributed — the unattributed form already returned take above): its
+  // verb is a verdict, not an event, so it must not count as one. See
+  // EVALUATIVE. The headline falls to the default instead, where the
+  // remote classifier decides who-is-speaking cases.
+  if (!EVALUATIVE.test(stripped) && hasCompletedEvidence(title)) {
+    return { type: 'reported', basis: 'evidence' };
+  }
 
-  if (looksLikeRumor(stripped, description)) return 'rumor';
+  if (looksLikeRumor(stripped, description)) return { type: 'rumor', basis: 'evidence' };
 
   // A trailing question mark, with nothing speculative in the text.
   //
@@ -404,10 +481,17 @@ export function classifyClaim(article: Pick<Article, 'title' | 'description'>): 
   // those are takes.
   if (ENDS_IN_QUESTION.test(title.trim())) {
     const endsInsideQuote = /["“”'’]\s*\?*\s*$/.test(title.trim());
-    if (!endsInsideQuote && !SERVICE_JOURNALISM.test(title)) return 'take';
+    if (!endsInsideQuote && !SERVICE_JOURNALISM.test(title)) {
+      return { type: 'take', basis: 'evidence' };
+    }
   }
 
-  return 'reported';
+  return { type: 'reported', basis: 'default' };
+}
+
+/** The classification alone, for callers with no use for the basis. */
+export function classifyClaim(article: Pick<Article, 'title' | 'description'>): ClaimType {
+  return classifyClaimDetailed(article).type;
 }
 
 /** `'all'` is the unfiltered case — the bar always offers a way back. */
@@ -418,6 +502,7 @@ export const CLAIM_FILTER_TABS: { key: ClaimFilter; label: string }[] = [
   { key: 'reported', label: 'Reported' },
   { key: 'rumor', label: 'Rumor' },
   { key: 'take', label: 'Take' },
+  { key: 'unlabeled', label: 'Unlabeled' },
 ];
 
 /** An article with its claim type attached, so it is computed once. */
@@ -428,11 +513,36 @@ export type Classified<T> = T & { claimType: ClaimType };
  * brief — needs the same answer for the same article, and classifying is a
  * few hundred regex tests each; doing it per consumer would repeat that
  * work three times per render for no benefit.
+ *
+ * ## The merge policy: local evidence first, then the remote verdict
+ *
+ * `remoteClaim` is the verdict service's classification, attached in
+ * team-news-pool.ts when one resolved (see `Article.remoteClaim`). It is
+ * deliberately **not** preferred over a positive lexicon match:
+ *
+ * 1. A local `evidence` result wins. The lexicons are curated,
+ *    precision-tuned rules — and this is what keeps MUST_STAY_REPORTED
+ *    (claim-type.test.ts) protecting what users actually see. It also
+ *    covers the model's known blind spots: tested live, the worker calls
+ *    "Opponent Preview" reported the same way the old lexicon did.
+ * 2. When the local result is only the default, the remote claim decides.
+ *    That is the fix for the errors a regex fundamentally can't reach —
+ *    "PSU legend says Green Bay won trade" is a take because of who is
+ *    speaking, which is a semantic call.
+ * 3. Neither → `unlabeled`, worn honestly instead of a guessed REPORTED.
+ *
+ * The local classifier stays permanently as the offline path
+ * (docs/deferred-work.md) — this is merge policy, not replacement.
  */
-export function withClaimTypes<T extends Pick<Article, 'title' | 'description'>>(
-  articles: T[],
-): Classified<T>[] {
-  return articles.map((article) => ({ ...article, claimType: classifyClaim(article) }));
+export function withClaimTypes<
+  T extends Pick<Article, 'title' | 'description'> & { remoteClaim?: ClaimType },
+>(articles: T[]): Classified<T>[] {
+  return articles.map((article) => {
+    const local = classifyClaimDetailed(article);
+    const claimType =
+      local.basis === 'evidence' ? local.type : (article.remoteClaim ?? 'unlabeled');
+    return { ...article, claimType };
+  });
 }
 
 export function filterByClaimType<T extends { claimType: ClaimType }>(

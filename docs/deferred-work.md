@@ -58,14 +58,18 @@ this one, for the retention and privacy story.
 What this unlocks is narrower than what was originally scoped, though — see
 each numbered section below for which half of it actually landed:
 
-- **Better claim tagging (§3)** is *not* delivered, despite an earlier
-  version of this line claiming it was. The verdict carries a `claim`
-  field and the worker fills it in, but nothing in the app reads it —
-  `isRelevantVerdict` uses `sport` and `kind` only, and the
-  REPORTED/RUMOR/TAKE badges still come from `claim-type.ts`'s local
-  regex. Same for the `teams` field. Both are paid for on every request
-  and thrown away on arrival. Wiring `claim` up is a small change and
-  the obvious next one; until someone makes it, this item is unbuilt.
+- **Better claim tagging (§3)** is **delivered as of 2026-08-25** — with
+  one caveat and one leftover. The verdict's `claim` now rides the pool
+  onto each article (`Article.remoteClaim`) and the badge merges it in
+  `withClaimTypes`: a positive local lexicon match wins (the curated rules
+  and MUST_STAY_REPORTED stay in force), the remote claim decides when
+  the lexicon only hit its default, and a headline neither has a signal
+  for wears an honest fourth badge, `unlabeled`, instead of a guessed
+  REPORTED. The caveat: no measured accuracy number exists — the labeling
+  loop that would produce one was deliberately deferred (user's call,
+  2026-08-25), so the claim here is "the known error classes are fixed
+  and regression-tested", not a percentage. The leftover: the `teams`
+  field is still paid for and discarded.
 - **Sources that find themselves (§1)** only got the *filter* half — a
   headline verdict's `sport` and `kind` fields can refine what local rules
   already found. The *discovery* half (asking a news-search service what's
@@ -181,22 +185,23 @@ declarative headline ("Michigan's defense has a problem") is invisible to it,
 and December's coaching carousel makes real news and rumor share every word.
 
 The upgrade is one extra question on a request the service is already making
-about the same headlines. **No screen changes** — same three labels, same
+about the same headlines. **No screen changes** — same labels, same
 filter, same chips. Only the answer gets better.
 
-**The question is already being asked — the answer isn't wired up yet.**
-Every verdict `worker/` returns already carries a `claim` field
-(`reported`/`rumor`/`take`, same three labels), for free, on the same
-request the sport/kind filtering above uses. What's still deferred is the
-migration this file's intro describes: `claim-type.ts` runs in a
-render-time `useMemo` in five call sites (`src/app/team/[id].tsx`,
-`src/app/(tabs)/index.tsx`, `src/app/player/[id].tsx`,
-`article-card.tsx`, and the tab components that read it), and none of them
-read a verdict's `claim` field yet. That migration is explicitly **later**
-even once the service is deployed — `claim-type.ts` stays permanently as
-the offline classifier and pre-filter (see "Why waiting costs nothing"
-below), so switching a screen over is a follow-up, not a blocker on
-anything in this file.
+**Wired up as of 2026-08-25.** The verdict's `claim` is attached to each
+surviving article in `withVerdictRefinement` (`Article.remoteClaim`) and
+merged into the badge in `withClaimTypes` — local lexicon evidence first,
+remote claim when the lexicon only hit its default, and an honest
+`unlabeled` badge when neither had a signal (`classifyClaimDetailed`'s
+`basis` is what makes the default distinguishable from a match). The
+migration cost less than this file predicted: only three call sites
+actually *compute* claim types (`(tabs)/index.tsx`, `team/[id].tsx`,
+`player/[id].tsx`); `article-card.tsx` takes the result as a prop and
+`article.tsx` as a route param, so neither moved. `claim-type.ts` stays
+permanently as the offline classifier and pre-filter (see "Why waiting
+costs nothing" below) — this was a merge, not a replacement. Still open:
+a measured accuracy number (the labeling loop is deferred by choice), and
+the `teams` field, which remains paid for and discarded.
 
 #### 3a. The byline signal — same blind spot, different fix, no service needed
 
@@ -251,14 +256,16 @@ Nothing built so far becomes rework. Each piece was shaped for this:
 | **Local claim classifier** | Stays permanently as the offline path and pre-filter, so a service outage degrades to the previous version of the feature rather than to nothing. |
 | **Atom parsing** | Discovered feeds arrive in either format; both already work. |
 
-**The one real refactor, done for the sport/kind half:** classification
-becomes asynchronous. `team-news-pool.ts` now has a pool-level enrichment
+**The one real refactor, now done for both halves:** classification
+becomes asynchronous. `team-news-pool.ts` has a pool-level enrichment
 step (`withVerdictRefinement`) that races `classifyHeadlines` against a 3s
 budget and falls through to the unrefined list on a miss — see the comment
-there for why the race is shorter than `verdicts.ts`'s own 6s timeout. The
-*screens*, though, are the other half of this refactor and haven't moved:
-they still call `classifyClaim` in a render-time `useMemo`, per §3 above.
-That part "simplifies the screens" only once it's actually done.
+there for why the race is shorter than `verdicts.ts`'s own 6s timeout. As
+of 2026-08-25 it also carries `verdict.claim` onto the articles it keeps,
+so the screens' render-time `useMemo`s (still `withClaimTypes`, still
+synchronous) merge a value that was computed asynchronously upstream —
+the screens never had to become async themselves, which is why this cost
+three call sites instead of a refactor.
 
 ---
 

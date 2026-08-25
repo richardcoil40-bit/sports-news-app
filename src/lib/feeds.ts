@@ -1,5 +1,8 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 
+// Type-only, so no runtime cycle exists: claim-type.ts type-imports Article
+// from here, and both edges erase at compile time.
+import type { ClaimType } from '@/lib/claim-type';
 import { DEFAULT_CONCURRENCY, FETCH_TIMEOUT_MS, mapWithConcurrency } from '@/lib/http';
 
 /**
@@ -71,6 +74,14 @@ export interface Article {
    * fallback when the headline names nobody.
    */
   scope: SourceScope;
+  /**
+   * The verdict service's claim classification, when one resolved for this
+   * headline — attached in team-news-pool.ts's refinement pass, absent
+   * otherwise (offline, race timeout, service unset). Never set by the
+   * feed mappers in this file. How it combines with the local classifier
+   * is `withClaimTypes`'s merge policy in claim-type.ts.
+   */
+  remoteClaim?: ClaimType;
 }
 
 const xmlParser = new XMLParser({

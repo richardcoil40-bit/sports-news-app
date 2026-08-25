@@ -178,7 +178,17 @@ async function withVerdictRefinement(
     }
   }
 
-  return articles.filter((a) => isRelevantVerdict(verdicts.get(a.link) ?? null, league));
+  // Two things ride on the same verdict: relevance filters the list, and
+  // `claim` is carried onto the survivors for the badge merge in
+  // claim-type.ts. The claim was computed, cached and paid for on every
+  // request since the service shipped; it was simply discarded on arrival
+  // (docs/deferred-work.md §3) — this line is the whole "wiring it up".
+  return articles
+    .filter((a) => isRelevantVerdict(verdicts.get(a.link) ?? null, league))
+    .map((a) => {
+      const claim = verdicts.get(a.link)?.claim;
+      return claim ? { ...a, remoteClaim: claim } : a;
+    });
 }
 
 /**

@@ -112,11 +112,19 @@ const BADGE_INK = Colors.light.background;
 /**
  * The claim badge's two colours, per claim type.
  *
- * All three are a solid block of colour with cream text; only the
- * reported block's fill follows the theme, through `claimReported`.
- * Rumor and take carry their own fixed hues — a story is no more a rumor
- * at night — so neither may follow `background` to black, which is why
- * the text is a constant rather than a theme lookup.
+ * The three claim states are a solid block of colour with cream text;
+ * only the reported block's fill follows the theme, through
+ * `claimReported`. Rumor and take carry their own fixed hues — a story is
+ * no more a rumor at night — so neither may follow `background` to black,
+ * which is why their text is a constant rather than a theme lookup.
+ *
+ * Unlabeled is deliberately not a fourth block: it means "no signal", and
+ * a solid chip would read as a fourth kind of claim. It recedes instead —
+ * translucent ink (the 14% DropdownPill's dividers use) under the theme's
+ * own ink — the same register as tierLabel's 'Unrated'.
+ *
+ * A Record rather than the if-chain this used to be: a new ClaimType now
+ * fails to compile here instead of silently wearing reported's colour.
  *
  * These are the one place a colour means "what kind of thing this is".
  * The accents above mean "what state this control is in"; keep the two
@@ -124,11 +132,15 @@ const BADGE_INK = Colors.light.background;
  */
 export function claimBadgeColors(
   type: ClaimType,
-  theme: { claimReported: string },
+  theme: { claimReported: string; text: string },
 ): { background: string; text: string } {
-  if (type === 'rumor') return { background: '#B5482E', text: BADGE_INK };
-  if (type === 'take') return { background: '#3A5A78', text: BADGE_INK };
-  return { background: theme.claimReported, text: BADGE_INK };
+  const byType: Record<ClaimType, { background: string; text: string }> = {
+    reported: { background: theme.claimReported, text: BADGE_INK },
+    rumor: { background: '#B5482E', text: BADGE_INK },
+    take: { background: '#3A5A78', text: BADGE_INK },
+    unlabeled: { background: withAlpha(theme.text, 0.14), text: theme.text },
+  };
+  return byType[type];
 }
 
 /**

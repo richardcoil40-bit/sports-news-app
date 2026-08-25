@@ -523,7 +523,9 @@ export default function FeedScreen() {
                       ? `No takes about ${scopeLabel} right now.`
                       : claimFilter === 'reported'
                         ? `No reported news for ${scopeLabel} right now.`
-                        : `Nothing new for ${scopeLabel} right now.`}
+                        : claimFilter === 'unlabeled'
+                          ? `No unlabeled stories for ${scopeLabel} right now.`
+                          : `Nothing new for ${scopeLabel} right now.`}
                 </ThemedText>
               </View>
               )

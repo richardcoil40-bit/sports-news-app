@@ -169,6 +169,14 @@ export function parseStoredArticles(raw: string | null): StoredArticle[] {
         record.tier === 1 || record.tier === 2 || record.tier === 3 ? record.tier : 0,
       reach: record.reach === 'beat' ? 'beat' : 'national',
       scope: record.scope === 'team' ? 'team' : 'broad',
+      // Kept so an article surviving only from the store still wears the
+      // verdict it earned when live. Only the three remote values are
+      // possible; anything else is junk and drops to absent.
+      ...(record.remoteClaim === 'reported' ||
+      record.remoteClaim === 'rumor' ||
+      record.remoteClaim === 'take'
+        ? { remoteClaim: record.remoteClaim }
+        : {}),
       firstSeenAt: record.firstSeenAt,
     });
   }

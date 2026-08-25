@@ -102,8 +102,25 @@ export function splitBrief<T extends Splittable>(
       earlier.push(article);
       continue;
     }
-    if (article.claimType === 'reported') reported.push(article);
-    else chatter.push(article);
+    switch (article.claimType) {
+      case 'rumor':
+      case 'take':
+        chatter.push(article);
+        break;
+      case 'reported':
+      // Unlabeled surfaces with reported on purpose: the no-signal pile is
+      // mostly ordinary news, and demoting it to chatter would recreate
+      // the misfiled-scoop error the asymmetry doctrine exists to prevent
+      // (see claim-type.ts). The badge's honesty changes; placement
+      // doesn't.
+      case 'unlabeled':
+        reported.push(article);
+        break;
+      default:
+        // Exhaustiveness: a fifth ClaimType must decide its routing here.
+        article.claimType satisfies never;
+        reported.push(article);
+    }
   }
 
   const briefTotal = reported.length;

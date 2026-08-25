@@ -50,6 +50,8 @@ const CLAIM_DEFINITIONS: Record<ClaimType, string> = {
   rumor:
     'Speculation, or sourced only to people who are not named. It might well be right; nobody has put their name to it yet.',
   take: 'Opinion — a column, a ranking, a grade, a prediction.',
+  unlabeled:
+    "The headline gave the classifiers nothing to go on either way, so it's left unmarked rather than guessed. Usually ordinary news.",
 };
 
 const TIER_DEFINITIONS: Record<SourceTier, string> = {
@@ -61,7 +63,7 @@ const TIER_DEFINITIONS: Record<SourceTier, string> = {
 
 /** Reading order rather than numeric order: best-understood first. */
 const TIER_ORDER: SourceTier[] = [1, 2, 3, 0];
-const CLAIM_ORDER: ClaimType[] = ['reported', 'rumor', 'take'];
+const CLAIM_ORDER: ClaimType[] = ['reported', 'rumor', 'take', 'unlabeled'];
 
 export const DEFINITION_SECTIONS: DefinitionSection[] = [
   {

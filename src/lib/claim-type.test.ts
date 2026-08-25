@@ -4,6 +4,7 @@ import {
   ClaimType,
   claimTypeLabel,
   classifyClaim,
+  classifyClaimDetailed,
   filterByClaimType,
   withClaimTypes,
 } from '@/lib/claim-type';
@@ -212,11 +213,121 @@ describe('determinism', () => {
   });
 });
 
+// The two tester screenshots that motivated the 2026-08 badge work, kept
+// as regressions the way MUST_STAY_REPORTED keeps its seventeen.
+describe('the screenshot cases', () => {
+  it('"Opponent Preview" is a take — the preview family, phrase-matched', () => {
+    expect(classify('Vanderbilt Football Opponent Preview: Austin Peay')).toBe('take');
+  });
+
+  it('a listings-page preview question is still not a take', () => {
+    expect(classify('Vanderbilt vs. Austin Peay: kickoff time, TV channel, preview?')).toBe(
+      'reported',
+    );
+  });
+
+  it('an unattributed trade verdict is a take', () => {
+    expect(classify('Green Bay won the trade with Dallas')).toBe('take');
+  });
+
+  // The PennLive headline. Locally this must NOT resolve on evidence in
+  // either direction: "says" makes the take call a who-is-speaking
+  // question (the remote classifier's job), and the "won" in "won the
+  // trade" is a verdict, not a completed event — without that
+  // suppression, the merge below could never reach the remote answer.
+  it('an attributed trade verdict falls to the default, for the remote to decide', () => {
+    const headline = 'PSU legend LaVar Arrington says Green Bay won trade for Micah Parsons';
+    expect(classifyClaimDetailed({ title: headline, description: '' })).toEqual({
+      type: 'reported',
+      basis: 'default',
+    });
+  });
+
+  it('a real win with a score is still completed-event evidence', () => {
+    expect(classifyClaimDetailed({ title: 'Ohio State won 30-24 in Ann Arbor', description: '' })).toEqual({
+      type: 'reported',
+      basis: 'evidence',
+    });
+  });
+});
+
+describe('classifyClaimDetailed basis', () => {
+  it('reports evidence for a positive match', () => {
+    expect(classifyClaimDetailed({ title: 'Michigan hires Brian Hartline', description: '' }).basis).toBe(
+      'evidence',
+    );
+  });
+
+  it('reports default for a plain declarative nothing matched', () => {
+    expect(
+      classifyClaimDetailed({ title: "Michigan's defense has a problem", description: '' }),
+    ).toEqual({ type: 'reported', basis: 'default' });
+  });
+
+  it('never returns unlabeled itself', () => {
+    expect(classifyClaim({ title: "Michigan's defense has a problem", description: '' })).toBe(
+      'reported',
+    );
+  });
+});
+
+/**
+ * The merge with the remote verdict: local evidence first, remote second,
+ * unlabeled last. Evidence-first is what keeps MUST_STAY_REPORTED
+ * protecting what users actually see once verdicts are flowing — a remote
+ * answer must not be able to overrule a curated lexicon match.
+ */
+describe('the remote claim merge', () => {
+  const one = (article: { title: string; description: string; remoteClaim?: ClaimType }) =>
+    withClaimTypes([article])[0].claimType;
+
+  it('local evidence beats a disagreeing remote verdict', () => {
+    // Tested live: the worker misses "Opponent Preview" the same way the
+    // old lexicon did. The 3b fix must win even when a verdict arrived.
+    expect(
+      one({
+        title: 'Vanderbilt Football Opponent Preview: Austin Peay',
+        description: '',
+        remoteClaim: 'reported',
+      }),
+    ).toBe('take');
+  });
+
+  it('a MUST_STAY_REPORTED headline resists a remote rumor call', () => {
+    expect(
+      one({ title: 'Michigan hires Brian Hartline', description: '', remoteClaim: 'rumor' }),
+    ).toBe('reported');
+  });
+
+  it('the remote decides when the local result is only the default', () => {
+    expect(
+      one({
+        title: 'PSU legend LaVar Arrington says Green Bay won trade for Micah Parsons',
+        description: '',
+        remoteClaim: 'take',
+      }),
+    ).toBe('take');
+  });
+
+  it('no signal from either side is worn honestly', () => {
+    expect(one({ title: "Michigan's defense has a problem", description: '' })).toBe('unlabeled');
+  });
+
+  it('unlabeled is filterable like the other three', () => {
+    const articles = withClaimTypes([
+      { title: "Michigan's defense has a problem", description: '' },
+      { title: 'Michigan hires Brian Hartline', description: '' },
+    ]);
+    expect(filterByClaimType(articles, 'unlabeled')).toHaveLength(1);
+  });
+});
+
 describe('claimTypeLabel', () => {
-  it('labels the three types', () => {
+  it('labels the four types', () => {
     expect(claimTypeLabel('reported')).toBe('Reported');
     expect(claimTypeLabel('rumor')).toBe('Rumor');
     expect(claimTypeLabel('take')).toBe('Take');
+    expect(claimTypeLabel('unlabeled')).toBe('Unlabeled');
   });
 
   // The value will eventually arrive over a network from a model.
