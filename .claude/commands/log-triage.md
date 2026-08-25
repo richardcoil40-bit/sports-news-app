@@ -1,5 +1,5 @@
 ---
-description: Pull the Worker's runtime logs, work out what the service actually did, and fix or propose from the evidence rather than from a guess.
+description: Pull the Worker's runtime logs plus Apple's build state and TestFlight crashes, work out what the service actually did, and fix or propose from the evidence rather than from a guess.
 ---
 
 # Log triage
@@ -7,6 +7,14 @@ description: Pull the Worker's runtime logs, work out what the service actually 
 The app has users now, which means the interesting failures happen on
 someone else's phone against a service nobody is watching. This reads what
 the service actually did.
+
+Three places, because a failure shows up in whichever one you aren't
+looking at: **Cloudflare** (what the Worker served), **Apple** (whether the
+build reached testers at all), and **TestFlight crashes**. Tester feedback
+is deliberately *not* part of this — that's `/testflight-triage`, which is
+a different job with a different output. Keep them apart; a health check
+you only run when you have time to read feedback is a health check you
+stop running.
 
 Optional argument: a window (`/log-triage 6h`), default 24h. Cloudflare
 keeps 3 days and nothing keeps them after that, so a window older than
@@ -16,8 +24,13 @@ $ARGUMENTS
 ## 1. Pull
 
 ```bash
-node scripts/worker-logs.mjs --since 24h
+node scripts/worker-logs.mjs --since 5h
 ```
+
+**Substitute the window argued above for `5h`** — the fence can't read
+`$ARGUMENTS`, so it is an example, not the command to run verbatim. A
+window nobody asked for is the one mistake here that produces a
+confident, complete, wrong review.
 
 Credentials come from `~/.cloudflare/config.json` or the environment —
 nothing to pass, nothing to print. The script's own error names what's
@@ -32,6 +45,40 @@ If it reports zero events, decide which of the two causes it is before
 going further: no traffic, or observability not actually deployed.
 `[observability]` is declared in `worker/wrangler.toml` but only takes
 effect on the next `npx wrangler deploy`.
+
+Then the Apple side. Both are read-only and neither needs the window —
+build state is current, and crashes are few enough to read whole.
+
+```bash
+node scripts/testflight-feedback.mjs --builds --limit 5
+```
+
+```bash
+node scripts/testflight-feedback.mjs --crashes --limit 20
+```
+
+`--crashes`, not the default screenshot feedback. Credentials resolve the
+same way the script's header documents; nothing to pass.
+
+## 1b. Join the two halves on the build number
+
+This is the step that makes it one review rather than two.
+
+Every app request in the Worker log carries a `NoFrills/<build>`
+user-agent, and that number is the App Store Connect build number. So the
+Cloudflare side tells you *which build the live traffic is actually coming
+from*, and the Apple side tells you what state that build is in. Neither
+answers it alone:
+
+- **Traffic from an older build than the newest VALID one** means testers
+  haven't updated — so a bug you fixed in the newest build is still live
+  on someone's phone, and a fix you're about to make may already exist.
+- **A newest build with no traffic at all** is the case that reads as
+  "quiet day" and isn't. Check its state before concluding nobody opened
+  the app: `PROCESSING` or `BETA_REVIEW_REJECTED` means it never reached
+  anyone.
+- **Zero crashes plus zero Worker events** is not a clean bill of health,
+  it's an absence of evidence. Say so rather than reporting all-clear.
 
 ## 2. Know what normal looks like here
 
@@ -65,6 +112,32 @@ it.
   free tier's 1,000 writes/day is being hit, the symptom is a rising
   *rate* of model calls, not an error — and D1 is the documented upgrade
   path.
+  - **A `canceled` outcome on `/v1/classify` is the client hanging up,**
+    not a Worker fault, and `wallMs` will sit near 6000 because that's
+    `CLASSIFY_TIMEOUT_MS` in `src/lib/verdicts.ts`. The degradation is
+    intended. What isn't free is that the `ctx.waitUntil` cache writes are
+    registered *after* the model call returns, so an abort mid-call spends
+    the call and caches nothing — the same headlines cost again next time.
+    Worth recording; only worth acting on if the rate climbs.
+  - **`wallMs` includes `waitUntil` work.** An `ok` event reading longer
+    than the client's 6s timeout did not exceed it — the response went out
+    well before the KV write finished. Don't read those as near-misses.
+- **`processingState=VALID` with `IN_BETA_TESTING` is the healthy pair.**
+  `PROCESSING` on a build uploaded minutes ago is normal and resolves
+  itself; `INVALID` or `FAILED` is real and means that build reached
+  nobody.
+- **`external=READY_FOR_BETA_SUBMISSION` on an older build is not a
+  fault.** It means that build was never submitted for external review,
+  which is the ordinary end state for one that got superseded. Only the
+  newest build's external state is worth reading.
+- **Zero crash submissions is the common case**, and TestFlight only
+  reports crashes testers agreed to share — so it is weak evidence, not
+  proof of stability. A crash count of zero alongside real Worker traffic
+  is good news; alongside no traffic it says nothing at all.
+- **Zero 401s across authenticated `/v1/classify` requests is positive
+  evidence**, not just an absence: it means the build carries
+  `EXPO_PUBLIC_VERDICT_TOKEN`. That's the one thing about an Xcode Cloud
+  build that fails silently, so call it out when it's clean.
 
 ## 3. Triage
 
@@ -106,6 +179,9 @@ Do not, without asking:
   document gets updated in the same change, per its own rule.
 - **Raise `DAILY_CALL_CAP`.** That's a spend decision, and the standing
   rule on this project is no changes that add dollar spend.
+- **Touch anything in App Store Connect.** This review is read-only
+  against Apple. Expiring a build, submitting one for review, or deleting
+  feedback are all outward-facing and none of them are triage.
 
 ## 5. Write it up
 
@@ -114,13 +190,18 @@ once something is acted on, the commit is the record, and a status file
 nobody updates is worse than none (`docs/deferred-work.md` makes that case
 itself).
 
-- One-line summary: N events over the window, M worth acting on.
+- One-line summary: N events over the window, M worth acting on. Name the
+  window in both UTC and local time — the logs are UTC and you are not.
 - **Faults**, most severe first, each with file:line and what you did or
   propose.
 - **Budget**, with the number and what it's tracking against.
 - **Documented behaviour**, one line each with the reference.
+- **Apple / TestFlight**, in two lines: build states, and the crash count.
+  Include the build the live traffic actually came from, per 1b.
 - Anything you couldn't classify, and what you'd need to classify it —
   including "the field that would answer this isn't in the log", which is
-  itself a finding.
+  itself a finding. `degraded` is the standing example: nothing in
+  `worker/src/index.ts` logs it, so cap binding and model failures are
+  indistinguishable from a healthy 200.
 
 Print the summary line and the file path in the chat response.

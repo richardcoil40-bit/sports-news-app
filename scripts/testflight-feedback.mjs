@@ -5,6 +5,7 @@
  *   node scripts/testflight-feedback.mjs [--limit N] [--download] [--json]
  *                                        [--crashes] [--build N]
  *                                        [--new] [--mark]
+ *   node scripts/testflight-feedback.mjs --builds [--limit N]
  *
  * This is the same feedback that shows up under TestFlight → Feedback in
  * App Store Connect — a tester's screenshot plus whatever they typed —
@@ -58,6 +59,20 @@
  *
  * `--json` is a raw passthrough of Apple's response and ignores both flags.
  *
+ * ## --builds is the other question this key can answer
+ *
+ * Not feedback at all: the processing and beta-testing state of what was
+ * uploaded. It lives here rather than in its own script because the
+ * credential handling above is the whole difficulty, and a second copy of
+ * it is a second thing to get wrong. `--builds` short-circuits before any
+ * feedback resource is fetched, so it shares nothing with the flags above
+ * and ignores them apart from `--limit` and `--json`.
+ *
+ * It answers "did the build Apple has actually make it to testers", which
+ * is the half of a health check the Worker logs can't see. A build stuck
+ * at PROCESSING or sitting in BETA_REVIEW_REJECTED looks, from the app's
+ * side, exactly like nobody opening the app.
+ *
  * ## Why the app id isn't hardcoded
  *
  * It's resolved from the bundle identifier in app.json, so this keeps
@@ -88,6 +103,7 @@ const LIMIT = Number(value('limit', '20'));
 const DOWNLOAD = flag('download');
 const JSON_OUT = flag('json');
 const CRASHES = flag('crashes');
+const BUILDS = flag('builds');
 const BUILD_FILTER = value('build', null);
 const NEW_ONLY = flag('new');
 const MARK = flag('mark');
@@ -328,10 +344,68 @@ function formatSubmission(item, included, index) {
   return { lines, urls: screenshotUrls(a), id: item.id };
 }
 
+/**
+ * Build state, newest first. One request: `buildBetaDetail` and
+ * `preReleaseVersion` are both includable on /v1/builds, so this doesn't
+ * fan out per build.
+ *
+ * Read defensively — an `include` Apple declines to honour comes back as a
+ * missing relationship rather than an error, and a build with no beta
+ * detail yet is a real state (it's brand new), not a fault.
+ */
+async function reportBuilds(token, app, creds) {
+  const json = await get(
+    token,
+    `/v1/builds?filter[app]=${app.id}&limit=${LIMIT}` +
+      `&sort=-uploadedDate&include=preReleaseVersion,buildBetaDetail`,
+    creds,
+  );
+
+  if (JSON_OUT) {
+    console.log(JSON.stringify(json, null, 2));
+    return;
+  }
+
+  const included = indexIncluded(json);
+  const builds = json?.data ?? [];
+
+  console.log(`${app.name} (${app.bundleId}) — app id ${app.id}`);
+  console.log(`${builds.length} build${builds.length === 1 ? '' : 's'}, newest first\n`);
+
+  if (!builds.length) {
+    console.log('Nothing uploaded yet.');
+    return;
+  }
+
+  for (const build of builds) {
+    const a = build?.attributes ?? {};
+    const train = resolve(included, build.relationships?.preReleaseVersion)?.attributes?.version;
+    const detail = resolve(included, build.relationships?.buildBetaDetail)?.attributes ?? {};
+
+    const version = `${train ?? '?'} (${a.version ?? '?'})`;
+    const flags = [
+      a.processingState && `processing=${a.processingState}`,
+      detail.internalBuildState && `internal=${detail.internalBuildState}`,
+      detail.externalBuildState && `external=${detail.externalBuildState}`,
+      a.expired && 'EXPIRED',
+    ].filter(Boolean);
+
+    console.log(`  ${version}`);
+    console.log(`      uploaded ${a.uploadedDate ? new Date(a.uploadedDate).toLocaleString() : 'unknown date'}`);
+    console.log(`      ${flags.join('  ')}`);
+    if (a.expirationDate && !a.expired) {
+      console.log(`      expires  ${new Date(a.expirationDate).toLocaleDateString()}`);
+    }
+  }
+}
+
 async function main() {
   const creds = await credentials();
   const token = mintToken(creds);
   const app = await resolveApp(token, creds);
+
+  // Not a feedback resource at all — short-circuit before touching one.
+  if (BUILDS) return reportBuilds(token, app, creds);
 
   const resource = CRASHES ? 'betaFeedbackCrashSubmissions' : 'betaFeedbackScreenshotSubmissions';
   const json = await listFeedback(token, app.id, resource, creds);
