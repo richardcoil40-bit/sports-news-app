@@ -57,6 +57,26 @@ jobs:
       - name: Unit tests
         run: npm run test
 
+      # --- Bundle check ---
+      # The only step here that runs Metro's resolver rather than tsc's.
+      # `tsc --noEmit` above resolves "@/" through tsconfig paths and never
+      # looks at a require() string literal at all — it's typed `any`, so the
+      # five require('@/assets/images/...') call sites in the app are invisible
+      # to it, as is Metro's @2x/@3x variant resolution. A renamed asset, a
+      # case-only path difference (macOS is case-insensitive, this runner is
+      # not), or an import of a package that resolves locally but isn't in
+      # dependencies all typecheck clean and die here instead.
+      #
+      # Without this step the first thing that ever bundles this app is Xcode
+      # Cloud, ~13 minutes into a run on a 25-hour monthly allowance. The
+      # exported output is discarded; the exit status is the whole point.
+      #
+      # EXPO_PUBLIC_VERDICT_TOKEN is absent here and that's correct — this
+      # bundle is thrown away. It is emphatically not fine in a build that
+      # ships, which is why ci_scripts/ci_post_clone.sh fails on it.
+      - name: Bundle check
+        run: npx expo export --platform ios --output-dir "$RUNNER_TEMP/expo-export"
+
       # --- expo-doctor ---
       # Validates app.json / native config / dependency versions are
       # consistent. continue-on-error because `npx expo-doctor` fetches the
