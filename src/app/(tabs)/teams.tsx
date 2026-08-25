@@ -24,12 +24,17 @@ import { useTheme } from '@/hooks/use-theme';
 import { Team } from '@/lib/teams';
 
 /**
- * A way in to each team you follow, and nothing else.
+ * A way in to each team you follow, and a way to the picker for more.
  *
  * This tab used to be the whole conference with a search box and a star
  * on every row, which made it two screens wearing one coat: a directory
  * and a settings surface. Managing the set moved to Settings →
- * Favorites, leaving this as pure navigation.
+ * Favorites, leaving this as pure navigation — but a tester hunting for
+ * "add a team" landed here, reasonably, and found nothing: the only
+ * routes to the picker were the two unlabeled settings marks in the
+ * header. So the list ends in the same affordance the empty state
+ * offers. A link to the management surface is still navigation; the
+ * directory-with-stars stays gone.
  *
  * The rows themselves used to be a two-column grid of full-bleed color
  * squares; see TeamBadgeRow for why the color moved into a badge.
@@ -191,6 +196,16 @@ export default function TeamsScreen() {
             keyExtractor={(item) => `${item.leagueId}:${item.id}`}
             renderItem={({ item }) => <TeamBadgeRow team={item} onPress={pressTeam(item)} />}
             contentContainerStyle={styles.listContent}
+            ListFooterComponent={
+              <TouchableOpacity
+                style={[styles.button, styles.footerButton, { backgroundColor: theme.text }]}
+                accessibilityRole="button"
+                onPress={() => router.push('/settings/favorites')}>
+                <ThemedText font="mono" style={[styles.buttonText, { color: theme.background }]}>
+                  Add teams
+                </ThemedText>
+              </TouchableOpacity>
+            }
           />
         )}
       </SafeAreaView>
@@ -267,6 +282,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.four,
     borderRadius: 0,
+  },
+  footerButton: {
+    alignItems: 'center',
+    marginTop: Spacing.two,
   },
   buttonText: {
     textTransform: 'uppercase',
