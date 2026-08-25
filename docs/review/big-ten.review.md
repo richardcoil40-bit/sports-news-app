@@ -75,8 +75,14 @@ source_candidates:
 decision:
 nicknames:
 sources:
+  gannett indianapolis-star "The Indianapolis Star" www.indystar.com 1
 probe:
 notes:
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
 ```
 
 ## iowa — Iowa
@@ -105,8 +111,16 @@ source_candidates:
 decision:
 nicknames:
 sources:
+  gannett des-moines-register "The Des Moines Register" www.desmoinesregister.com 1
 probe:
 notes:
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
+  The Register entry is shared with Iowa State (same id in both
+  tables, the Tulsa World rule).
 ```
 
 ## maryland — Maryland
@@ -424,8 +438,16 @@ source_candidates:
 decision:
 nicknames:
 sources:
+  gannett journal-courier "Journal & Courier" www.jconline.com 1
 probe:
 notes:
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
+  Lafayette is Purdue's town; the paper is small and its window
+  runs a handful of items.
 ```
 
 ## rutgers — Rutgers

@@ -21,12 +21,13 @@ import { teamSlug } from '@/lib/team-slug';
  *   sites after AB5 (the state's freelancer law) made the contributor model
  *   unworkable there. The LA Times sports feed covers both programs instead.
  *
- * - Iowa, Indiana, and Purdue have no local newsroom feed. Their metro papers
- *   are Gannett (Des Moines Register, Indianapolis Star), and Gannett appears
- *   to have retired RSS entirely — every documented path returns 200 with an
- *   empty body. Chicago Tribune and Baltimore Sun (Illinois/Northwestern and
- *   Maryland) return 403 to any programmatic request. Neither is a wrong-URL
- *   problem, so those programs run on their SB Nation blog alone for now.
+ * - The Gannett metro papers (Des Moines Register, Indianapolis Star,
+ *   Journal & Courier) retired RSS entirely — every documented path returns
+ *   200 with an empty body — but each still publishes a Google news
+ *   sitemap, which is what their SITEMAP() entries read since 2026-08-25.
+ *   Chicago Tribune and Baltimore Sun (Illinois/Northwestern and Maryland)
+ *   return 403 to any programmatic request and publish no sitemap either,
+ *   so those two programs run on their SB Nation blog alone.
  *
  * ## Present-with-nothing vs. absent
  *
@@ -50,6 +51,11 @@ import { teamSlug } from '@/lib/team-slug';
 const GANNETT =
   'Gannett has retired RSS: every documented path returns 200 with an ' +
   'empty body, which is a shut-off feature rather than a wrong URL';
+const GANNETT_SITEMAP =
+  'the paper still publishes a Google news sitemap (news-sitemap.xml, a ' +
+  'rolling ~48h window of the whole paper), which the SITEMAP() helper ' +
+  'reads with the sports desk filtered back out by URL path — so the ' +
+  'beat is recoverable even though RSS is gone';
 const TRIBUNE =
   'Tribune returns HTTP 403 to any programmatic request, regardless of ' +
   'path or user agent';
@@ -112,6 +118,7 @@ export const DEAD_FEED_OWNERS: Record<string, string> = {
  */
 export const OWNER_FEED_URL: Record<string, (host: string, section?: string) => string> = {
   advance: (host) => `https://${host}/arc/outboundfeeds/rss/category/sports/?outputType=xml`,
+  gannett: (host) => `https://${host}/news-sitemap.xml`,
   lee: (host, section = 'sports') => `https://${host}/search/?f=rss&t=article&c=${section}&l=50`,
   'sb-nation': (host) => `https://${host}/rss/index.xml`,
 };
@@ -190,16 +197,53 @@ const LEE = (
   scope: 'broad',
 });
 
+/**
+ * Gannett's mastheads — all tier-1 metro dailies, read through their Google
+ * news sitemap because the chain retired RSS across every paper at once
+ * (see GANNETT above). The sitemap is the *whole* paper on a rolling ~48h
+ * window, so feeds.ts's sitemap mapper filters back down to /story/sports/
+ * URLs before anything else sees the items, and item counts run lower than
+ * an RSS feed's — a short check-feeds.sh row here is the window, not a
+ * dying source (see docs/evidence/README.md). Every host below was
+ * verified live before its entry was added.
+ */
+const SITEMAP = (id: string, name: string, host: string): FeedSource => ({
+  id,
+  name,
+  url: OWNER_FEED_URL.gannett(host),
+  tier: 1,
+  scope: 'broad',
+});
+
 /** Alabama and Auburn share a statewide paper, the way UCLA and USC do. */
 const AL_COM: FeedSource = ADVANCE('al-com', 'AL.com', 'www.al.com');
+
+/**
+ * Iowa and Iowa State share the statewide Register the way Alabama and
+ * Auburn share AL.com — and like the Tulsa World, the id must stay
+ * identical across the two tables so nickname-safety.ts can see the
+ * shared newsroom. The Ames Tribune (Iowa State's town paper) has a live
+ * sitemap too, but its window is prep sports — see the Big 12 reasons.
+ */
+const DES_MOINES_REGISTER: FeedSource = SITEMAP(
+  'des-moines-register',
+  'The Des Moines Register',
+  'www.desmoinesregister.com',
+);
 
 const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   illinois: [
     SB_NATION('champaign-room', 'The Champaign Room', 'thechampaignroom.com'),
     LEE('news-gazette', 'The News-Gazette', 'www.news-gazette.com', 'sports/illini-sports'),
   ],
-  indiana: [SB_NATION('crimson-quarry', 'The Crimson Quarry', 'crimsonquarry.com')],
-  iowa: [SB_NATION('bhgp', 'Black Heart Gold Pants', 'blackheartgoldpants.com')],
+  indiana: [
+    SB_NATION('crimson-quarry', 'The Crimson Quarry', 'crimsonquarry.com'),
+    SITEMAP('indianapolis-star', 'The Indianapolis Star', 'www.indystar.com'),
+  ],
+  iowa: [
+    SB_NATION('bhgp', 'Black Heart Gold Pants', 'blackheartgoldpants.com'),
+    DES_MOINES_REGISTER,
+  ],
   maryland: [SB_NATION('testudo-times', 'Testudo Times', 'testudotimes.com')],
   michigan: [
     SB_NATION('maize-n-brew', 'Maize n Brew', 'maizenbrew.com'),
@@ -247,7 +291,10 @@ const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
     SB_NATION('black-shoe-diaries', 'Black Shoe Diaries', 'blackshoediaries.com'),
     ADVANCE('pennlive', 'PennLive', 'www.pennlive.com'),
   ],
-  purdue: [SB_NATION('hammer-and-rails', 'Hammer and Rails', 'hammerandrails.com')],
+  purdue: [
+    SB_NATION('hammer-and-rails', 'Hammer and Rails', 'hammerandrails.com'),
+    SITEMAP('journal-courier', 'Journal & Courier', 'www.jconline.com'),
+  ],
   rutgers: [
     SB_NATION('on-the-banks', 'On the Banks', 'onthebanks.com'),
     ADVANCE('nj-com', 'NJ.com', 'www.nj.com'),
@@ -305,11 +352,11 @@ const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
  */
 const BIG_TEN_NO_SOURCE_REASONS: Record<string, string> = {
   illinois: `Chicago Tribune: ${TRIBUNE}. The News-Gazette carries the program instead.`,
-  indiana: `Indianapolis Star: ${GANNETT}. No local newsroom feed available.`,
-  iowa: `Des Moines Register: ${GANNETT}. No local newsroom feed available.`,
+  indiana: `Indianapolis Star: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25, and the entry above.`,
+  iowa: `Des Moines Register: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25. The Register entry is shared with Iowa State, like AL.com across the Alabama schools.`,
   maryland: `Baltimore Sun: ${TRIBUNE}. No local newsroom feed available.`,
   northwestern: `Chicago Tribune: ${TRIBUNE}. No local newsroom feed available.`,
-  purdue: `Indianapolis Star and Journal & Courier: ${GANNETT}. No local newsroom feed available.`,
+  purdue: `Indianapolis Star and Journal & Courier: ${GANNETT}, but ${GANNETT_SITEMAP} — the Journal & Courier (Lafayette, Purdue's town) verified 2026-08-25 and is the entry above; its window runs small.`,
   ucla: `No SB Nation blog: ${VOX_AB5}. The LA Times covers both LA programs.`,
   usc: `No SB Nation blog: ${VOX_AB5}. The LA Times covers both LA programs.`,
 };
@@ -342,14 +389,17 @@ const BIG_TEN_NO_SOURCE_REASONS: Record<string, string> = {
  *   Oklahoma and Mississippi (Gainesville Sun, Knoxville News Sentinel,
  *   Austin American-Statesman, Athens Banner-Herald, The Oklahoman,
  *   Clarion Ledger), and every one of those returns 200 with an empty
- *   body — the same retirement documented for the Big Ten above. McClatchy
- *   (Lexington Herald-Leader, The State) resets the connection to any
- *   programmatic request, like the Tribune papers do.
+ *   body for RSS — the same retirement documented for the Big Ten above.
+ *   All six are carried through their news sitemaps instead since
+ *   2026-08-25; see the SITEMAP() helper. McClatchy (Lexington
+ *   Herald-Leader, The State) resets the connection to any programmatic
+ *   request, like the Tribune papers do, and publishes no sitemap.
  */
 const SEC_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   alabama: [
     SB_NATION('roll-bama-roll', 'Roll Bama Roll', 'rollbamaroll.com'),
     AL_COM,
+    SITEMAP('tuscaloosa-news', 'The Tuscaloosa News', 'www.tuscaloosanews.com'),
   ],
   arkansas: [
     {
@@ -366,6 +416,7 @@ const SEC_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   auburn: [
     LEE('opelika-auburn-news', 'Opelika-Auburn News', 'oanow.com', 'sports/college/auburn'),
     AL_COM,
+    SITEMAP('montgomery-advertiser', 'Montgomery Advertiser', 'www.montgomeryadvertiser.com'),
   ],
   florida: [
     {
@@ -375,10 +426,12 @@ const SEC_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
       tier: 2,
       scope: 'team',
     },
+    SITEMAP('gainesville-sun', 'The Gainesville Sun', 'www.gainesville.com'),
   ],
   georgia: [
     SB_NATION('dawg-sports', 'Dawg Sports', 'dawgsports.com'),
     LEE('red-and-black', 'The Red & Black', 'www.redandblack.com', 'sports/football', 3),
+    SITEMAP('athens-banner-herald', 'Athens Banner-Herald', 'www.onlineathens.com'),
   ],
   kentucky: [SB_NATION('a-sea-of-blue', 'A Sea of Blue', 'aseaofblue.com')],
   lsu: [
@@ -413,41 +466,64 @@ const SEC_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
     // athletics-department output, not for a newsroom with an editor.
     LEE('columbia-missourian', 'Columbia Missourian', 'www.columbiamissourian.com', 'sports/mizzou_football', 3),
   ],
-  'ole-miss': [SB_NATION('red-cup-rebellion', 'Red Cup Rebellion', 'redcuprebellion.com')],
+  'ole-miss': [
+    SB_NATION('red-cup-rebellion', 'Red Cup Rebellion', 'redcuprebellion.com'),
+    SITEMAP('clarion-ledger', 'The Clarion-Ledger', 'www.clarionledger.com'),
+  ],
   oklahoma: [
     // The statewide paper, read through OU's own section rather than its
     // sports front — see the Big 12 table's note on the shared id, and the
     // LEE() helper on why the front is the wire.
     LEE('tulsa-world', 'Tulsa World', 'tulsaworld.com', 'sports/college/ou'),
     LEE('ou-daily', 'The OU Daily', 'www.oudaily.com', 'sports/football', 3),
+    SITEMAP('the-oklahoman', 'The Oklahoman', 'www.oklahoman.com'),
   ],
   'south-carolina': [
     LEE('post-and-courier', 'The Post and Courier', 'www.postandcourier.com', 'sports/college'),
   ],
-  tennessee: [SB_NATION('rocky-top-talk', 'Rocky Top Talk', 'rockytoptalk.com')],
-  texas: [SB_NATION('burnt-orange-nation', 'Burnt Orange Nation', 'burntorangenation.com')],
+  tennessee: [
+    SB_NATION('rocky-top-talk', 'Rocky Top Talk', 'rockytoptalk.com'),
+    SITEMAP('knoxville-news-sentinel', 'Knoxville News Sentinel', 'www.knoxnews.com'),
+  ],
+  texas: [
+    SB_NATION('burnt-orange-nation', 'Burnt Orange Nation', 'burntorangenation.com'),
+    // The one Gannett masthead whose /news-sitemap.xml is a sitemap *index*
+    // holding a single "local" child — subscribe to the child directly. Its
+    // URLs also drop the /story/ prefix (sports/longhorns/…), which is why
+    // SITEMAP_SPORTS_PATH in feeds.ts matches the bare /sports/ segment.
+    {
+      id: 'austin-american-statesman',
+      name: 'Austin American-Statesman',
+      url: 'https://www.statesman.com/sitemap/news/local.xml',
+      tier: 1,
+      scope: 'broad',
+    },
+  ],
   'texas-am': [
     SB_NATION('good-bull-hunting', 'Good Bull Hunting', 'goodbullhunting.com'),
     LEE('the-eagle', 'The Eagle', 'theeagle.com', 'sports/college/aggiesports'),
   ],
-  vanderbilt: [SB_NATION('anchor-of-gold', 'Anchor Of Gold', 'anchorofgold.com')],
+  vanderbilt: [
+    SB_NATION('anchor-of-gold', 'Anchor Of Gold', 'anchorofgold.com'),
+    SITEMAP('tennessean', 'The Tennessean', 'www.tennessean.com'),
+  ],
 };
 
 /** The SEC's half of the same record. See BIG_TEN_NO_SOURCE_REASONS. */
 const SEC_NO_SOURCE_REASONS: Record<string, string> = {
-  alabama: `The Tuscaloosa News: ${GANNETT}. Roll Tide Wire: ${USA_TODAY_WIRE}. AL.com carries the program.`,
+  alabama: `The Tuscaloosa News: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25, the entry above. Roll Tide Wire: ${USA_TODAY_WIRE}. AL.com also carries the program.`,
   arkansas: `Arkansas Fight is gone: ${VOX_SHUTDOWN}.`,
-  auburn: `College and Magnolia is gone: ${VOX_SHUTDOWN}. Montgomery Advertiser: ${GANNETT}.`,
-  florida: `Alligator Army still publishes and still advertises /rss/index.xml, but that path 404s — a broken feed on a working site, so worth re-checking rather than writing off. Gainesville Sun: ${GANNETT}. Gators Wire: ${USA_TODAY_WIRE}.`,
-  georgia: `Athens Banner-Herald: ${GANNETT}. The Red & Black, the student paper, carries what a metro paper would.`,
+  auburn: `College and Magnolia is gone: ${VOX_SHUTDOWN}. Montgomery Advertiser: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25, the entry above.`,
+  florida: `Alligator Army still publishes and still advertises /rss/index.xml, but that path 404s — a broken feed on a working site, so worth re-checking rather than writing off. Gainesville Sun: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25, the entry above. Gators Wire: ${USA_TODAY_WIRE}.`,
+  georgia: `Athens Banner-Herald: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25, the entry above, beside the Red & Black.`,
   kentucky: `Lexington Herald-Leader: ${MCCLATCHY}. No local newsroom feed available.`,
   'mississippi-state': `For Whom the Cowbell Tolls is gone: ${VOX_SHUTDOWN}. The Starkville Daily News carries the program.`,
-  'ole-miss': `Clarion Ledger, the statewide paper: ${GANNETT}. No local newsroom feed verified for Oxford.`,
-  oklahoma: `Crimson And Cream Machine is gone: ${VOX_SHUTDOWN}. The Oklahoman: ${GANNETT}. Tulsa World and the OU Daily carry the program.`,
+  'ole-miss': `Clarion Ledger, the statewide paper: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25, the entry above. No local newsroom feed verified for Oxford itself.`,
+  oklahoma: `Crimson And Cream Machine is gone: ${VOX_SHUTDOWN}. The Oklahoman: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25, the entry above, beside Tulsa World and the OU Daily.`,
   'south-carolina': `Garnet And Black Attack is gone: ${VOX_SHUTDOWN}. The State: ${MCCLATCHY}. The Post and Courier carries the program.`,
-  tennessee: `Knoxville News Sentinel: ${GANNETT}. No local newsroom feed available.`,
-  texas: `Austin American-Statesman: ${GANNETT}. Longhorns Wire: ${USA_TODAY_WIRE}. No local newsroom feed available.`,
-  vanderbilt: `Tennessean: ${GANNETT}. No local newsroom feed available.`,
+  tennessee: `Knoxville News Sentinel: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25, the entry above.`,
+  texas: `Austin American-Statesman: ${GANNETT}, and its sitemap is live in a nonstandard shape — /news-sitemap.xml is an index holding one "local" child, so the entry above subscribes to the child directly (verified 2026-08-25, Longhorns coverage present). Longhorns Wire: ${USA_TODAY_WIRE}.`,
+  vanderbilt: `Tennessean: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25 with four live Vanderbilt football beat stories, which is the second entry above.`,
 };
 
 /**
@@ -479,21 +555,25 @@ const SEC_NO_SOURCE_REASONS: Record<string, string> = {
  *   Chronicle (Hearst) and both Salt Lake dailies simply publish no feed at
  *   any path tried. None of those are Gannett, Tribune or McClatchy, so
  *   DEAD_FEED_OWNERS does not cover them and each cost its own probe.
- * - **Student papers carry five programs here.** That is a bigger share
- *   than either other conference, and it is what the Big 12 has instead of
- *   metro coverage.
+ * - **Student papers carry a bigger share here than in either other
+ *   conference** — it is what the Big 12 has instead of metro coverage.
+ *   Five programs at review time; Utah's Chronicle went behind a bot
+ *   challenge on 2026-08-25 (see the reasons), so four today.
  */
 const BIG_12_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   arizona: [
     SB_NATION('az-desert-swarm', 'AZ Desert Swarm', 'azdesertswarm.com'),
     LEE('arizona-daily-star', 'Arizona Daily Star', 'tucson.com', 'sports/arizonawildcats'),
   ],
-  // Reviewed and deliberately empty: nothing this school has publishes a
-  // feed. See BIG_12_NO_SOURCE_REASONS.
-  'arizona-state': [],
+  'arizona-state': [
+    SITEMAP('arizona-republic', 'The Arizona Republic', 'www.azcentral.com'),
+  ],
   baylor: [LEE('waco-tribune-herald', 'Waco Tribune-Herald', 'wacotrib.com', 'sports/college/baylor')],
   byu: [SB_NATION('vanquish-the-foe', 'Vanquish The Foe', 'vanquishthefoe.com')],
-  cincinnati: [LEE('news-record', 'The News Record', 'www.newsrecord.org', 'sports/football', 3)],
+  cincinnati: [
+    LEE('news-record', 'The News Record', 'www.newsrecord.org', 'sports/football', 3),
+    SITEMAP('cincinnati-enquirer', 'The Cincinnati Enquirer', 'www.cincinnati.com'),
+  ],
   // The CU Independent was here and was removed rather than retuned — see
   // BIG_12_NO_SOURCE_REASONS. The blog carries the program alone now.
   colorado: [SB_NATION('ralphie-report', 'The Ralphie Report', 'ralphiereport.com')],
@@ -508,6 +588,7 @@ const BIG_12_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   ],
   'iowa-state': [
     SB_NATION('wide-right-natty-lite', 'Wide Right & Natty Lite', 'widerightnattylite.com'),
+    DES_MOINES_REGISTER,
   ],
   kansas: [
     SB_NATION('rock-chalk-talk', 'Rock Chalk Talk', 'rockchalktalk.com'),
@@ -549,18 +630,31 @@ const BIG_12_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
     LEE('stillwater-news-press', 'Stillwater News Press', 'www.stwnewspress.com', 'sports/osu_sports'),
   ],
   tcu: [SB_NATION('frogs-o-war', "Frogs O' War", 'frogsowar.com')],
-  // Reviewed and deliberately empty, like Arizona State above.
-  'texas-tech': [],
-  ucf: [SB_NATION('black-and-gold-banneret', 'Black And Gold Banneret', 'blackandgoldbanneret.com')],
-  utah: [
+  'texas-tech': [
+    SITEMAP('lubbock-avalanche-journal', 'Lubbock Avalanche-Journal', 'www.lubbockonline.com'),
+  ],
+  ucf: [
+    SB_NATION('black-and-gold-banneret', 'Black And Gold Banneret', 'blackandgoldbanneret.com'),
+    // Orlando's own paper is Tribune (dark, see the reasons), so the beat
+    // comes from the next paper over: Daytona Beach is ~50 miles out and
+    // its sports desk genuinely covers UCF alongside NASCAR — verified
+    // 2026-08-25 with UCF football and basketball stories in the window.
+    SITEMAP('daytona-beach-news-journal', 'The Daytona Beach News-Journal', 'www.news-journalonline.com'),
+    // The student outlet, on the same WordPress-category shape as The
+    // Daily Cougar. Campus-wide sports section (UFL's Orlando team, rec
+    // sports), so broad-scoped and name-filtered like every student paper
+    // that isn't purely one program's.
     {
-      id: 'daily-utah-chronicle',
-      name: 'Daily Utah Chronicle',
-      url: 'https://dailyutahchronicle.com/feed/',
+      id: 'knightnews',
+      name: 'KnightNews',
+      url: 'https://knightnews.com/category/sports/feed/',
       tier: 3,
       scope: 'broad',
     },
   ],
+  // Reviewed and currently empty: the Chronicle went behind a bot
+  // challenge on 2026-08-25 — see BIG_12_NO_SOURCE_REASONS.
+  utah: [],
   // A blog and a metro daily. WV MetroNews was here for a day and came out
   // again — see BIG_12_NO_SOURCE_REASONS.
   'west-virginia': [
@@ -571,18 +665,18 @@ const BIG_12_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
 
 /** The Big 12's third of the same record. See BIG_TEN_NO_SOURCE_REASONS. */
 const BIG_12_NO_SOURCE_REASONS: Record<string, string> = {
-  'arizona-state': `House of Sparky is still publishing but /rss/index.xml 404s, the same broken-feed-on-a-live-site case as Alligator Army. The State Press runs TownNews and returns no items at any category slug tried. Arizona Republic: ${GANNETT}`,
+  'arizona-state': `House of Sparky is still publishing but /rss/index.xml 404s, the same broken-feed-on-a-live-site case as Alligator Army. The State Press runs TownNews and returns no items at any category slug tried. Arizona Republic: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25 with live ASU football beat coverage, which is the entry above.`,
   baylor: `Our Daily Bears is gone: ${VOX_SHUTDOWN} The Waco Tribune-Herald carries the program.`,
   byu: 'Neither Salt Lake daily publishes a feed: the Deseret News and the Salt Lake Tribune both 404 at every path tried. Vanquish The Foe carries the program, and is the reason BYU has no broad-scoped source at all.',
-  cincinnati: `Down The Drive is gone: ${VOX_SHUTDOWN} Cincinnati Enquirer: ${GANNETT} The student paper carries the program.`,
+  cincinnati: `Down The Drive is gone: ${VOX_SHUTDOWN} Cincinnati Enquirer: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25, the entry above, beside the student paper.`,
   colorado: `The Daily Camera and the Denver Post both answer 403 to a programmatic request — a block rather than a retirement, so worth re-checking rather than writing off. ${CU_INDEPENDENT_SOLD} The Ralphie Report carries the program alone.`,
   houston: 'The Houston Chronicle is Hearst and publishes no public sports feed at any path tried. No SB Nation blog ever covered Houston.',
-  'iowa-state': `Des Moines Register and Ames Tribune: ${GANNETT} The same finding Iowa already carries in the Big Ten table, for the same two papers.`,
+  'iowa-state': `Des Moines Register: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25; the entry is shared with Iowa, like AL.com across the Alabama schools. The Ames Tribune's sitemap is live too, but its whole window was prep sports on the day checked, so the statewide Register carries the Cyclones instead.`,
   kansas: `The Lawrence Journal-World returns 200 with no items at both feed paths. Kansas City Star: ${MCCLATCHY}`,
   'oklahoma-state': `Cowboys Ride For Free is gone: ${VOX_SHUTDOWN}`,
   tcu: `Fort Worth Star-Telegram: ${MCCLATCHY}`,
-  'texas-tech': `Viva The Matadors is gone: ${VOX_SHUTDOWN} The Daily Toreador runs TownNews and returns no items at any category slug tried. Lubbock Avalanche-Journal: ${GANNETT}`,
-  ucf: `Orlando Sentinel: ${TRIBUNE} Black And Gold Banneret is kept but has published nothing since 2026-03-01, and its last ten posts are all other sports — so UCF currently ends with an empty feed. Left in rather than removed: a quiet publisher is not a broken source, and a football blog going quiet in March is a season, not a shutdown. Re-check it once the season starts; if it is still silent it belongs out, the way the CU Independent went.`,
+  'texas-tech': `Viva The Matadors is gone: ${VOX_SHUTDOWN} The Daily Toreador runs TownNews and returns no items at any category slug tried. Lubbock Avalanche-Journal: ${GANNETT}, but ${GANNETT_SITEMAP} — verified 2026-08-25 with live Red Raiders coverage, which is the entry above.`,
+  ucf: `Orlando Sentinel: ${TRIBUNE}, and it publishes no news sitemap either (404, checked 2026-08-25). Black And Gold Banneret is kept but has published no football since 2026-03-01 — re-checked 2026-08-25, its window is still all other sports. Left in rather than removed: a quiet publisher is not a broken source, and the season opens this week; if it is still silent when the season is underway it belongs out, the way the CU Independent went. The beat now comes from the two entries beside it: the Daytona Beach News-Journal, the nearest Gannett masthead, whose sitemap carried UCF football and basketball stories when verified 2026-08-25, and KnightNews, the student outlet (offseason window is UFL and campus sports; football expected in season).`,
   'west-virginia':
     'WV MetroNews answers, and takes 16-20s to do it — measured five times '  +
     'in a row. That is inside check-feeds.sh\'s 20s curl budget and outside '  +
@@ -590,7 +684,16 @@ const BIG_12_NO_SOURCE_REASONS: Record<string, string> = {
     'every device. Removed rather than kept as a source that can only ever '  +
     'contribute a failed-source line. Worth re-checking: a slow origin is '  +
     'not a dead one.',
-  utah: 'Block U is still up but its feed 404s, and neither Salt Lake daily publishes one — the same gap BYU has, from the other school in that city.',
+  utah:
+    'Block U is still up but its feed 404s. The Daily Utah Chronicle ' +
+    'carried the program until 2026-08-25, when its WordPress feed went ' +
+    'behind a Cloudflare challenge — 403 "Just a moment…" to any ' +
+    'programmatic request, the same class of block as the Tribune papers. ' +
+    'Removed rather than kept as a permanent failed-source line, the way ' +
+    'WV MetroNews went; a bot challenge is configuration rather than a ' +
+    'shutdown, so worth re-checking. Neither Salt Lake daily publishes a ' +
+    'feed or a news sitemap (both 404, checked 2026-08-25) — the same gap ' +
+    'BYU has, from the other school in that city.',
 };
 
 /**

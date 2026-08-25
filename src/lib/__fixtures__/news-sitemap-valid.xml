@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+        <url>
+          <loc>
+            https://www.azcentral.com/story/sports/college/asu/2026/08/24/ashton-stamps-locks-down-spot-arizona-state-football-secondary/91410972007/
+          </loc>
+          <news:news>
+            <news:publication>
+              <news:name>The Arizona Republic</news:name>
+              <news:language>en</news:language>
+            </news:publication>
+            <news:publication_date>2026-08-24T11:02:03Z</news:publication_date>
+            <news:title>Ashton Stamps locks down spot in Arizona State football secondary</news:title>
+          </news:news>
+          <image:image>
+            <image:loc>https://www.azcentral.com/gcdn/authoring/images/2026/08/24/stamps.jpg</image:loc>
+          </image:image>
+        </url>
+        <url>
+          <loc>https://www.azcentral.com/story/news/local/phoenix/2026/08/23/arizona-state-fair-lawsuit/91429974008/</loc>
+          <news:news>
+            <news:publication>
+              <news:name>The Arizona Republic</news:name>
+              <news:language>en</news:language>
+            </news:publication>
+            <news:publication_date>2026-08-23T22:10:00Z</news:publication_date>
+            <news:title>Family of 6-year-old sues Arizona State Fair</news:title>
+          </news:news>
+        </url>
+        <url>
+          <loc>https://www.azcentral.com/story/sports/college/asu/2026/08/23/takeaways-asu-football-scrimmage/91429974007/</loc>
+          <news:news>
+            <news:publication>
+              <news:name>The Arizona Republic</news:name>
+            </news:publication>
+            <news:publication_date>2026-08-23T18:45:12Z</news:publication_date>
+            <news:title>Takeaways from ASU football&#39;s scrimmage</news:title>
+          </news:news>
+        </url>
+        <url>
+          <loc>https://www.azcentral.com/story/sports/mlb/diamondbacks/2026/08/24/diamondbacks-walk-off-win/91440000007/</loc>
+          <news:news>
+            <news:publication>
+              <news:name>The Arizona Republic</news:name>
+            </news:publication>
+            <news:title>Diamondbacks walk off in the ninth</news:title>
+          </news:news>
+        </url>
+</urlset>

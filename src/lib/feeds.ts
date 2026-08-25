@@ -313,11 +313,18 @@ function extractAtomLink(entry: Record<string, unknown>): string | null {
 }
 
 /**
- * The two shapes this app understands. Detected from the parsed document
+ * The three shapes this app understands. Detected from the parsed document
  * rather than the Content-Type header, which feeds get wrong constantly
  * (several serve Atom as `application/rss+xml`).
+ *
+ * `sitemap` is a Google news sitemap (`<urlset>` of `<url>` entries carrying
+ * `news:title` and `news:publication_date`). It exists because Gannett
+ * retired RSS across every masthead but still publishes one of these per
+ * paper — a rolling ~48h window of the whole site, which is the only
+ * machine-readable coverage those papers have left. See the SITEMAP()
+ * helper in community-sources.ts.
  */
-export type FeedFormat = 'rss' | 'atom';
+export type FeedFormat = 'rss' | 'atom' | 'sitemap';
 
 interface DetectedFeed {
   format: FeedFormat;
@@ -336,8 +343,8 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 /**
  * Returns null when the document is well-formed XML but not a feed at all
- * — an HTML error page that happens to parse, an API error document, a
- * sitemap. The caller turns that into a reported failure; see fetchFeed.
+ * — an HTML error page that happens to parse, an API error document, an
+ * SVG. The caller turns that into a reported failure; see fetchFeed.
  *
  * Note this deliberately accepts a feed with *zero* items. A publisher
  * having a quiet day is not a broken source, and conflating the two is
@@ -355,6 +362,15 @@ function detectFeed(parsed: unknown): DetectedFeed | null {
   const atomFeed = asRecord(root.feed);
   if (atomFeed) {
     return { format: 'atom', items: toArray(atomFeed.entry as unknown) };
+  }
+
+  // A news sitemap's root is <urlset>; a sitemap *index* (<sitemapindex>)
+  // is deliberately not accepted — it lists other sitemaps, not articles,
+  // so subscribing to one would be a configuration error worth surfacing
+  // as "not a feed" rather than serving as a healthy empty source.
+  const urlset = asRecord(root.urlset);
+  if (urlset) {
+    return { format: 'sitemap', items: toArray(urlset.url as unknown) };
   }
 
   return null;
@@ -434,6 +450,69 @@ function articleFromAtomEntry(entry: Record<string, unknown>, source: FeedSource
 }
 
 /**
+ * A news sitemap is the *whole paper* — the sports desk beside obituaries,
+ * courts and the state fair — so unlike the other two mappers this one
+ * keeps only the sports section, decided by URL path. The name filter alone
+ * can't make that cut: "Family of 6-year-old sues Arizona State Fair"
+ * word-boundary-matches "Arizona State". Reading the section off the URL
+ * slug is the established idiom (off-sport.ts does the same), and Gannett
+ * files every sports story under a literal /sports/ path segment — most
+ * mastheads as /story/sports/ (measured live on azcentral 40 of 74,
+ * tennessean 29 of 51, lubbockonline), the Statesman without the /story/
+ * prefix (sports/longhorns/…). Matching the bare segment covers both; a
+ * slug like /news/sports-betting-bill/ has no slash directly after
+ * "sports" and stays out. If a non-Gannett sitemap ever lands here,
+ * revisit this constant before concluding the source is quiet.
+ */
+const SITEMAP_SPORTS_PATH = /\/sports\//;
+
+function articleFromSitemapUrl(url: Record<string, unknown>, source: FeedSource): Article | null {
+  // Gannett pretty-prints these documents, so <loc> arrives with the URL
+  // wrapped in newlines and indentation — trim before anything reads it.
+  const link = textOf(url.loc).trim();
+  if (!link) return null;
+  if (!SITEMAP_SPORTS_PATH.test(link)) return null;
+
+  const news = asRecord(url['news:news']);
+  const title = decodeHtmlEntities(textOf(news?.['news:title']).trim());
+  if (!title) return null;
+
+  const image = asRecord(toArray(url['image:image'] as unknown)[0]);
+  const imageUrl = image ? textOf(image['image:loc']).trim() : '';
+
+  return {
+    id: link,
+    title,
+    link,
+    // Sitemaps carry no teaser text. Empty rather than fabricated: the
+    // name filter and off-topic both read `title + description`, and an
+    // empty string contributes nothing to either.
+    description: '',
+    source: source.name,
+    author: null,
+    publishedAt: parsePubDate(textOf(news?.['news:publication_date']).trim()),
+    imageUrl: imageUrl || null,
+    tier: source.tier ?? 0,
+    reach: source.reach ?? (source.scope === 'team' ? 'beat' : 'national'),
+    scope: source.scope ?? 'broad',
+  };
+}
+
+/**
+ * Exhaustive over FeedFormat on purpose: the dispatch used to be a binary
+ * ternary, under which a third format silently fell into the Atom mapper.
+ * A Record makes the next format a compile error instead.
+ */
+const ITEM_MAPPERS: Record<
+  FeedFormat,
+  (item: Record<string, unknown>, source: FeedSource) => Article | null
+> = {
+  rss: articleFromRssItem,
+  atom: articleFromAtomEntry,
+  sitemap: articleFromSitemapUrl,
+};
+
+/**
  * Flip DEBUG_TIMING below to log how long each individual feed takes and
  * whether it succeeded, failed, or hit the 10s timeout. Deliberately a
  * hardcoded constant rather than an env var: this is a Metro reload away,
@@ -469,14 +548,16 @@ async function fetchFeed(source: FeedSource): Promise<Article[]> {
     }
 
     // Gate 2: is it a feed we understand? Well-formed XML that is an HTML
-    // error page, a JSON-ish error document or a sitemap lands here.
+    // error page or a JSON-ish error document lands here.
     const parsed = xmlParser.parse(xml);
     const detected = detectFeed(parsed);
     if (!detected) {
-      throw new Error(`${source.name} served well-formed XML that is not an RSS or Atom feed`);
+      throw new Error(
+        `${source.name} served well-formed XML that is not an RSS or Atom feed or a news sitemap`,
+      );
     }
 
-    const mapItem = detected.format === 'rss' ? articleFromRssItem : articleFromAtomEntry;
+    const mapItem = ITEM_MAPPERS[detected.format];
     const articles = detected.items
       .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
       .map((item) => mapItem(item, source))

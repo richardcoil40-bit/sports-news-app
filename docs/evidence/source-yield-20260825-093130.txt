@@ -1,0 +1,213 @@
+
+## Big Ten
+
+Illinois — 38 articles
+    The Champaign Room           team             10 →  10 →   6   60%
+    The News-Gazette             broad/beat       50 →  33 →  32   64%
+
+Indiana — 17 articles
+    The Crimson Quarry           team             10 →  10 →  10  100%
+    The Indianapolis Star        broad/beat       50 →  12 →   7   14%
+
+Iowa — 20 articles
+    Black Heart Gold Pants       team             10 →  10 →  10  100%
+    The Des Moines Register      broad/beat       18 →  16 →  10   56%
+
+Maryland — 4 articles
+    Testudo Times                team             10 →  10 →   4   40%
+
+Michigan — 18 articles
+    Maize n Brew                 team             10 →  10 →  10  100%
+    MLive                        broad/beat       50 →   9 →   8   16%
+
+Michigan St — 11 articles
+    The Only Colors              team             10 →  10 →   8   80%
+    MLive                        broad/beat       50 →   3 →   3    6%
+
+Minnesota — 11 articles
+    The Daily Gopher             team             10 →  10 →  10  100%
+    Star Tribune                 broad/beat       10 →   2 →   1   10%
+
+Nebraska — 136 articles
+    Corn Nation                  team             10 →  10 →  10  100%
+    Lincoln Journal Star         broad/beat       50 →  49 →  38   76%
+    Omaha World-Herald           broad/beat       50 →  50 →  42   84%
+    Daily Nebraskan              broad/beat       50 →  49 →  46   92%
+
+Northwestern — 5 articles
+    Inside NU                    team             10 →  10 →   5   50%
+
+Ohio State — 24 articles
+    Land-Grant Holy Land         team             10 →  10 →  10  100%
+    Eleven Warriors              team             10 →  10 →  10  100%
+    Cleveland.com                broad/beat       50 →   5 →   4    8%
+
+Oregon — 29 articles
+    Addicted To Quack            team             10 →  10 →   6   60%
+    OregonLive                   broad/beat       50 →  24 →  23   46%
+
+Penn State — 16 articles
+    Black Shoe Diaries           team             10 →  10 →   9   90%
+    PennLive                     broad/beat       50 →   8 →   7   14%
+
+Purdue — 12 articles
+    Hammer and Rails             team             10 →  10 →  10  100%
+    Journal & Courier            broad/beat        4 →   2 →   2   50%
+
+Rutgers — 14 articles
+    On the Banks                 team             10 →  10 →  10  100%
+    NJ.com                       broad/beat       50 →   4 →   4    8%
+
+UCLA — 15 articles
+    Los Angeles Times            broad/beat       53 →  25 →  15   28%
+
+USC — 18 articles
+    Los Angeles Times            broad/beat       53 →  25 →  18   34%
+
+Washington — 38 articles
+    UW Dawg Pound                team             10 →  10 →  10  100%
+    The Seattle Times            broad/beat       35 →  28 →  28   80%
+
+Wisconsin — 44 articles
+    Bucky's 5th Quarter          team             10 →  10 →   8   80%
+    Wisconsin State Journal      broad/beat       50 →  36 →  36   72%
+
+
+## SEC
+
+Alabama — 29 articles
+    Roll Bama Roll               team             10 →  10 →  10  100%
+    AL.com                       broad/beat       50 →  12 →   9   18%
+    The Tuscaloosa News          broad/beat       13 →  10 →  10   77%
+
+Arkansas — 76 articles
+    Arkansas Democrat-Gazette    broad/beat      150 →  40 →  28   19%
+    The Arkansas Traveler        broad/beat       50 →  48 →  48   96%
+
+Auburn — 60 articles
+    Opelika-Auburn News          broad/beat       50 →  49 →  44   88%
+    AL.com                       broad/beat       50 →   9 →   9   18%
+    Montgomery Advertiser        broad/beat       21 →   7 →   7   33%
+
+Florida — 20 articles
+    Gator Country                team             20 →  20 →  15   75%
+    The Gainesville Sun          broad/beat        9 →   6 →   5   56%
+
+Georgia — 53 articles
+    Dawg Sports                  team             10 →  10 →   8   80%
+    The Red & Black              broad/beat       50 →  46 →  44   88%
+    Athens Banner-Herald         broad/beat        4 →   2 →   1   25%
+
+Kentucky — 4 articles
+    A Sea of Blue                team             10 →  10 →   4   40%
+
+LSU — 53 articles
+    And The Valley Shook         team             10 →  10 →   5   50%
+    The Advocate                 team             50 →  50 →  48   96%
+
+Mississippi St — 9 articles
+    Starkville Daily News        broad/beat       50 →  14 →   9   18%
+
+Missouri — 94 articles
+    Rock M Nation                team             10 →  10 →   7   70%
+    St. Louis Post-Dispatch      broad/beat       50 →  48 →  43   86%
+    Columbia Missourian          broad/beat       50 →  44 →  44   88%
+
+Oklahoma — 35 articles
+    Tulsa World                  broad/beat       50 →  21 →  19   38%
+    The OU Daily                 broad/beat       50 →  14 →  14   28%
+    The Oklahoman                broad/beat       15 →   3 →   2   13%
+
+Ole Miss — 14 articles
+    Red Cup Rebellion            team             10 →  10 →   9   90%
+    The Clarion-Ledger           broad/beat       14 →   5 →   5   36%
+
+South Carolina — 16 articles
+    The Post and Courier         broad/beat       50 →  31 →  16   32%
+
+Tennessee — 16 articles
+    Rocky Top Talk               team             10 →  10 →   8   80%
+    Knoxville News Sentinel      broad/beat       13 →   8 →   8   62%
+
+Texas — 18 articles
+    Burnt Orange Nation          team             10 →  10 →  10  100%
+    Austin American-Statesman    broad/beat       17 →  12 →   8   47%
+
+Texas A&M — 34 articles
+    Good Bull Hunting            team             10 →  10 →   9   90%
+    The Eagle                    broad/beat       50 →  35 →  25   50%
+
+Vanderbilt — 11 articles
+    Anchor Of Gold               team             10 →  10 →   4   40%
+    The Tennessean               broad/beat       31 →   7 →   7   23%
+
+
+## Big 12
+
+Arizona — 12 articles
+    AZ Desert Swarm              team             10 →  10 →   5   50%
+    Arizona Daily Star           broad/beat       50 →  17 →   7   14%
+
+Arizona St — 4 articles
+    The Arizona Republic         broad/beat       36 →   4 →   4   11%
+
+Baylor — 31 articles
+    Waco Tribune-Herald          broad/beat       50 →  45 →  31   62%
+
+BYU — 6 articles
+    Vanquish The Foe             team             10 →  10 →   6   60%
+
+Cincinnati — 44 articles
+    The News Record              broad/beat       50 →  35 →  35   70%
+    The Cincinnati Enquirer      broad/beat       32 →  15 →   9   28%
+
+Colorado — 5 articles
+    The Ralphie Report           team             10 →  10 →   5   50%
+
+Houston — 38 articles
+    The Daily Cougar             broad/beat       40 →  40 →  38   95%
+
+Iowa State — 6 articles
+    Wide Right & Natty Lite      team             10 →  10 →   4   40%
+    The Des Moines Register      broad/beat       18 →   2 →   2   11%
+
+Kansas — 57 articles
+    Rock Chalk Talk              team             10 →  10 →  10  100%
+    The University Daily Kansan  broad/beat       50 →  47 →  47   94%
+
+Kansas St — 56 articles
+    Bring On The Cats            team             10 →  10 →  10  100%
+    The Manhattan Mercury        broad/beat       50 →  46 →  46   92%
+
+Oklahoma St — 41 articles
+    Tulsa World                  broad/beat       50 →  14 →  13   26%
+    Stillwater News Press        broad/beat       50 →  37 →  28   56%
+
+TCU — 10 articles
+    Frogs O' War                 team             10 →  10 →  10  100%
+
+Texas Tech — 2 articles  ⚠
+    Lubbock Avalanche-Journal    broad/beat        5 →   2 →   2   40%
+
+UCF — 5 articles
+    Black And Gold Banneret      team             10 →  10 →   0    0%
+        everything it published was another sport or off-topic
+    The Daytona Beach News-Journal broad/beat       14 →   2 →   1    7%
+    KnightNews                   broad/beat       10 →   5 →   4   40%
+
+Utah — 0 articles  ⚠
+    (no curated sources — national pool only)
+
+West Virginia — 27 articles
+    The Smoking Musket           team             10 →  10 →   9   90%
+    Charleston Gazette-Mail      broad/beat       50 →  35 →  18   36%
+
+
+## Below the floor
+
+  ⚠ Big 12 / Texas Tech (2)
+  ⚠ Big 12 / Utah (0)
+
+## Naming gaps
+
+None — every live broad source named its team at least once.

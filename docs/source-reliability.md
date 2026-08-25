@@ -336,9 +336,9 @@ re-tested once per team it owns.
 
 | Owner | Failure mode | Verdict |
 | --- | --- | --- |
-| Gannett | 200 with an empty body on every documented path | Retired the feature. Give up. |
-| Tribune | 403 to any programmatic request, any path or agent | Actively blocked. Give up. |
-| McClatchy | Connection reset to any programmatic request | Actively blocked. Give up. |
+| Gannett | RSS: 200 with an empty body on every documented path — retired | **Recoverable by news sitemap.** Every masthead checked (16 papers, 2026-08-25) serves `/news-sitemap.xml`: a Google news sitemap of the whole paper on a rolling ~48h window, with real publisher URLs, `news:title`, dates and images. `SITEMAP()` in `community-sources.ts` builds it; feeds.ts filters back to the sports section by URL path. One deviant: the Statesman serves a sitemap *index* there — subscribe to its child. |
+| Tribune | 403 to any programmatic request, any path or agent; no news sitemap either (404, checked 2026-08-25) | Actively blocked. Give up. |
+| McClatchy | Connection reset to any programmatic request; no news sitemap either (reset, checked 2026-08-25) | Actively blocked. Give up. |
 | Vox / SB Nation (California) | Sites shut down after AB5 | Gone. UCLA and USC have no blog. |
 | Vox / SB Nation (elsewhere) | Domain resets rather than 404s | Gone, not moved. |
 | USA Today "Wire" | 404 including the control site | Network folded in. |
@@ -348,10 +348,11 @@ re-tested once per team it owns.
 The dead ones are also `DEAD_FEED_OWNERS` in
 `src/lib/community-sources.ts`, composed into the per-team reason each
 league's table carries, so the finding is reachable from the code as well
-as from here. The two live ones are `OWNER_FEED_URL` in the same file —
-builders rather than prose, since a paper on one of these chains has a
-feed URL that is purely a function of its host, and the review tooling
-probes a candidate through the same builder the table would use.
+as from here. The live ones — Advance, Lee/TownNews, and now Gannett's
+sitemaps — are `OWNER_FEED_URL` in the same file: builders rather than
+prose, since a paper on one of these chains has a feed URL that is purely
+a function of its host, and the review tooling probes a candidate through
+the same builder the table would use.
 
 ## Applying this
 

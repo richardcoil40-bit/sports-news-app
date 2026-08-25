@@ -84,8 +84,9 @@ nickname_candidates:
 source_candidates:  (nothing to check — add hosts to probe: below and re-run)
 
 decision:           approve
-nicknames:          Sun Devil, Sun Devils
+nicknames:          Sun Devil, Sun Devils, ASU
 sources:
+  gannett arizona-republic "The Arizona Republic" www.azcentral.com 1
 probe:
 notes:
   No feed found. House of Sparky is still publishing but /rss/index.xml
@@ -94,6 +95,16 @@ notes:
   category slug tried; the Arizona Republic is Gannett. Nicknames recorded
   anyway — they are unambiguous and cost nothing to carry until a feed turns
   up.
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
+  "ASU" added 2026-08-25 on the Cincinnati "UC" provenance
+  argument: the Republic is Phoenix's own paper, and its beat
+  headlines write "ASU football" (1 of 36 live sitemap items
+  named the full school). Elsewhere "ASU" is also Arkansas
+  State — re-read if a non-Phoenix broad source is ever added.
 ```
 
 ## baylor — Baylor
@@ -193,10 +204,16 @@ source_candidates:
 decision:           approve
 nicknames:          Bearcat, Bearcats
 sources:            lee news-record "The News Record" www.newsrecord.org 3
+  gannett cincinnati-enquirer "The Cincinnati Enquirer" www.cincinnati.com 1
 probe:
 notes:
   Down The Drive is gone the way the SEC blogs went. The Enquirer is
   Gannett. The student paper is what carries the program.
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
 ```
 
 ## colorado — Colorado
@@ -296,10 +313,20 @@ source_candidates:
 decision:           approve
 nicknames:          Cyclone, Cyclones
 sources:            sb-nation wide-right-natty-lite "Wide Right & Natty Lite" widerightnattylite.com
+  gannett des-moines-register "The Des Moines Register" www.desmoinesregister.com 1
 probe:
 notes:
   "Clones" is left out — it is an ordinary noun. Both Iowa papers are
   Gannett, the same finding Iowa already carries in the Big Ten table.
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
+  Shared with Iowa (same id, the Tulsa World rule). The Ames
+  Tribune's sitemap is live too but its whole window was prep
+  sports on the day checked, so the statewide Register carries
+  the Cyclones instead.
 ```
 
 ## kansas — Kansas
@@ -482,12 +509,18 @@ source_candidates:  (nothing to check — add hosts to probe: below and re-run)
 decision:           approve
 nicknames:          Red Raider, Red Raiders
 sources:
+  gannett lubbock-avalanche-journal "Lubbock Avalanche-Journal" www.lubbockonline.com 1
 probe:
 notes:
   No feed found, and the bare "Raiders" is reserved to Las Vegas — only the
   two-word form is usable. Viva The Matadors is gone, the Daily Toreador
   runs TownNews but returns nothing at any category slug tried, and the
   Lubbock Avalanche-Journal is Gannett.
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
 ```
 
 ## ucf — UCF
@@ -517,12 +550,23 @@ source_candidates:
 decision:           approve
 nicknames:
 sources:            sb-nation black-and-gold-banneret "Black And Gold Banneret" blackandgoldbanneret.com
+  gannett daytona-beach-news-journal "The Daytona Beach News-Journal" www.news-journalonline.com 1
+  KnightNews https://knightnews.com/category/sports/feed/ tier 3 broad
 probe:
 notes:
   "Knights" is reserved, and RESERVED_NICKNAMES names UCF itself as the
   reason — Rutgers' "Scarlet Knights" shortens to it and Vegas has a hockey
   team. "UCF" is already the short name and is unambiguous. The Orlando
   Sentinel is Tribune.
+  2026-08-25: Black And Gold Banneret re-checked at season start
+  per the standing note — still no football in its window. Kept,
+  but the beat now comes from two additions: the Daytona Beach
+  News-Journal, the nearest Gannett masthead (~50 miles), whose
+  sitemap carried UCF football and basketball stories when
+  verified; and KnightNews, the student outlet, on the same
+  WordPress-category shape as The Daily Cougar (offseason window
+  is UFL and campus sports; football expected in season). The
+  Orlando Sentinel stays dark — Tribune, and no sitemap either.
 ```
 
 ## utah — Utah
@@ -550,11 +594,18 @@ source_candidates:
 
 decision:           approve
 nicknames:          Ute, Utes
-sources:            Daily Utah Chronicle https://dailyutahchronicle.com/feed/ tier 3 broad
+sources:
 probe:
 notes:
   Block U is still up but its feed 404s. Neither Salt Lake daily publishes
   one, which is the same gap BYU has.
+  2026-08-25: the Daily Utah Chronicle went behind a Cloudflare
+  challenge — 403 "Just a moment…" to any programmatic request,
+  the Tribune class of block. Removed rather than kept as a
+  permanent failed-source line (the WV MetroNews rule); a bot
+  challenge is configuration, not a shutdown, so worth
+  re-checking. Neither Salt Lake daily has a feed or a news
+  sitemap (both 404, same day).
 ```
 
 ## west-virginia — West Virginia

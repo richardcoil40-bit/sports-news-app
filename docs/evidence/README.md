@@ -181,9 +181,21 @@ What changed:
 - A well-formed feed with **zero items is still a success**. A publisher having
   a quiet day is not a broken source, and conflating those two is what created
   this whole class of problem.
-- The script prints the detected format (`rss` / `atom`) on every OK line, so
-  any future gap between "the script can read it" and "the app can read it" is
-  visible in the report rather than hidden by it.
+- The script prints the detected format (`rss` / `atom` / `sitemap`) on every
+  OK line, so any future gap between "the script can read it" and "the app
+  can read it" is visible in the report rather than hidden by it.
+
+**Addendum, 2026-08-25: `sitemap` is a third format, and its item counts run
+low by design.** Gannett retired RSS but every masthead still publishes a
+Google news sitemap (`/news-sitemap.xml`), which is how ~14 teams got their
+metro paper back — see `SITEMAP()` in `community-sources.ts` and the
+sitemap branch in `feeds.ts`. Two things to hold when reading a report row
+for one: the document is a **rolling ~48h window of the whole paper**, so a
+single-digit item count is the window on a quiet news day, not a dying
+feed (the Lubbock Avalanche-Journal swung 12 → 5 within one day while
+perfectly healthy); and the count here is *raw* `<url>` entries — the app
+keeps only `/sports/` paths, so the contributing number is always lower
+and lives in the yield report, not this one.
 
 **Addendum, 2026-08-25: the 202 source is out of the catalog.** Detection
 was the 2026-08-18 fix; this is the curation decision it left open. The RSS

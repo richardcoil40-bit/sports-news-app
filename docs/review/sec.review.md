@@ -45,8 +45,14 @@ source_candidates:
 decision:
 nicknames:
 sources:
+  gannett tuscaloosa-news "The Tuscaloosa News" www.tuscaloosanews.com 1
 probe:
 notes:
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
 ```
 
 ## arkansas — Arkansas
@@ -109,8 +115,14 @@ source_candidates:
 decision:
 nicknames:
 sources:
+  gannett montgomery-advertiser "Montgomery Advertiser" www.montgomeryadvertiser.com 1
 probe:
 notes:
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
 ```
 
 ## florida — Florida
@@ -139,8 +151,14 @@ source_candidates:
 decision:
 nicknames:
 sources:
+  gannett gainesville-sun "The Gainesville Sun" www.gainesville.com 1
 probe:
 notes:
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
 ```
 
 ## georgia — Georgia
@@ -171,8 +189,14 @@ source_candidates:
 decision:
 nicknames:
 sources:
+  gannett athens-banner-herald "Athens Banner-Herald" www.onlineathens.com 1
 probe:
 notes:
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
 ```
 
 ## kentucky — Kentucky
@@ -330,8 +354,14 @@ source_candidates:
 decision:
 nicknames:
 sources:
+  gannett the-oklahoman "The Oklahoman" www.oklahoman.com 1
 probe:
 notes:
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
 ```
 
 ## ole-miss — Ole Miss
@@ -360,8 +390,14 @@ source_candidates:
 decision:
 nicknames:
 sources:
+  gannett clarion-ledger "The Clarion-Ledger" www.clarionledger.com 1
 probe:
 notes:
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
 ```
 
 ## south-carolina — South Carolina
@@ -420,8 +456,14 @@ source_candidates:
 decision:
 nicknames:
 sources:
+  gannett knoxville-news-sentinel "Knoxville News Sentinel" www.knoxnews.com 1
 probe:
 notes:
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
 ```
 
 ## texas — Texas
@@ -450,8 +492,18 @@ source_candidates:
 decision:
 nicknames:
 sources:
+  Austin American-Statesman https://www.statesman.com/sitemap/news/local.xml tier 1 broad
 probe:
 notes:
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
+  The Statesman is the one nonstandard Gannett host:
+  /news-sitemap.xml there is a sitemap *index* with a single
+  "local" child, so the entry subscribes to the child directly,
+  and its URLs drop the /story/ prefix (sports/longhorns/…).
 ```
 
 ## texas-am — Texas A&M
@@ -511,6 +563,12 @@ source_candidates:
 decision:
 nicknames:
 sources:
+  gannett tennessean "The Tennessean" www.tennessean.com 1
 probe:
 notes:
+  2026-08-25: metro paper recovered via its Google news sitemap —
+  Gannett retired RSS but every masthead still publishes
+  news-sitemap.xml (SITEMAP() in community-sources.ts; the sports
+  desk is filtered back out by URL path in feeds.ts). Verified live
+  with beat coverage before the entry was added.
 ```

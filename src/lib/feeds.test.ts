@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import atomValid from '@/lib/__fixtures__/atom-valid.xml?raw';
+import sitemapValid from '@/lib/__fixtures__/news-sitemap-valid.xml?raw';
 import rssMalformed from '@/lib/__fixtures__/rss-malformed.xml?raw';
 import rssValid from '@/lib/__fixtures__/rss-valid.xml?raw';
 import { FeedSource, fetchFeeds } from '@/lib/feeds';
@@ -120,9 +121,18 @@ describe('fetchFeeds', () => {
       ['an empty body', ''],
       ['an HTML error page', '<!DOCTYPE html><html><body><h1>502 Bad Gateway</h1></body></html>'],
       ['plain text', 'not xml at all'],
-      ['valid XML that is neither RSS nor Atom', '<?xml version="1.0"?><foo><bar>baz</bar></foo>'],
+      ['valid XML that is neither RSS, Atom nor a news sitemap', '<?xml version="1.0"?><foo><bar>baz</bar></foo>'],
       ['a JSON body', '{"items":[{"title":"nope"}]}'],
       ['an RSS root with no channel', '<?xml version="1.0"?><rss version="2.0"></rss>'],
+      // A sitemap *index* lists other sitemaps, not articles. Subscribing to
+      // one is a configuration error, and accepting it would make it a
+      // permanently healthy empty source — the exact failure mode this list
+      // exists to keep dead.
+      [
+        'a sitemap index',
+        '<?xml version="1.0"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+          '<sitemap><loc>https://a.test/news-sitemap.xml</loc></sitemap></sitemapindex>',
+      ],
     ];
 
     for (const [label, body] of unusableBodies) {
@@ -270,6 +280,81 @@ describe('fetchFeeds', () => {
       expect(articles).toHaveLength(5);
       const dates = articles.map((a) => a.publishedAt);
       expect(dates).toEqual([...dates].sort().reverse());
+    });
+  });
+
+  // Gannett retired RSS across every masthead but still publishes a Google
+  // news sitemap per paper — the only machine-readable coverage those papers
+  // have left, and the recovery path for the ~16 teams whose reasons tables
+  // cite the Gannett retirement. Fixture trimmed from the live azcentral
+  // document fetched 2026-08-24.
+  describe('news sitemaps', () => {
+    const sitemapSource = (): FeedSource => ({
+      id: 'arizona-republic',
+      name: 'The Arizona Republic',
+      url: 'https://a.test/news-sitemap.xml',
+      tier: 1,
+      scope: 'broad',
+    });
+
+    it('parses sitemap URLs into the same Article shape as RSS', async () => {
+      respondPerUrl({ 'https://a.test/news-sitemap.xml': { body: sitemapValid } });
+
+      const { articles, failedSources } = await fetchFeeds([sitemapSource()]);
+
+      expect(failedSources).toEqual([]);
+      const first = articles[0];
+      expect(first.title).toBe('Ashton Stamps locks down spot in Arizona State football secondary');
+      // Gannett pretty-prints <loc>, so the URL arrives wrapped in
+      // whitespace and has to come out trimmed.
+      expect(first.link).toBe(
+        'https://www.azcentral.com/story/sports/college/asu/2026/08/24/ashton-stamps-locks-down-spot-arizona-state-football-secondary/91410972007/',
+      );
+      expect(first.publishedAt).toBe('2026-08-24T11:02:03.000Z');
+      expect(first.imageUrl).toBe(
+        'https://www.azcentral.com/gcdn/authoring/images/2026/08/24/stamps.jpg',
+      );
+      expect(first.author).toBeNull();
+      expect(first.description).toBe('');
+      expect(first.tier).toBe(1);
+      expect(first.scope).toBe('broad');
+    });
+
+    // The reason the path filter exists: a news sitemap is the whole paper,
+    // and "Arizona State Fair" word-boundary-matches the team name. The cut
+    // has to happen before the name filter ever sees the item.
+    it('keeps only /story/sports/ URLs', async () => {
+      respondPerUrl({ 'https://a.test/news-sitemap.xml': { body: sitemapValid } });
+
+      const { articles } = await fetchFeeds([sitemapSource()]);
+
+      expect(articles).toHaveLength(3);
+      expect(articles.some((a) => a.title.includes('Arizona State Fair'))).toBe(false);
+    });
+
+    it('decodes entities in news:title and dates an entry without news:publication_date as null', async () => {
+      respondPerUrl({ 'https://a.test/news-sitemap.xml': { body: sitemapValid } });
+
+      const { articles } = await fetchFeeds([sitemapSource()]);
+
+      expect(articles.some((a) => a.title === "Takeaways from ASU football's scrimmage")).toBe(true);
+      const undated = articles.find((a) => a.title.startsWith('Diamondbacks'));
+      expect(undated?.publishedAt).toBeNull();
+      // No image:image on this entry either.
+      expect(undated?.imageUrl).toBeNull();
+    });
+
+    it('treats an empty urlset as a success, not a failure', async () => {
+      respondPerUrl({
+        'https://a.test/news-sitemap.xml': {
+          body: '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>',
+        },
+      });
+
+      const result = await fetchFeeds([sitemapSource()]);
+
+      expect(result.articles).toEqual([]);
+      expect(result.failedSources).toEqual([]);
     });
   });
 

@@ -196,6 +196,9 @@ operator_of() {
     *search/\?f=rss*)    printf 'lee-townnews\n' ;;
     *arc/outboundfeeds*) printf 'advance-arc\n' ;;
     */rss/index.xml)     printf 'sb-nation\n' ;;
+    # Gannett's news sitemaps (plus the Statesman's nonstandard child
+    # path) — one platform serves every masthead, so one pacing group.
+    */news-sitemap.xml|*/sitemap/news/*) printf 'gannett-sitemap\n' ;;
     *) printf '%s\n' "$1" | sed -E 's#^https?://([^/]+).*#\1#' ;;
   esac
 }
@@ -248,6 +251,19 @@ EOF
     if [ "${entries:-0}" -gt 0 ]; then
       fmt="atom"
       items="$entries"
+    fi
+  fi
+
+  # News sitemaps — the Gannett recovery path; see SITEMAP() in
+  # community-sources.ts and the sitemap branch in feeds.ts. The <urlset>
+  # guard is load-bearing: an RSS channel's <image> carries a bare <url>
+  # element too, so an empty RSS feed without it would misreport as a
+  # healthy sitemap instead of EMPTY.
+  if [ "${items:-0}" -eq 0 ] && grep -q '<urlset' "$body" 2>/dev/null; then
+    urls=$(grep -o '<url>' "$body" 2>/dev/null | wc -l | tr -d ' ')
+    if [ "${urls:-0}" -gt 0 ]; then
+      fmt="sitemap"
+      items="$urls"
     fi
   fi
 

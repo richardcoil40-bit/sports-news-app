@@ -175,7 +175,15 @@ function diagnose(row) {
   if (row.failed) return 'source failed — check-feeds.sh territory, not this report';
   if (row.items === 0) return 'answered with no items';
   if (row.named === 0) return 'nothing named the team — a naming gap, see team-nicknames.ts';
-  if (row.kept === 0) return 'everything that named the team was another sport or off-topic';
+  if (row.kept === 0) {
+    // A team-scoped source skips the name filter (its `named` is a no-op —
+    // see measureTeam), so "named the team" would imply a check that never
+    // ran. That wording is how a dead team blog got misread as a filtering
+    // problem once; say what actually happened for each scope.
+    return row.scope === 'broad'
+      ? 'everything that named the team was another sport or off-topic'
+      : 'everything it published was another sport or off-topic';
+  }
   return null;
 }
 

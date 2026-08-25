@@ -67,10 +67,16 @@ const NICKNAMES_BY_SLUG: Record<string, string[]> = {
   // Arizona Daily Star covers one Wildcats team, and no two of the four
   // share a paper.
   arizona: ['Wildcat', 'Wildcats'],
-  // Recorded although nothing can reach them: ASU has no working feed at
-  // all (see NO_SOURCE_REASONS). Unambiguous and free to carry until one
-  // turns up. Bare "Devils" is left out — New Jersey and Duke.
-  'arizona-state': ['Sun Devil', 'Sun Devils'],
+  // Reachable since 2026-08-25 via the Arizona Republic's news sitemap.
+  // "ASU" clears the metro-sports-section rule on the same provenance
+  // argument as Cincinnati's "UC" below: the Republic is Phoenix's own
+  // paper, where ASU is one school — and its beat headlines write "ASU
+  // football", almost never the full name (measured on the live sitemap:
+  // 1 of 36 items named "Arizona State"; the rest said ASU). Elsewhere
+  // "ASU" is also Arkansas State, so re-read this the day Arizona State
+  // gains a broad source that isn't a Phoenix paper. Bare "Devils" is
+  // left out — New Jersey and Duke.
+  'arizona-state': ['Sun Devil', 'Sun Devils', 'ASU'],
   // "Hogs" is what the Democrat-Gazette writes; the singular is left out
   // because an Arkansas paper also covers actual hog farming.
   arkansas: ['Razorback', 'Razorbacks', 'Hogs'],
