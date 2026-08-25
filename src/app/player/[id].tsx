@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Logo } from '@/components/logo';
 import { NewsTab } from '@/components/player-tabs/news-tab';
 import { StatsTab } from '@/components/player-tabs/stats-tab';
 import { TabBar } from '@/components/tab-bar';
@@ -132,11 +131,16 @@ export default function PlayerScreen() {
 
   return (
     <ThemedView style={styles.flex}>
+      {/*
+        No headerRight — the bare logo there read as a dead button under
+        iOS 26's circular header chrome, the same report the article
+        screen fixed by dropping its own. Nothing for a control to do
+        here either, so the mark goes rather than gaining a behaviour.
+      */}
       <Stack.Screen
         options={{
           title: params.fullName,
           headerBackTitle: params.teamName,
-          headerRight: () => <Logo size={18} />,
         }}
       />
       <SafeAreaView style={styles.flex} edges={['bottom']}>

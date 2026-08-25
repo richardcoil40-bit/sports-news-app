@@ -261,15 +261,24 @@ export default function TeamScreen() {
 
   return (
     <ThemedView style={styles.flex}>
+      {/*
+        No headerRight: iOS 26 wraps every native-header item in a circular
+        glass disc, so the bare mark there read as a button that does
+        nothing — the same tester report the article screen fixed by
+        dropping its logo. This screen keeps the flag, but on the band
+        below, where no system chrome dresses it up as a control.
+      */}
       <Stack.Screen
         options={{
           title: shortName || name,
           headerBackTitle: 'Teams',
-          headerRight: () => <Logo size={18} />,
         }}
       />
       <SafeAreaView style={styles.flex} edges={['bottom']}>
         <View style={[styles.header, { backgroundColor: shownColor ?? theme.backgroundElement }]}>
+          <View style={styles.brandMark}>
+            <Logo size={16} color={shownColor ? inkOn(shownColor) : theme.text} />
+          </View>
           {logoUrl ? (
             <View style={styles.logoChip}>
               <Image source={{ uri: logoUrl }} style={styles.logo} contentFit="contain" />
@@ -334,6 +343,11 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.four,
     paddingBottom: Spacing.three,
     paddingHorizontal: Spacing.three,
+  },
+  brandMark: {
+    position: 'absolute',
+    top: Spacing.two,
+    right: Spacing.three,
   },
   logoChip: {
     width: 56,
