@@ -633,6 +633,12 @@ code comments:
     That is why `LEE()` now takes a required `section`. Run it after
     adding a source, not just `check-feeds.sh`, and write the report next
     to the others.
+- `docs/recovery.md` — what exists in exactly one copy on one machine, and
+  what it takes to rebuild the release pipeline without it. Written because
+  two of the three items in it (the App Store Connect private key, the client
+  token) cannot be re-read from the service that holds them, and this Mac has
+  no Time Machine destination. Also records which commit shipped as which
+  build, now that those are tagged rather than derived from Xcode Cloud.
 - `docs/dependency-risk.md` — the advisories in the dependency tree that
   are knowingly accepted rather than fixed, and the scope of that
   acceptance. Read it before acting on an `npm audit` result: the current
