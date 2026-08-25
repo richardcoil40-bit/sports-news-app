@@ -339,3 +339,65 @@ league catalog and does **not** widen that door. It is a GET with no body and
 no query string: it sends nothing, and the only thing it reveals is that some
 device launched the app. Unset it and the app runs on its bundled catalog
 without touching the network, the same escape hatch the verdicts URL has.
+
+## Test coverage that was chosen against
+
+Unlike everything above, this block waits on nothing external — no service,
+no key, no budget. It is deferred on judgement alone, which is exactly why it
+belongs in a file that has to answer "is this missing or is it decided".
+
+Added 2026-08-25, alongside the CI bundle check and `scripts/worker-smoke.mjs`.
+
+### The UI layer has no tests, and that is the largest hole
+
+**52 files** across `src/app/`, `src/components/` and `src/hooks/`, and **zero
+test files** among them. `vitest.config.mts` scopes `include` to
+`src/lib/**/*.test.ts` and its header explains why: that directory is plain
+TypeScript with no React imports (enforced by `no-restricted-imports`), which
+is the whole reason it runs under a plain Node environment with no jest-expo
+and no Metro transform.
+
+This is where the bugs testers actually report. Every one fixed so far — the
+clipped dropdown panel, the header logo that read as a dead button, the
+missing dates, the dangling `·` on undated cards, the un-sectioned brief for a
+team-filtered reader — lives in those 52 files, and `tsc` catches none of that
+class.
+
+**Deferred anyway**, on a deliberate trade. It needs a second runner
+(`jest-expo` + `@testing-library/react-native`) standing alongside Vitest, not
+folded into it — days of work. And it covers failures that are *loud*: a
+tester sees them, reports them, and they have all been fixed the same day. The
+two changes made instead — `expo export` in CI and the Worker smoke test —
+cost half a day and cover failures that are **silent**: a bundle that only
+breaks in Xcode Cloud, and a rotated token that degrades every verdict with
+nothing on screen to say so. Silent beats loud when you are choosing.
+
+If it gets built, scope it to render decisions that have actually broken —
+the conditional dateline separator, brief sectioning under a team filter,
+`claimBadgeColors` across both themes — rather than to "test the UI".
+
+### Ten `src/lib` modules have no test, and need no new harness
+
+Cheaper than the above and worth more per hour, because the runner already
+exists — these are plain TypeScript the current Vitest setup would run today:
+
+`refresh-schedule.ts` (191 lines), `multi-team-feed.ts`, `article-store.ts`,
+`favorites.ts`, `team-slug.ts`, `source-balance.ts`, `caught-up.ts`,
+`storage.ts`, `source-tier.ts`, `format.ts`.
+
+(Seven others — `roster.ts`, `schedule.ts`, `team-color.ts`,
+`team-leaders.ts`, `team-news.ts`, `player-stats.ts`, `community-sources.ts` —
+have no file of their own but are reached through `espn-parsers.test.ts` or
+`team-review.test.ts` for the contract that matters. They are not in this
+list.)
+
+Two are worth doing first for reasons beyond line count:
+
+- **`refresh-schedule.ts`** carries the followed-league filter that the "cost
+  scales with follows, not the catalog" rule depends on, and `f08287a` already
+  had to fix a bug in its refresh key. A module with a shipped bug and no test
+  is the one to write first.
+- **`multi-team-feed.ts`** is what `worker/wrangler.toml` names as the driver
+  of classify volume — one pool per followed team, each its own classify
+  request. A regression there spends real money against `DAILY_CALL_CAP` and
+  then degrades the feed quietly once the cap binds.
