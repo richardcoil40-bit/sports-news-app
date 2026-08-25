@@ -7,6 +7,9 @@
  *                                        [--new] [--mark]
  *   node scripts/testflight-feedback.mjs --builds [--limit N]
  *   node scripts/testflight-feedback.mjs --prep-archive
+ *   node scripts/testflight-feedback.mjs --start-build [--branch NAME]
+ *   node scripts/testflight-feedback.mjs --release [--build N]
+ *                                        [--notes "..."] [--confirm]
  *
  * This is the same feedback that shows up under TestFlight → Feedback in
  * App Store Connect — a tester's screenshot plus whatever they typed —
@@ -92,6 +95,27 @@
  * config if it did. app.json is therefore not the source of truth for a
  * manual archive and is left alone rather than edited into agreement.
  *
+ * ## --start-build and --release are the two halves of shipping
+ *
+ * Xcode Cloud only builds when asked — the workflow has no automatic
+ * branch trigger, so merging to `main` as often as you like costs nothing
+ * and four changes become one build rather than four.
+ *
+ * `--start-build` is the ask. `--release` is what happens after, and it
+ * exists because **Xcode Cloud uploads but never distributes**: a
+ * successful run leaves a build in App Store Connect attached to no
+ * tester group, which looks identical to a finished release right up
+ * until you notice nobody got it. Three calls close that gap — set the
+ * release note, attach to every group, submit the external ones for beta
+ * review — and doing them by hand is how one gets forgotten.
+ *
+ * `--release` prints its plan and changes nothing without `--confirm`.
+ * That is the same split as `--new` / `--mark` above and for a stronger
+ * reason: this one reaches real people.
+ *
+ * Every step re-checks before acting, so a re-run after a partial failure
+ * reports what is already done instead of erroring.
+ *
  * ## Why the app id isn't hardcoded
  *
  * It's resolved from the bundle identifier in app.json, so this keeps
@@ -125,6 +149,11 @@ const JSON_OUT = flag('json');
 const CRASHES = flag('crashes');
 const BUILDS = flag('builds');
 const PREP_ARCHIVE = flag('prep-archive');
+const START_BUILD = flag('start-build');
+const RELEASE = flag('release');
+const CONFIRM = flag('confirm');
+const NOTES = value('notes', null);
+const BRANCH = value('branch', 'main');
 const BUILD_FILTER = value('build', null);
 const NEW_ONLY = flag('new');
 const MARK = flag('mark');
@@ -220,6 +249,44 @@ async function get(token, path, { keyId, issuerId }) {
   }
 
   return res.json();
+}
+
+/**
+ * The write half of `get`. Kept beside it so both render Apple's error
+ * envelope the same way — the messages are the whole value when a POST is
+ * rejected for a reason the docs don't cover.
+ *
+ * `status` and `detail` are attached to the thrown error because callers
+ * here treat some failures as success: re-submitting a build that is
+ * already in review is the expected outcome of a safe re-run, not a fault.
+ */
+async function send(token, method, path, body, { keyId, issuerId }) {
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const text = await res.text();
+
+  if (!res.ok) {
+    const detail = (() => {
+      try {
+        return JSON.parse(text).errors?.map((e) => `${e.title}: ${e.detail}`).join('\n') || text;
+      } catch {
+        return text;
+      }
+    })();
+    if (res.status === 401) {
+      throw new Error(`401 Unauthorized (key ${keyId}, issuer ${issuerId})\n${detail}`);
+    }
+    const err = new Error(`${res.status} ${res.statusText} on ${method} ${path}\n${detail}`);
+    err.status = res.status;
+    err.detail = detail;
+    throw err;
+  }
+
+  return text ? JSON.parse(text) : null;
 }
 
 /** Resolve the numeric App Store Connect id from app.json's bundle identifier. */
@@ -491,6 +558,205 @@ async function prepArchive(token, app, creds) {
   console.log(`\napp.json is deliberately untouched; see this file's header for why.`);
 }
 
+/**
+ * Find the app's Xcode Cloud workflow. Discovered rather than hardcoded,
+ * for the reason the app id is (see the header) — and because a workflow
+ * id is the kind of opaque UUID nobody notices has gone stale.
+ */
+async function resolveWorkflow(token, app, creds) {
+  const products = await get(token, `/v1/ciProducts?filter[app]=${app.id}&limit=10`, creds);
+  const product = products?.data?.[0];
+  if (!product) {
+    throw new Error(
+      `${app.name} has no Xcode Cloud product.\n` +
+        `Set one up in App Store Connect, or archive from Xcode instead.`,
+    );
+  }
+
+  const json = await get(token, `/v1/ciProducts/${product.id}/workflows?limit=50`, creds);
+  const enabled = (json?.data ?? []).filter((w) => w.attributes?.isEnabled);
+
+  if (!enabled.length) {
+    throw new Error(`No enabled workflow on ${product.attributes?.name ?? product.id}.`);
+  }
+  if (enabled.length > 1) {
+    throw new Error(
+      `More than one enabled workflow, so which to build is ambiguous:\n` +
+        enabled.map((w) => `  ${w.attributes.name}`).join('\n'),
+    );
+  }
+
+  return { product, workflow: enabled[0] };
+}
+
+/** Ask Xcode Cloud for a build. The workflow has no automatic trigger. */
+async function startBuild(token, app, creds) {
+  const { product, workflow } = await resolveWorkflow(token, app, creds);
+
+  const repos = await get(
+    token,
+    `/v1/ciProducts/${product.id}/primaryRepositories?limit=10`,
+    creds,
+  );
+  const repo = repos?.data?.[0];
+  if (!repo) throw new Error('No primary repository on the Xcode Cloud product.');
+
+  // Naming the reference explicitly, rather than letting Apple pick a
+  // default, so the run says on its face what it built.
+  const refs = await get(token, `/v1/scmRepositories/${repo.id}/gitReferences?limit=200`, creds);
+  const ref = (refs?.data ?? []).find(
+    (r) => r.attributes?.name === BRANCH && r.attributes?.kind === 'BRANCH',
+  );
+  if (!ref) {
+    throw new Error(
+      `No branch "${BRANCH}" known to Xcode Cloud.\n` +
+        `It only sees branches that have been pushed to the remote.`,
+    );
+  }
+
+  const run = await send(token, 'POST', '/v1/ciBuildRuns', {
+    data: {
+      type: 'ciBuildRuns',
+      relationships: {
+        workflow: { data: { type: 'ciWorkflows', id: workflow.id } },
+        sourceBranchOrTag: { data: { type: 'scmGitReferences', id: ref.id } },
+      },
+    },
+  }, creds);
+
+  const a = run?.data?.attributes ?? {};
+  console.log(`${app.name} — started ${workflow.attributes.name} on ${BRANCH}`);
+  console.log(`  run #${a.number ?? '(assigning)'}  ${a.executionProgress ?? 'PENDING'}`);
+  console.log(`\nWatch it with --builds once it finishes, then release with --release.`);
+}
+
+/**
+ * Turn an uploaded build into one testers actually have.
+ *
+ * Prints its plan and does nothing without --confirm. Each step checks
+ * current state first, so re-running after a partial failure is safe and
+ * reports what was already done.
+ */
+async function releaseBuild(token, app, creds) {
+  const json = await get(
+    token,
+    `/v1/builds?filter[app]=${app.id}&limit=50` +
+      `&sort=-uploadedDate&include=preReleaseVersion,buildBetaDetail`,
+    creds,
+  );
+  const included = indexIncluded(json);
+  const builds = json?.data ?? [];
+
+  const target = BUILD_FILTER
+    ? builds.find((b) => b.attributes?.version === BUILD_FILTER)
+    : builds.find((b) => b.attributes?.processingState === 'VALID');
+
+  if (!target) {
+    throw new Error(
+      BUILD_FILTER
+        ? `No build ${BUILD_FILTER} for ${app.name}.`
+        : `No build has finished processing yet. Check --builds.`,
+    );
+  }
+
+  const train = resolve(included, target.relationships?.preReleaseVersion)?.attributes?.version;
+  const detail = resolve(included, target.relationships?.buildBetaDetail)?.attributes ?? {};
+  const label = `${train ?? '?'} (${target.attributes?.version})`;
+
+  if (target.attributes?.processingState !== 'VALID') {
+    throw new Error(
+      `Build ${label} is ${target.attributes?.processingState}, not VALID.\n` +
+        `Apple has to finish processing before it can go to testers.`,
+    );
+  }
+
+  // Release note first: it is the only part testers read, and the only
+  // part that is silently empty rather than visibly missing.
+  const locs = await get(token, `/v1/builds/${target.id}/betaBuildLocalizations`, creds);
+  const loc = (locs?.data ?? [])[0];
+  const currentNote = loc?.attributes?.whatsNew ?? '';
+  const noteChange = NOTES && NOTES !== currentNote;
+
+  const groups = (await get(token, `/v1/apps/${app.id}/betaGroups?limit=50`, creds))?.data ?? [];
+  const attachments = [];
+  for (const group of groups) {
+    const has = await get(token, `/v1/betaGroups/${group.id}/builds?limit=200`, creds);
+    attachments.push({
+      group,
+      attached: (has?.data ?? []).some((b) => b.id === target.id),
+    });
+  }
+
+  const hasExternal = groups.some((g) => !g.attributes?.isInternalGroup);
+  const reviewDone = ['IN_BETA_TESTING', 'WAITING_FOR_REVIEW', 'IN_BETA_REVIEW'].includes(
+    detail.externalBuildState,
+  );
+  const needsReview = hasExternal && !reviewDone;
+
+  console.log(`${app.name} (${app.bundleId})`);
+  console.log(`Releasing ${label} — internal=${detail.internalBuildState ?? '?'} ` +
+    `external=${detail.externalBuildState ?? '?'}\n`);
+
+  console.log('  release note :', noteChange ? 'set from --notes' :
+    currentNote ? 'already set, unchanged' : 'EMPTY — pass --notes to fill it');
+  const width = Math.max(...attachments.map((a) => (a.group.attributes?.name ?? '').length), 0);
+  for (const { group, attached } of attachments) {
+    const kind = group.attributes?.isInternalGroup ? 'internal' : 'external';
+    console.log(`  ${(group.attributes?.name ?? group.id).padEnd(width)} (${kind}) :` +
+      ` ${attached ? 'already attached' : 'attach'}`);
+  }
+  console.log('  beta review  :', !hasExternal ? 'not needed, no external group'
+    : needsReview ? 'submit' : `already ${detail.externalBuildState}`);
+
+  if (!CONFIRM) {
+    console.log(`\nDry run — nothing changed. Re-run with --confirm to do it.`);
+    return;
+  }
+
+  console.log('');
+
+  if (noteChange) {
+    if (!loc) throw new Error('No betaBuildLocalization on this build to write a note to.');
+    await send(token, 'PATCH', `/v1/betaBuildLocalizations/${loc.id}`, {
+      data: { type: 'betaBuildLocalizations', id: loc.id, attributes: { whatsNew: NOTES } },
+    }, creds);
+    console.log('  release note set');
+  }
+
+  for (const { group, attached } of attachments) {
+    if (attached) continue;
+    await send(token, 'POST', `/v1/betaGroups/${group.id}/relationships/builds`, {
+      data: [{ type: 'builds', id: target.id }],
+    }, creds);
+    console.log(`  attached to ${group.attributes?.name ?? group.id}`);
+  }
+
+  if (needsReview) {
+    try {
+      await send(token, 'POST', '/v1/betaAppReviewSubmissions', {
+        data: {
+          type: 'betaAppReviewSubmissions',
+          relationships: { build: { data: { type: 'builds', id: target.id } } },
+        },
+      }, creds);
+      console.log('  submitted for beta review');
+    } catch (err) {
+      // A build already in review is the expected result of a safe re-run.
+      if (err.status !== 409) throw err;
+      console.log('  beta review already submitted');
+    }
+  }
+
+  const after = await get(token, `/v1/builds/${target.id}/buildBetaDetail`, creds);
+  const s = after?.data?.attributes ?? {};
+  console.log(`\n${label} — internal=${s.internalBuildState ?? '?'} ` +
+    `external=${s.externalBuildState ?? '?'}`);
+  if (!NOTES && !currentNote) {
+    console.log(`\nNo release note: testers get an update prompt with no explanation.`);
+    console.log(`Fill it with --release --build ${target.attributes?.version} --notes "..." --confirm`);
+  }
+}
+
 async function main() {
   const creds = await credentials();
   const token = mintToken(creds);
@@ -499,6 +765,8 @@ async function main() {
   // Not a feedback resource at all — short-circuit before touching one.
   if (BUILDS) return reportBuilds(token, app, creds);
   if (PREP_ARCHIVE) return prepArchive(token, app, creds);
+  if (START_BUILD) return startBuild(token, app, creds);
+  if (RELEASE) return releaseBuild(token, app, creds);
 
   const resource = CRASHES ? 'betaFeedbackCrashSubmissions' : 'betaFeedbackScreenshotSubmissions';
   const json = await listFeedback(token, app.id, resource, creds);

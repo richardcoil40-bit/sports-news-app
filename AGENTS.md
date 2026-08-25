@@ -334,6 +334,39 @@ Two things follow, and the first was briefly got wrong here:
 `version` is untouched by any of this. Only `CFBundleVersion` moves, so
 neither route starts a new App Review.
 
+### Releasing: builds are asked for, never automatic
+
+The workflow has **no automatic branch trigger** — `branchStartCondition`
+is null and `manualBranchStartCondition` names `main`. Merging to `main`
+therefore costs nothing, which is the point: this repo merges several times
+a day, and one build per merge meant four changes became four ~13-minute
+builds and four uploaded builds to choose between.
+
+**Xcode Cloud uploads but never distributes.** A successful run leaves a
+build in App Store Connect attached to no tester group, which is
+indistinguishable from a finished release until you notice nobody got it.
+Closing that gap takes three more calls — release note, attach to groups,
+submit external groups for beta review — and `--release` is those three.
+
+```
+node scripts/testflight-feedback.mjs --start-build
+node scripts/testflight-feedback.mjs --builds            # wait for VALID
+node scripts/testflight-feedback.mjs --release --notes "…"          # dry run
+node scripts/testflight-feedback.mjs --release --notes "…" --confirm
+```
+
+`--release` prints its plan and changes nothing without `--confirm`, the
+same split as `--new` / `--mark` and for a stronger reason: this one
+reaches real people. Every step re-checks first, so a re-run after a
+partial failure reports what is already done rather than erroring.
+
+Two things that look like faults and aren't. Beta review is required for
+external testers on **every** build, but under an already-approved version
+it clears in seconds — it is a formality, not a queue, and skipping it
+entirely would mean making those testers internal, which means giving them
+App Store Connect accounts. And the build number will jump, because Xcode
+Cloud assigns it; see the note above.
+
 ## Reading what the service did
 
 The Worker is the one component with live users and no screen to look at.
