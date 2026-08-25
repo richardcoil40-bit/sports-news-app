@@ -6,6 +6,7 @@
  *                                        [--crashes] [--build N]
  *                                        [--new] [--mark]
  *   node scripts/testflight-feedback.mjs --builds [--limit N]
+ *   node scripts/testflight-feedback.mjs --prep-archive
  *
  * This is the same feedback that shows up under TestFlight → Feedback in
  * App Store Connect — a tester's screenshot plus whatever they typed —
@@ -73,6 +74,24 @@
  * at PROCESSING or sitting in BETA_REVIEW_REJECTED looks, from the app's
  * side, exactly like nobody opening the app.
  *
+ * ## --prep-archive stops a manual archive being rejected at the last step
+ *
+ * Xcode Cloud overwrites CFBundleVersion with its own run counter when it
+ * delivers, so the number on App Store Connect climbs without anything in
+ * this repo changing. A manual archive reads ios/NoFrills/Info.plist
+ * instead, which nothing updates — so the two drift apart silently, and
+ * the first sign is an upload rejected for a duplicate or lower build
+ * number, after the archive has already been built and signed.
+ *
+ * This asks Apple what the highest build number actually is and writes one
+ * above it into Info.plist. Run it before Product → Archive.
+ *
+ * It writes Info.plist and not app.json deliberately: app.json's
+ * buildNumber only reaches the native project through prebuild, which
+ * won't re-run while ios/ exists, and prebuild would destroy the signing
+ * config if it did. app.json is therefore not the source of truth for a
+ * manual archive and is left alone rather than edited into agreement.
+ *
  * ## Why the app id isn't hardcoded
  *
  * It's resolved from the bundle identifier in app.json, so this keeps
@@ -81,6 +100,7 @@
  * sync by hand.
  */
 
+import { execFileSync } from 'node:child_process';
 import { createSign } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -104,6 +124,7 @@ const DOWNLOAD = flag('download');
 const JSON_OUT = flag('json');
 const CRASHES = flag('crashes');
 const BUILDS = flag('builds');
+const PREP_ARCHIVE = flag('prep-archive');
 const BUILD_FILTER = value('build', null);
 const NEW_ONLY = flag('new');
 const MARK = flag('mark');
@@ -399,6 +420,77 @@ async function reportBuilds(token, app, creds) {
   }
 }
 
+/**
+ * Set ios/NoFrills/Info.plist's CFBundleVersion above every build Apple
+ * already has, so a manual archive can't collide with one Xcode Cloud
+ * uploaded.
+ *
+ * The maximum is taken across every build rather than only those matching
+ * the current short version. Scoping it per version would be technically
+ * sufficient — Apple requires uniqueness within a CFBundleShortVersionString
+ * — but a number that can go *down* when the version changes is a footgun
+ * for no gain, and starting a new version's builds above the old one's
+ * costs nothing.
+ */
+async function prepArchive(token, app, creds) {
+  const plist = join(REPO_ROOT, 'ios', 'NoFrills', 'Info.plist');
+
+  let current;
+  try {
+    current = execFileSync('plutil', ['-extract', 'CFBundleVersion', 'raw', plist], {
+      encoding: 'utf8',
+    }).trim();
+  } catch {
+    throw new Error(
+      `Can't read ${relative(REPO_ROOT, plist)}\n` +
+        `There's no generated native project here. That's normal on a fresh\n` +
+        `clone — a manual archive needs one, and Xcode Cloud generates its own.`,
+    );
+  }
+
+  const json = await get(
+    token,
+    `/v1/builds?filter[app]=${app.id}&limit=200&sort=-uploadedDate`,
+    creds,
+  );
+
+  const numbers = (json?.data ?? [])
+    .map((b) => Number(b.attributes?.version))
+    .filter((n) => Number.isFinite(n));
+
+  if (!numbers.length) {
+    console.log(`${app.name} — App Store Connect has no builds yet.`);
+    console.log(`Leaving CFBundleVersion at ${current}; nothing can collide with it.`);
+    return;
+  }
+
+  const highest = Math.max(...numbers);
+  const next = String(highest + 1);
+
+  if (current === next) {
+    console.log(`Already set: CFBundleVersion ${current}, highest on Apple ${highest}.`);
+    return;
+  }
+
+  execFileSync('plutil', ['-replace', 'CFBundleVersion', '-string', next, plist]);
+
+  const shortVersion = execFileSync(
+    'plutil',
+    ['-extract', 'CFBundleShortVersionString', 'raw', plist],
+    { encoding: 'utf8' },
+  ).trim();
+
+  console.log(`${app.name} (${app.bundleId})`);
+  console.log(`  highest build on App Store Connect : ${highest}`);
+  console.log(`  CFBundleVersion was                : ${current}`);
+  console.log(`  CFBundleVersion now                : ${next}`);
+  console.log(`\nNext manual archive uploads as ${shortVersion} (${next}).`);
+  if (Number(current) <= highest) {
+    console.log(`Before this it would have been rejected — ${current} is not above ${highest}.`);
+  }
+  console.log(`\napp.json is deliberately untouched; see this file's header for why.`);
+}
+
 async function main() {
   const creds = await credentials();
   const token = mintToken(creds);
@@ -406,6 +498,7 @@ async function main() {
 
   // Not a feedback resource at all — short-circuit before touching one.
   if (BUILDS) return reportBuilds(token, app, creds);
+  if (PREP_ARCHIVE) return prepArchive(token, app, creds);
 
   const resource = CRASHES ? 'betaFeedbackCrashSubmissions' : 'betaFeedbackScreenshotSubmissions';
   const json = await listFeedback(token, app.id, resource, creds);
