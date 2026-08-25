@@ -12,12 +12,19 @@ import { allPlanned, leaguesIn, levelsIn, sportsIn } from '@/lib/league-taxonomy
 /**
  * The top of the Sport → Level → League → Team picker.
  *
- * Every step is shown, including ones with a single option. The original
- * plan had a step auto-skip itself when it held only one choice, which
- * with today's catalog would collapse Sport and League to nothing and
- * leave a bare list of levels — the hierarchy would exist but never be
- * visible. Showing it is what makes the shape of the app legible: this
- * is a football app today, and it is built to not stay one.
+ * Every step is shown, including ones with a single option — with one
+ * narrow exception below. The original plan had every step auto-skip
+ * itself when it held only one choice, which with today's catalog would
+ * collapse Sport and League to nothing and leave a bare list of levels —
+ * the hierarchy would exist but never be visible. Showing it is what
+ * makes the shape of the app legible: this is a football app today, and
+ * it is built to not stay one.
+ *
+ * The exception: a level holding exactly one league goes straight to
+ * that league's teams (see levels.tsx). A screen titled "NFL" whose
+ * entire content is one row reading "NFL" showed the hierarchy by
+ * charging a tap for no information — a tester called it out, fairly.
+ * This screen and multi-league levels still render every step.
  *
  * Everything here is derived from the league catalog, which is no longer
  * bundled — `useLeagueCatalog` is what re-renders these three screens if a

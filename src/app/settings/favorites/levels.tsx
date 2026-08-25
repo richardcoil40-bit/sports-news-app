@@ -34,18 +34,29 @@ export default function FavoritesLevelsScreen() {
           keyExtractor={(item) => item.level}
           renderItem={({ item }) => {
             const planned = allPlanned(item.under);
+            const names = item.under.map((l) => l.displayName).join(' · ');
             return (
               <PickerRow
                 label={item.level}
-                detail={
-                  planned ? 'Not available yet' : item.under.map((l) => l.displayName).join(' · ')
-                }
+                // A lone league sharing the level's name ("NFL" under NFL)
+                // would only repeat the label.
+                detail={planned ? 'Not available yet' : names === item.level ? undefined : names}
                 disabled={planned}
                 onPress={() =>
-                  router.push({
-                    pathname: '/settings/favorites/leagues',
-                    params: { sport, level: item.level },
-                  })
+                  // One league is not a choice: the screen between would be
+                  // a title over a single row repeating it. A level that
+                  // also holds a *planned* league keeps the screen — what's
+                  // coming is part of the hierarchy being legible. See the
+                  // picker root for the rule this is the one exception to.
+                  item.under.length === 1
+                    ? router.push({
+                        pathname: '/settings/favorites/teams',
+                        params: { league: item.under[0].id },
+                      })
+                    : router.push({
+                        pathname: '/settings/favorites/leagues',
+                        params: { sport, level: item.level },
+                      })
                 }
               />
             );
