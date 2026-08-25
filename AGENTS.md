@@ -318,13 +318,18 @@ Two things follow, and the first was briefly got wrong here:
   prebuild, which won't re-run. Bump the generated project directly:
 
   ```
-  plutil -replace CFBundleVersion -string "N" ios/NoFrills/Info.plist
+  node scripts/testflight-feedback.mjs --prep-archive
   ```
 
+  That reads the highest build number off App Store Connect and writes one
+  above it, which is the part nothing else does: the two routes share one
+  number space, CI's counter climbs on its own, and an archive built below
+  it is rejected *at upload*, after being built and signed. It had already
+  drifted to 5 against 25 once. `plutil -replace CFBundleVersion` by hand
+  does the same write if you know the number.
+
   Never `npx expo prebuild` to sync it; that destroys signing, per the
-  Environment-specific constraints section. And keep it above whatever
-  Xcode Cloud has reached, or the upload is rejected as a duplicate — the
-  two routes share one number space and only one of them counts for you.
+  Environment-specific constraints section.
 
 `version` is untouched by any of this. Only `CFBundleVersion` moves, so
 neither route starts a new App Review.
