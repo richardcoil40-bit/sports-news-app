@@ -243,8 +243,35 @@ nothing, and fails with `Workspace NoFrills.xcworkspace does not exist at
 ios/NoFrills.xcworkspace`. That reads like a project or signing problem
 and is neither — there is simply no native project in a fresh clone.
 
-`ci_scripts/ci_post_clone.sh` generates one. Three things in it are load-
+`ci_scripts/ci_post_clone.sh` generates one. Four things in it are load-
 bearing and none of them are obvious from the failure they prevent:
+
+- **The script has to live in `ios/ci_scripts/`, and the copy at the repo
+  root is not the one that runs.** Apple's rule is that `ci_scripts`
+  "resides in a directory named ci_scripts that's located in the same
+  directory as your Xcode project or workspace" — so with a
+  `containerFilePath` of `ios/NoFrills.xcworkspace`, the only path Xcode
+  Cloud ever reads is `ios/ci_scripts/`. The near-universal advice to put
+  it at the repo root holds only when the `.xcodeproj` is itself at the
+  root.
+
+  This was wrong for a week and cost every build: runs #15 through #22
+  failed in about twenty seconds at
+  `xcodebuild -resolvePackageDependencies` with the workspace error above,
+  which looks exactly like the problem the script exists to prevent and
+  was actually the script never being invoked at all. The tell is the log
+  bundle — a run whose script never ran contains
+  `resolve_package_dependencies.log` and nothing else. **Xcode Cloud has
+  never successfully built this app**; every TestFlight build so far was a
+  manual Xcode archive.
+
+  So `.gitignore` carves out exactly that one path (`/ios/*` plus
+  `!/ios/ci_scripts/`); nothing else under `ios/` is tracked. The file
+  there is a stub that `exec`s this one, because `expo prebuild` clears
+  `ios/` — stub included — partway through the run, and the root copy sits
+  outside `ios/` where prebuild can't reach it. One consequence locally: a
+  prebuild deletes the tracked stub, so `git status` will show it deleted.
+  Restore it with `git checkout -- ios/ci_scripts`.
 
 - **Prebuild is safe here, unlike locally.** The Environment-specific
   constraints section warns at length that prebuild is destructive to
@@ -264,7 +291,12 @@ bearing and none of them are obvious from the failure they prevent:
   usual machine ships without the token, gets a 401 from every
   `/v1/classify`, and **degrades to local verdict rules with nothing on
   screen to say so**. The script writes it from an Xcode Cloud secret
-  environment variable of the same name and warns when it can't.
+  environment variable of the same name and **fails the build when it
+  can't** — it warned and continued when it first shipped, which is the
+  wrong instrument for a defect whose only symptom is a slightly worse
+  feed on a build that already reached testers. Same call `teams.ts` and
+  `fetchLeagueCatalog` make: an app that looks like it loaded correctly is
+  worse than one that visibly didn't.
 
 ## Reading what the service did
 

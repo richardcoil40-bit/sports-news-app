@@ -67,7 +67,8 @@ yarn-error.*
 example
 
 # generated native folders
-/ios
+/ios/*
+!/ios/ci_scripts/
 /android
 
 # local agent settings

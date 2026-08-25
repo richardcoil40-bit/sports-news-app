@@ -20,7 +20,10 @@
 
 set -euo pipefail
 
-# Xcode Cloud invokes this with ci_scripts/ as the working directory.
+# Xcode Cloud never invokes this file directly. It only reads ci_scripts
+# beside the workspace, so ios/ci_scripts/ci_post_clone.sh is what it runs,
+# and that stub execs this. See the comment there for why the split exists
+# and why this half has to stay outside ios/.
 cd "$CI_PRIMARY_REPOSITORY_PATH"
 
 export HOMEBREW_NO_AUTO_UPDATE=1
@@ -51,11 +54,28 @@ npm ci
 # degrades to local classification rules — a worse feed with nothing on
 # screen to say so. Set it as a secret environment variable on the Xcode
 # Cloud workflow to avoid that.
-if [ -n "${EXPO_PUBLIC_VERDICT_TOKEN:-}" ]; then
-  echo "EXPO_PUBLIC_VERDICT_TOKEN=$EXPO_PUBLIC_VERDICT_TOKEN" >> .env.local
-else
-  echo "warning: EXPO_PUBLIC_VERDICT_TOKEN is unset — this build will fall back to local verdicts"
+# This fails the build rather than warning, which is a change from how the
+# script first shipped. A warning is the wrong instrument here: the build
+# succeeds, uploads, and reaches testers, and the only symptom is a feed
+# that classifies slightly worse — nothing on screen, nothing in a crash
+# log, nothing anyone would report. By the time it's noticed the build is
+# the one people are using.
+#
+# It is also the same call the data layer already makes twice. `teams.ts`
+# throws on a non-OK response and `fetchLeagueCatalog` rejects rather than
+# degrade to an empty catalog, both for the reason that an app which looks
+# like it loaded correctly is worse than one that visibly didn't.
+#
+# Set it as a secret environment variable on the Xcode Cloud workflow.
+if [ -z "${EXPO_PUBLIC_VERDICT_TOKEN:-}" ]; then
+  echo "error: EXPO_PUBLIC_VERDICT_TOKEN is unset." >&2
+  echo "  Add it as a secret environment variable on the Xcode Cloud workflow." >&2
+  echo "  Without it this build ships degraded to local verdict rules, and" >&2
+  echo "  nothing on screen would say so — so it fails here instead." >&2
+  exit 1
 fi
+
+echo "EXPO_PUBLIC_VERDICT_TOKEN=$EXPO_PUBLIC_VERDICT_TOKEN" >> .env.local
 
 npx expo prebuild --platform ios
 
