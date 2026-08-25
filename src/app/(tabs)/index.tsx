@@ -166,19 +166,39 @@ export default function FeedScreen() {
     [teamScoped, claimFilter],
   );
 
-  // Only when nothing is filtered. Catching up and browsing are different
-  // intents: filtering to RUMOR and still seeing a "you're caught up" line
-  // above a collapsed section holding everything is nonsense, so an active
-  // filter renders one plain list instead.
+  // Only when nothing is filtered by *claim*. Catching up and browsing are
+  // different intents: filtering to RUMOR and still seeing a "you're caught
+  // up" line above a collapsed section holding everything is nonsense, so an
+  // active claim filter renders one plain list instead.
   //
-  // The team selection has to be in this condition for a second and harder
-  // reason. Reaching the finish line calls markCaughtUp(), which writes
-  // one timestamp for the whole feed, not one per team. Sectioning a
-  // team-filtered list would let scrolling to the bottom of *one* team's
-  // stories advance the cutoff for all of them — silently retiring the
-  // other teams' unread news. Whatever else that control does, it must not
-  // be able to mark stories read that were never on screen.
-  const sectioned = BRIEF_MODE && claimFilter === 'all' && allTeamsSelected && cutoff !== null;
+  // The team selection used to be in this condition too, for a second and
+  // harder reason: reaching the finish line calls markCaughtUp(), which
+  // writes one timestamp for the whole feed rather than one per team, so
+  // finishing *one* team's stories would silently retire every other team's
+  // unread news. That reasoning is sound, but it is about the write, and the
+  // write has its own gate below. Spending one boolean on both meant
+  // narrowing to a team also turned off the finish line and both collapsed
+  // sections — handing a filtered reader precisely the endless feed the
+  // brief exists to replace, which is what a tester reported on build 4.
+  //
+  // Zero teams selected stays unsectioned, and not incidentally: an empty
+  // brief renders as a lone caught-up marker, which is a non-empty list, so
+  // ListEmptyComponent never fires and "You're caught up" would replace the
+  // copy telling the reader they just filtered everyone out.
+  const sectioned =
+    BRIEF_MODE && claimFilter === 'all' && cutoff !== null && selectedTeams.length > 0;
+
+  // Advancing the cutoff is the whole-feed operation the note above
+  // describes, so it stays scoped to the whole feed. Sectioning is a
+  // rendering choice; this is a write to storage that outlives the screen.
+  const mayMarkCaughtUp = sectioned && allTeamsSelected;
+
+  // Named only where an unqualified count would be read as a claim about the
+  // whole feed. A subset of several teams is left unnamed rather than
+  // described vaguely — "your teams" is what the *unfiltered* feed already
+  // calls itself, so reusing it here would say nothing.
+  const briefScope =
+    !allTeamsSelected && selectedTeams.length === 1 ? selectedTeams[0].shortName : undefined;
 
   const sections = useMemo(
     () => (cutoff ? splitBrief(visibleArticles, cutoff) : null),
@@ -231,7 +251,7 @@ export default function FeedScreen() {
     out.push({
       kind: 'marker',
       key: 'caught-up',
-      message: caughtUpMessage(sections, periodLabel),
+      message: caughtUpMessage(sections, periodLabel, briefScope),
     });
 
     for (const { id, label, items } of [
@@ -246,7 +266,7 @@ export default function FeedScreen() {
     }
 
     return out;
-  }, [sectioned, sections, visibleArticles, periodLabel, openSections]);
+  }, [sectioned, sections, visibleArticles, periodLabel, briefScope, openSections]);
 
   // Widened past Article because the detail screen shows the same claim
   // chip the row does, and re-classifying there would repeat a few hundred
@@ -479,7 +499,7 @@ export default function FeedScreen() {
               if (e.nativeEvent.contentOffset.y > 8) hasScrolled.current = true;
             }}
             scrollEventThrottle={200}
-            onEndReached={sectioned ? () => reachedEnd(briefWasSeen()) : undefined}
+            onEndReached={mayMarkCaughtUp ? () => reachedEnd(briefWasSeen()) : undefined}
             onEndReachedThreshold={0.1}
             // Suppressed in sectioned mode, where the caught-up marker is
             // itself a row and already says there's nothing new. This copy

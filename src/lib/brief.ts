@@ -128,12 +128,24 @@ export function splitBrief<T extends Splittable>(
  * Never claims you're caught up when the cap truncated the list — the
  * marker is worth having only if it's true, and one overstatement teaches
  * the reader to stop believing it.
+ *
+ * `scope` names what is being counted, for when the marker sits over a
+ * narrowed list. The counts always come from what is actually on screen, so
+ * an unqualified line is never *false* — but "3 stories since you last
+ * looked" above one team's feed reads as a claim about the whole feed, and
+ * the caller is what knows the difference. Omitted when the reader hasn't
+ * narrowed, where naming the scope is noise rather than precision.
  */
-export function caughtUpMessage(sections: BriefSections<unknown>, periodLabel: string): string {
+export function caughtUpMessage(
+  sections: BriefSections<unknown>,
+  periodLabel: string,
+  scope?: string,
+): string {
+  const forScope = scope ? ` for ${scope}` : '';
   if (sections.truncated) {
-    return `Showing ${sections.brief.length} of ${sections.briefTotal} since ${periodLabel}`;
+    return `Showing ${sections.brief.length} of ${sections.briefTotal}${forScope} since ${periodLabel}`;
   }
-  if (sections.briefTotal === 0) return `Nothing new since ${periodLabel}`;
+  if (sections.briefTotal === 0) return `Nothing new${forScope} since ${periodLabel}`;
   const noun = sections.briefTotal === 1 ? 'story' : 'stories';
-  return `${sections.briefTotal} ${noun} since ${periodLabel}`;
+  return `${sections.briefTotal} ${noun}${forScope} since ${periodLabel}`;
 }

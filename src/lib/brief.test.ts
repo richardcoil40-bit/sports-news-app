@@ -175,4 +175,31 @@ describe('caughtUpMessage', () => {
       'Showing 12 of 30 since this morning',
     );
   });
+
+  // Sectioning now survives a team filter, so the marker can sit above a
+  // narrowed list. The counts were always taken from what is on screen; the
+  // scope is what says so out loud.
+  it('names the scope it was given', () => {
+    expect(caughtUpMessage(sections(3, 3), 'you last looked', 'Michigan')).toBe(
+      '3 stories for Michigan since you last looked',
+    );
+  });
+
+  it('names the scope when there is nothing', () => {
+    expect(caughtUpMessage(sections(0, 0), 'midday', 'Michigan')).toBe(
+      'Nothing new for Michigan since midday',
+    );
+  });
+
+  it('names the scope in the truncated form too', () => {
+    expect(caughtUpMessage(sections(12, 30), 'this morning', 'Michigan')).toBe(
+      'Showing 12 of 30 for Michigan since this morning',
+    );
+  });
+
+  // An unscoped call is the unfiltered feed, and must read exactly as it did
+  // before the parameter existed.
+  it('is unchanged when no scope is given', () => {
+    expect(caughtUpMessage(sections(2, 2), 'midday')).toBe('2 stories since midday');
+  });
 });
