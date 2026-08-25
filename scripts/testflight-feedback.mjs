@@ -116,6 +116,15 @@
  * Every step re-checks before acting, so a re-run after a partial failure
  * reports what is already done instead of erroring.
  *
+ * The plan also lists what has landed since the last build that reached
+ * testers, which is the moment you want it — you are writing --notes right
+ * then. That range is derived, not tracked: each Xcode Cloud run records
+ * its source commit and reports whether it delivered anything, so the
+ * answer is read off what shipped and can't drift the way a changelog
+ * nobody remembers to update does. Commits are split by whether they
+ * touched src/, assets/, app.json or package.json, because most of what
+ * lands here is tooling a tester cannot perceive.
+ *
  * ## Why the app id isn't hardcoded
  *
  * It's resolved from the bundle identifier in app.json, so this keeps
@@ -631,6 +640,89 @@ async function startBuild(token, app, creds) {
 }
 
 /**
+ * The commit behind the last build that actually reached testers.
+ *
+ * Derived rather than tracked. Every Xcode Cloud run records its source
+ * commit, and `ciBuildRuns/{id}/builds` says which run *delivered* — most
+ * don't, being archive-only or failed. So the range for a release note is
+ * readable off what shipped, and can't drift the way a changelog file
+ * someone has to remember to update does.
+ *
+ * Returns null rather than throwing: a missing range should cost the note
+ * a convenience, never the release.
+ */
+async function lastReleasedCommit(token, app, targetBuildId, creds) {
+  let workflow;
+  try {
+    ({ workflow } = await resolveWorkflow(token, app, creds));
+  } catch {
+    return null;
+  }
+
+  const runs = await get(
+    token,
+    `/v1/ciWorkflows/${workflow.id}/buildRuns?limit=25&sort=-number`,
+    creds,
+  );
+
+  for (const run of runs?.data ?? []) {
+    const sha = run.attributes?.sourceCommit?.commitSha;
+    if (!sha) continue;
+
+    const delivered = await get(token, `/v1/ciBuildRuns/${run.id}/builds?limit=5`, creds);
+    const builds = delivered?.data ?? [];
+    // Skip runs that delivered nothing, and the run that made this build.
+    if (!builds.length || builds.some((b) => b.id === targetBuildId)) continue;
+
+    return { sha, version: builds[0]?.attributes?.version, run: run.attributes?.number };
+  }
+
+  return null;
+}
+
+/**
+ * What landed since that commit, split by whether a tester could perceive
+ * it. Most commits in this repo are tooling or documentation, and listing
+ * those in a release note is noise — but the split is a path heuristic,
+ * not a judgement, so both halves are shown and the human picks.
+ */
+function commitsSince(sha) {
+  const git = (args) =>
+    execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+
+  try {
+    git(['cat-file', '-e', `${sha}^{commit}`]);
+  } catch {
+    return { error: `commit ${sha.slice(0, 8)} isn't in this clone — try git fetch` };
+  }
+
+  let ancestor = true;
+  try {
+    git(['merge-base', '--is-ancestor', sha, 'HEAD']);
+  } catch {
+    ancestor = false;
+  }
+
+  const out = git(['log', `${sha}..HEAD`, '--first-parent', '--format=%h\t%s']).trim();
+  const commits = out
+    ? out.split('\n').map((line) => {
+        const tab = line.indexOf('\t');
+        const hash = line.slice(0, tab);
+        const files = git(['show', '--name-only', '--format=', hash]).split('\n').filter(Boolean);
+        return {
+          hash,
+          subject: line.slice(tab + 1),
+          // package-lock.json is deliberately absent: it only ever moves
+          // alongside package.json, so counting it would double-flag.
+          visible: files.some((f) => /^(src|assets)\//.test(f) || ['app.json', 'package.json'].includes(f)),
+        };
+      })
+    : [];
+
+  return { commits, ancestor };
+}
+
+/**
  * Turn an uploaded build into one testers actually have.
  *
  * Prints its plan and does nothing without --confirm. Each step checks
@@ -696,6 +788,34 @@ async function releaseBuild(token, app, creds) {
   console.log(`${app.name} (${app.bundleId})`);
   console.log(`Releasing ${label} — internal=${detail.internalBuildState ?? '?'} ` +
     `external=${detail.externalBuildState ?? '?'}\n`);
+
+  const since = await lastReleasedCommit(token, app, target.id, creds);
+  if (!since) {
+    // True for the first CI delivery: earlier builds were manual archives,
+    // which leave no run to read a commit off.
+    console.log('  no earlier CI-delivered build to diff against\n');
+  } else {
+    const { commits, ancestor, error } = commitsSince(since.sha);
+    const from = `build ${since.version} (${since.sha.slice(0, 7)})`;
+    if (error) {
+      console.log(`  changes since ${from}: ${error}\n`);
+    } else if (!commits.length) {
+      console.log(`  nothing has landed since ${from}\n`);
+    } else {
+      console.log(`  ${commits.length} commit${commits.length === 1 ? '' : 's'} since ${from}` +
+        `${ancestor ? '' : ' — NOT an ancestor of HEAD, range may be wrong'}`);
+      const visible = commits.filter((c) => c.visible);
+      const rest = commits.filter((c) => !c.visible);
+      if (visible.length) {
+        console.log('    app changes — testers may notice:');
+        for (const c of visible) console.log(`      ${c.hash}  ${c.subject}`);
+      }
+      if (rest.length) {
+        console.log(`    tooling and docs (${rest.length}): ${rest.map((c) => c.hash).join(', ')}`);
+      }
+      console.log('');
+    }
+  }
 
   console.log('  release note :', noteChange ? 'set from --notes' :
     currentNote ? 'already set, unchanged' : 'EMPTY — pass --notes to fill it');
