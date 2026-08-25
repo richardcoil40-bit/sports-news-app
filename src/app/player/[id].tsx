@@ -17,7 +17,7 @@ import { Article } from '@/lib/feeds';
 import { DEFAULT_LEAGUE, getLeague } from '@/lib/league-catalog';
 import { matchArticlesForPlayer } from '@/lib/player-match';
 import { fetchPlayerSeasonStats, PlayerStatCategory } from '@/lib/player-stats';
-import { fetchTeamNewsPool } from '@/lib/team-news-pool';
+import { fetchTeamNewsPoolWithStore } from '@/lib/article-store';
 
 type TabKey = 'stats' | 'news';
 
@@ -56,7 +56,7 @@ export default function PlayerScreen() {
     // Same pool the team's News tab uses (ESPN + community sites + local
     // newsroom + national feeds), and cached there, so this is usually
     // instant rather than a fresh fetch of everything.
-    const pool = await fetchTeamNewsPool(params.teamId, params.teamShortName || params.teamName, league);
+    const pool = await fetchTeamNewsPoolWithStore(params.teamId, params.teamShortName || params.teamName, league);
     // The same matcher, with the same inputs, that produced the article
     // count on the card you tapped — see notable-players.ts. Surname
     // matching is opt-*out*: '0' is the Players tab saying a teammate

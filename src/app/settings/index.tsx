@@ -1,17 +1,22 @@
 import { Stack, router } from 'expo-router';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { clearStoredArticles } from '@/lib/article-store';
 
 /**
  * The three things there are to say about this app: which teams it's
  * for, what its labels mean, and who made it. Deliberately not a list of
  * toggles — there is nothing to configure, because the app collects
- * nothing and has no account.
+ * nothing and has no account. The one action below the list is the
+ * escape hatch for the one thing the app now stores beyond your teams:
+ * the on-device article cache (see docs/data-retention.md), whose
+ * clear-all storage.ts always promised a place for.
  */
 const ITEMS = [
   {
@@ -47,6 +52,30 @@ const ITEMS = [
 
 export default function SettingsScreen() {
   const theme = useTheme();
+  const [clearedNote, setClearedNote] = useState<string | null>(null);
+
+  const confirmClearArticles = () => {
+    Alert.alert(
+      'Clear cached articles?',
+      'Removes the stored copies of your followed teams’ recent articles. They rebuild as feeds are fetched again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: () => {
+            clearStoredArticles()
+              .then((count) =>
+                setClearedNote(
+                  count === 0 ? 'Nothing was stored' : `Cleared ${count} team${count === 1 ? '' : 's'}`,
+                ),
+              )
+              .catch(() => setClearedNote('Could not clear — try again'));
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <ThemedView style={styles.flex}>
@@ -73,6 +102,21 @@ export default function SettingsScreen() {
             <View style={[styles.rule, { backgroundColor: theme.text }]} />
           </View>
         ))}
+
+        {/* An action rather than a destination, so no chevron. */}
+        <TouchableOpacity
+          style={styles.row}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          onPress={confirmClearArticles}>
+          <View style={styles.rowText}>
+            <ThemedText style={styles.rowLabel}>Clear cached articles</ThemedText>
+            <ThemedText font="mono" themeColor="textSecondary" style={styles.rowDetail}>
+              {clearedNote ?? 'Stored copies of your teams’ recent articles'}
+            </ThemedText>
+          </View>
+        </TouchableOpacity>
+        <View style={[styles.rule, { backgroundColor: theme.text }]} />
       </SafeAreaView>
     </ThemedView>
   );

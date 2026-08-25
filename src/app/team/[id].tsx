@@ -32,7 +32,8 @@ import { withTeamMentions } from '@/lib/team-mentions';
 import { inkOn, visibleOn } from '@/lib/color';
 import { fetchTeamColor } from '@/lib/team-color';
 import { StatLeader, fetchTeamStatLeaders } from '@/lib/team-leaders';
-import { fetchTeamNewsPool, type TeamNewsPool } from '@/lib/team-news-pool';
+import { fetchTeamNewsPoolWithStore } from '@/lib/article-store';
+import type { TeamNewsPool } from '@/lib/team-news-pool';
 
 type TabKey = 'news' | 'schedule' | 'players';
 
@@ -125,7 +126,7 @@ export default function TeamScreen() {
 
   // The whole pool rather than just its articles: the News tab's empty
   // state reads `coverage` to say *why* it's empty.
-  const news = useAsync<TeamNewsPool>(() => fetchTeamNewsPool(params.id, poolName, league));
+  const news = useAsync<TeamNewsPool>(() => fetchTeamNewsPoolWithStore(params.id, poolName, league));
 
   const schedule = useAsync<ScheduledGame[]>(async (publish) => {
     const games = await fetchTeamSchedule(params.id, league);

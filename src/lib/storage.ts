@@ -38,3 +38,12 @@ export async function writeValue(key: string, value: string): Promise<void> {
     console.warn(`[storage] write failed for "${key}", kept in memory only`, err);
   }
 }
+
+export async function removeValue(key: string): Promise<void> {
+  memoryFallback.delete(key);
+  try {
+    await AsyncStorage.removeItem(key);
+  } catch (err) {
+    console.warn(`[storage] remove failed for "${key}", removed from memory only`, err);
+  }
+}

@@ -53,7 +53,9 @@ const poolCache = createEntityCache<string, TeamNewsPool>({ ttlMs: CACHE_TTL_MS,
 // (see leagues.ts). This pool's *composition* is a function of league id —
 // source-catalog.ts picks the source tables by league.id — so the shared key
 // would let a pool built under one league's sources be served to another.
-function poolCacheKey(league: League, teamId: string): string {
+// Exported because article-store.ts keys its persisted copy of a pool the
+// same way — one definition, so the two can never disagree about identity.
+export function poolCacheKey(league: League, teamId: string): string {
   return `${league.id}:${espnCacheKey(league, teamId)}`;
 }
 

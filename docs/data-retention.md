@@ -4,14 +4,17 @@ What this app keeps, where, and for how long. Written so the answer to "how
 long do you retain X" is something you can point to rather than reconstruct
 from the code each time someone asks.
 
-## Current state: four small persisted values, everything else in memory
+## Current state: five persisted stores, everything else in memory
 
-The app persists four things: which teams you follow, whether you've
-completed onboarding, when you last reached the end of a brief, and which
-refresh window it last pulled fresh news for. Nothing else. No analytics SDK,
-no user accounts, no article content, no usage or behavioral history. See
-"Persisted stores" below for the detail, including why the last two are each
-a single overwritten value rather than a log.
+The app persists five things: which teams you follow, whether you've
+completed onboarding, when you last reached the end of a brief, which
+refresh window it last pulled fresh news for, and — since 2026-08-25 — a
+rolling per-team copy of your followed teams' recent articles, the one
+store that isn't a single small value. Nothing else. No analytics SDK, no
+user accounts, no usage or behavioral history. See "Persisted stores"
+below for the detail, including why two of the small values are each a
+single overwritten value rather than a log, and what bounds the article
+store.
 
 Every other cache in the codebase is in-memory only and exists for the
 lifetime of the running app process. All but two are created through
@@ -244,9 +247,11 @@ points.
 This is the same question SOC 2 (CC6.5, secure disposal) and GDPR's
 storage limitation principle are getting at: don't keep data longer than
 you have a reason to, and be able to say why for whatever you do keep.
-Right now the honest answer is "we don't keep it past the running
-process" — worth writing down while it's true and trivial, rather than
-only when someone asks and it's no longer obvious from the code.
+The honest answer used to be "we don't keep it past the running process";
+since the article store (2026-08-25) it is "seven days of public feed
+metadata for the teams you follow, capped, evictable, and clearable from
+Settings" — still an answer this file can give in one sentence, which is
+the property to preserve.
 
 ## The rule for whenever persistence gets added
 
@@ -273,18 +278,22 @@ it, decided at the same time as the feature, not bolted on later:
 | Onboarding-complete flag (`nofrills.hasOnboarded`) | AsyncStorage, via `lib/storage.ts` | A single boolean | Nothing to cap |
 | Last caught-up mark (`nofrills.lastCaughtUpAt`) | AsyncStorage, via `lib/storage.ts` | A single ISO-8601 timestamp, overwritten in place | Deliberately **not** a history. Only the most recent mark is kept, so this can't accumulate into a log of when you read. It has to persist at all because a brief that means "since you last looked" would otherwise reset to a fixed window on every relaunch — see `lib/caught-up.ts` |
 | Last refreshed window (`nofrills.lastRefreshedPeriod`) | AsyncStorage, via `lib/storage.ts` | A single `"<date>-<morning\|noon\|night>"` string, overwritten in place | Same shape and the same rule as the row above: a marker, not a log. Only the current window is kept, so it can't accumulate into a record of when you opened the app. It persists because it was memory-only, which meant every cold launch read `null` and forced a full cache-bypassing pull of every national feed — the real cadence was "every cold start", not "3x a day". See `lib/refresh-schedule.ts` |
+| Followed-team article store (`nofrills.teamArticles.<key>` per team, plus `nofrills.teamArticles.index`) | AsyncStorage, via `lib/storage.ts` | 60 articles per team; 50 teams (matching the in-memory pool cache's bound); 7 days by age, with undated articles aged from first sight so nothing is immortal; descriptions truncated to ~300 chars on persist; LRU across teams via the index, FIFO by date within a team. Roughly 1–2 MB at full caps | Several sources are rolling windows (a news sitemap is ~48h, an SB Nation feed is ten items), so a thin team's feed was permanently capped at whatever exists *right now*; remembering what was already fetched turns that into a week's accumulation, and gives an offline launch last week's news instead of nothing. **A fetch cache, not a reading history**: entries exist only for teams you follow — the set of keys is derivable from the followed-teams list — never for screens you opened, and the index's per-team `lastUsedAt` is a single overwritten value (the refresh marker's rule, per team). An entry for a since-unfollowed team lingers until LRU eviction or the clear-all in Settings. Rules in `lib/article-retention.ts`, disk half in `lib/article-store.ts` |
 
-All four are written and read only through `lib/storage.ts`, which is the
+All five are written and read only through `lib/storage.ts`, which is the
 single chokepoint for anything touching disk — deliberately, so this
 table can't silently drift from reality. If a future feature needs
 persistence, it goes through that module, and it gets a row here at the
-same time it gets written, per the rule above.
+same time it gets written, per the rule above. The article store is also
+the reason Settings now carries a "Clear cached articles" action — the
+clear-all that chokepoint was always meant to make possible.
 
-None of the four is transmitted off the device, and none contains
+None of the five is transmitted off the device, and none contains
 anything identifying — team IDs are ESPN's public identifiers, the same
-for every user who follows that team, and the refresh marker is a
+for every user who follows that team, the refresh marker is a
 time-of-day bucket the app derives for itself rather than a record of
-anything the user did.
+anything the user did, and the article store holds public feed metadata
+(titles, links, teasers) identical for every user who follows that team.
 
 The caught-up mark is the one persisted value that is *behavioral* rather
 than a preference: it records something about when the app was used, not

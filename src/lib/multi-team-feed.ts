@@ -1,8 +1,8 @@
+import { fetchTeamNewsPoolWithStore } from '@/lib/article-store';
 import { Article } from '@/lib/feeds';
 import { DEFAULT_CONCURRENCY, mapWithConcurrency } from '@/lib/http';
 import { DEFAULT_LEAGUE, getLeague } from '@/lib/league-catalog';
 import { balanceBySource } from '@/lib/source-balance';
-import { fetchTeamNewsPool } from '@/lib/team-news-pool';
 import { Team } from '@/lib/teams';
 
 /**
@@ -51,7 +51,7 @@ export async function fetchMultiTeamFeed(
     // Each team carries the league it came from, so a merged feed across
     // leagues resolves each team's own sources rather than assuming one.
     const league = getLeague(team.leagueId) ?? DEFAULT_LEAGUE;
-    const pool = await fetchTeamNewsPool(team.id, team.shortName || team.name, league, options);
+    const pool = await fetchTeamNewsPoolWithStore(team.id, team.shortName || team.name, league, options);
     return pool.articles.map(
       (article): FeedArticle => ({
         ...article,
