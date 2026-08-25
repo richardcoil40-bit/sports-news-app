@@ -26,6 +26,19 @@ set -euo pipefail
 # and why this half has to stay outside ios/.
 cd "$CI_PRIMARY_REPOSITORY_PATH"
 
+# Checked before anything is installed. The gate itself is explained further
+# down, next to the .env.local write it guards — what matters here is only
+# that it runs first: brew and `npm ci` cost about five minutes of the
+# monthly compute allowance, and spending them to discover a missing secret
+# is five minutes bought for nothing.
+if [ -z "${EXPO_PUBLIC_VERDICT_TOKEN:-}" ]; then
+  echo "error: EXPO_PUBLIC_VERDICT_TOKEN is unset." >&2
+  echo "  Add it as a secret environment variable on the workflow." >&2
+  echo "  Without it this build ships degraded to local verdict rules, and" >&2
+  echo "  nothing on screen would say so — so it fails here instead." >&2
+  exit 1
+fi
+
 export HOMEBREW_NO_AUTO_UPDATE=1
 export HOMEBREW_NO_INSTALL_CLEANUP=1
 
@@ -44,37 +57,26 @@ export LC_ALL=en_US.UTF-8
 
 npm ci
 
+# This is what the gate at the top of the file protects.
+#
 # `.env` is tracked and carries EXPO_PUBLIC_VERDICT_URL / _CATALOG_URL, so
 # those arrive with the clone. `.env.local` is gitignored (`.env*.local`) and
 # is where EXPO_PUBLIC_VERDICT_TOKEN lives, so it does not — and Expo inlines
-# EXPO_PUBLIC_* at bundle time, which happens here, not at launch.
+# EXPO_PUBLIC_* at bundle time, which happens here, not at launch. Xcode
+# Cloud supplies it as a secret environment variable of the same name.
 #
-# Without it the build still succeeds and still runs. It just gets a 401 from
+# Missing, the build still succeeds and still runs. It just gets a 401 from
 # every POST /v1/classify (the Worker has CLIENT_TOKEN set) and silently
 # degrades to local classification rules — a worse feed with nothing on
-# screen to say so. Set it as a secret environment variable on the Xcode
-# Cloud workflow to avoid that.
-# This fails the build rather than warning, which is a change from how the
-# script first shipped. A warning is the wrong instrument here: the build
-# succeeds, uploads, and reaches testers, and the only symptom is a feed
-# that classifies slightly worse — nothing on screen, nothing in a crash
-# log, nothing anyone would report. By the time it's noticed the build is
-# the one people are using.
+# screen to say so.
 #
-# It is also the same call the data layer already makes twice. `teams.ts`
-# throws on a non-OK response and `fetchLeagueCatalog` rejects rather than
-# degrade to an empty catalog, both for the reason that an app which looks
+# Which is why the gate exits rather than warning, as this script did when
+# it first shipped. A warning is the wrong instrument for a defect that
+# reaches testers looking healthy: no crash, no error, nothing anyone would
+# think to report. It is the same call the data layer already makes twice —
+# `teams.ts` throws on a non-OK response and `fetchLeagueCatalog` rejects
+# rather than degrade to an empty catalog, both because an app that looks
 # like it loaded correctly is worse than one that visibly didn't.
-#
-# Set it as a secret environment variable on the Xcode Cloud workflow.
-if [ -z "${EXPO_PUBLIC_VERDICT_TOKEN:-}" ]; then
-  echo "error: EXPO_PUBLIC_VERDICT_TOKEN is unset." >&2
-  echo "  Add it as a secret environment variable on the Xcode Cloud workflow." >&2
-  echo "  Without it this build ships degraded to local verdict rules, and" >&2
-  echo "  nothing on screen would say so — so it fails here instead." >&2
-  exit 1
-fi
-
 echo "EXPO_PUBLIC_VERDICT_TOKEN=$EXPO_PUBLIC_VERDICT_TOKEN" >> .env.local
 
 npx expo prebuild --platform ios
