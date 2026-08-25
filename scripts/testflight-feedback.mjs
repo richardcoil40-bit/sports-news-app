@@ -598,8 +598,146 @@ async function resolveWorkflow(token, app, creds) {
   return { product, workflow: enabled[0] };
 }
 
+/**
+ * Does the commit Xcode Cloud is about to build actually pass CI?
+ *
+ * This is the one gate between `main` and production, and until it existed
+ * there was nothing in that window at all. Everything else runs earlier:
+ * ci.yml fires per push, and the smoke/feed scripts are things a person
+ * remembers to type. `--start-build` just POSTed a ciBuildRuns and Apple
+ * built whatever the remote had — green, red, or still running.
+ *
+ * Three things worth knowing about how this checks:
+ *
+ * - **It asks the remote, not the local ref.** `git rev-parse origin/main`
+ *   answers from the last fetch, which can be hours stale; Xcode Cloud
+ *   clones what is actually there. `git ls-remote` is the only answer that
+ *   matches what will be built.
+ * - **Pending blocks as firmly as red.** CI here is ~60 seconds and a build
+ *   is ~13 minutes, so "pushed, then immediately asked for a build" is the
+ *   normal case rather than the rare one — and a run still in flight tells
+ *   you nothing. Treating it as acceptable would make the gate a coin flip
+ *   exactly when it matters.
+ * - **It fails closed when it cannot tell.** No `gh`, no check runs on the
+ *   commit, an API error: all block. "I could not verify" is not "verified
+ *   fine", and the whole reason this file hard-fails on a missing verdict
+ *   token rather than warning is that a build which looks healthy is worse
+ *   than one that visibly isn't.
+ *
+ * `--confirm` overrides any of it, which is deliberate: AGENTS.md carves out
+ * shipping a fix for something broken immediately, and a gate with no
+ * override gets worked around instead of used.
+ */
+function ciPreflight() {
+  const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+
+  let remoteSha;
+  try {
+    const line = git(['ls-remote', 'origin', `refs/heads/${BRANCH}`]);
+    remoteSha = line.split(/\s+/)[0];
+    if (!remoteSha) throw new Error(`origin has no branch "${BRANCH}"`);
+  } catch (err) {
+    return { ok: false, reason: `could not resolve origin/${BRANCH}: ${err.message}` };
+  }
+
+  const short = remoteSha.slice(0, 9);
+  const notes = [];
+
+  // Not a blocker: building main from a topic-branch checkout is normal.
+  // Worth saying out loud, because what ships is not what is on screen.
+  try {
+    const localSha = git(['rev-parse', 'HEAD']);
+    if (localSha !== remoteSha) {
+      notes.push(
+        `local HEAD is ${localSha.slice(0, 9)}, not ${short} — the build takes origin/${BRANCH}`,
+      );
+    }
+  } catch {
+    // A detached or unreadable HEAD says nothing about the remote.
+  }
+
+  let slug;
+  try {
+    slug = git(['remote', 'get-url', 'origin'])
+      .replace(/\.git$/, '')
+      .replace(/^git@github\.com:/, '')
+      .replace(/^https:\/\/github\.com\//, '');
+  } catch (err) {
+    return { ok: false, sha: short, notes, reason: `could not read the origin remote: ${err.message}` };
+  }
+
+  let runs;
+  try {
+    const raw = execFileSync(
+      'gh',
+      ['api', `/repos/${slug}/commits/${remoteSha}/check-runs`, '--jq', '.check_runs'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    runs = JSON.parse(raw);
+  } catch (err) {
+    return {
+      ok: false,
+      sha: short,
+      notes,
+      reason:
+        `could not read CI status from GitHub: ${(err.stderr || err.message).toString().trim()}\n` +
+        `  This needs the gh CLI, authenticated: gh auth login`,
+    };
+  }
+
+  if (!Array.isArray(runs) || runs.length === 0) {
+    return {
+      ok: false,
+      sha: short,
+      notes,
+      reason: `no CI checks have run on ${short} at all — nothing has verified this commit`,
+    };
+  }
+
+  const pending = runs.filter((r) => r.status !== 'completed');
+  const failed = runs.filter(
+    (r) => r.status === 'completed' && !['success', 'neutral', 'skipped'].includes(r.conclusion),
+  );
+
+  if (pending.length > 0) {
+    return {
+      ok: false,
+      sha: short,
+      notes,
+      reason:
+        `CI is still running on ${short}: ${pending.map((r) => `${r.name} (${r.status})`).join(', ')}\n` +
+        `  It takes about a minute. An Xcode Cloud run takes thirteen.`,
+    };
+  }
+  if (failed.length > 0) {
+    return {
+      ok: false,
+      sha: short,
+      notes,
+      reason: `CI failed on ${short}: ${failed.map((r) => `${r.name} (${r.conclusion})`).join(', ')}`,
+    };
+  }
+
+  return { ok: true, sha: short, notes, checks: runs.length };
+}
+
 /** Ask Xcode Cloud for a build. The workflow has no automatic trigger. */
 async function startBuild(token, app, creds) {
+  const pre = ciPreflight();
+  for (const note of pre.notes ?? []) console.log(`note: ${note}`);
+  if (pre.ok) {
+    console.log(`CI is green on ${pre.sha} (${pre.checks} checks).\n`);
+  } else if (CONFIRM) {
+    console.log(`Preflight: ${pre.reason}\n  Overridden by --confirm.\n`);
+  } else {
+    throw new Error(
+      `Not starting a build.\n  ${pre.reason}\n\n` +
+        `This is the only check between ${BRANCH} and a build Apple will hand to testers.\n` +
+        `Re-run with --confirm to build anyway — which is the right call for an urgent fix,\n` +
+        `and the wrong one for a routine release.`,
+    );
+  }
+
   const { product, workflow } = await resolveWorkflow(token, app, creds);
 
   const repos = await get(

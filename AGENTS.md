@@ -409,6 +409,57 @@ entirely would mean making those testers internal, which means giving them
 App Store Connect accounts. And the build number will jump, because Xcode
 Cloud assigns it; see the note above.
 
+#### What checks the build, and where
+
+Four things verify a release, and they fire at three different moments.
+Knowing which is which matters, because for a long time the middle column
+was empty:
+
+| | per merge | main → build | after upload |
+|---|---|---|---|
+| `tsc`, lint, Vitest, worker typecheck | ci.yml | — | — |
+| `expo export` bundle check | ci.yml | — | — |
+| `--start-build` preflight | — | automatic | — |
+| `check-feeds.sh`, worker smoke | — | by hand | — |
+| install it and launch it | — | — | by hand |
+
+**`--start-build` refuses a commit CI hasn't passed.** It resolves the head
+of `origin/<branch>` with `git ls-remote` — the remote, not the local ref,
+because that is what Xcode Cloud clones — and asks GitHub for that commit's
+check runs. Red blocks. **Pending blocks just as hard**, which is the case
+that actually comes up: CI here is about a minute and a build is thirteen,
+so "push, then ask for a build" is the normal rhythm. Not being able to tell
+also blocks — no `gh`, no checks on the commit, an API error — because "I
+could not verify" is not "verified fine". `--confirm` overrides all of it,
+which is deliberate: the urgent-fix exception above is real, and a gate with
+no override gets worked around instead of used.
+
+The bundle check is what gives that preflight its teeth. `tsc --noEmit`
+resolves `@/` through tsconfig paths and never looks at a `require()` string
+literal — it is typed `any` — so the five `require('@/assets/images/…')`
+call sites are invisible to it, as is Metro's `@2x`/`@3x` resolution. Before
+`expo export` ran in CI, "green" did not mean "this bundles".
+
+Three things a script can't check, before `--release --confirm`:
+
+1. **`bash scripts/check-feeds.sh` from the laptop**, not CI. Feeds rot
+   silently and CI cannot see a third of the catalog — the sixteen
+   TownNews/BLOX papers refuse datacenter IPs. Commit the report to
+   `docs/evidence/`. (Before dispatching the CI variant, note that
+   `docs/evidence/ci-unreachable.txt` says its own baseline predates the 23
+   NFL and Big 12 sources, seven of them TownNews. Those will report as new
+   failures on the next run. Re-anchor the file from it; that is a stale
+   baseline, not rot.)
+2. **`node --env-file=.env --env-file=.env.local scripts/worker-smoke.mjs`**
+   if the Worker changed. See the Worker section below for why the env files
+   are not optional there.
+3. **Install the build and launch it.** `--builds` reporting `VALID` means
+   Apple finished *processing the binary* — nothing anywhere checks that the
+   app launches. Cold launch, one team screen, one article. Six family
+   testers get one notification per release, and the triage record already
+   shows build lag polluting the feedback signal; five minutes is cheap
+   against that.
+
 ## Reading what the service did
 
 The Worker is the one component with live users and no screen to look at.
