@@ -11,9 +11,26 @@ import { localNamesFor, schoolNamesFor, teamNicknamesFor } from '@/lib/team-nick
 import { wordBoundaryMatch } from '@/lib/text-match';
 import { classifyHeadlines, isRelevantVerdict } from '@/lib/verdicts';
 
+/**
+ * How covered a team actually is, distinct from how many articles came
+ * back. A team with zero curated sources used to resolve fulfilled-and-
+ * empty with zero failures — indistinguishable from "sources published
+ * nothing" and from "everything was filtered out". This is the difference,
+ * so an empty screen can say which of those is true. Counts curated
+ * per-team sources only; ESPN's team feed and the national pool run for
+ * every team and say nothing about this one's coverage.
+ */
+export interface TeamNewsCoverage {
+  /** Curated sources configured for this team. */
+  configured: number;
+  /** How many of them landed at least one article in this pool. */
+  contributed: number;
+}
+
 export interface TeamNewsPool {
   articles: Article[];
   failedSources: string[];
+  coverage: TeamNewsCoverage;
 }
 
 // Fetching this pool touches every community/local source for a team, not
@@ -29,6 +46,16 @@ const CACHE_TTL_MS = 3 * 60 * 1000;
 // so without a size bound a long session accumulates a full article pool per
 // team ever opened.
 const poolCache = createEntityCache<string, TeamNewsPool>({ ttlMs: CACHE_TTL_MS, maxEntries: 50 });
+
+// League-qualified on purpose, unlike the roster/color/schedule caches that
+// key on espnCacheKey alone. Those hold league-independent ESPN entity data,
+// so two conferences sharing football/college-football should share entries
+// (see leagues.ts). This pool's *composition* is a function of league id —
+// source-catalog.ts picks the source tables by league.id — so the shared key
+// would let a pool built under one league's sources be served to another.
+function poolCacheKey(league: League, teamId: string): string {
+  return `${league.id}:${espnCacheKey(league, teamId)}`;
+}
 
 // Debug: logs how long the four fetch groups take. Every underlying request
 // already has its own 10s timeout, so this pool should never take much more
@@ -331,7 +358,20 @@ async function fetchTeamNewsPoolUncached(
     );
   }
 
-  return { articles, failedSources };
+  // Counted off the final list rather than per group, so a source whose
+  // every item was filtered out (another sport, off-topic, not this team)
+  // counts as not contributing — which is the honest answer, and exactly
+  // the state a dead-but-answering source sits in.
+  const configuredNames = new Set(sources.map((s) => s.name));
+  const contributed = new Set(
+    articles.filter((a) => configuredNames.has(a.source)).map((a) => a.source),
+  ).size;
+
+  return {
+    articles,
+    failedSources,
+    coverage: { configured: sources.length, contributed },
+  };
 }
 
 // Belt-and-suspenders: every request inside fetchTeamNewsPoolUncached has
@@ -353,14 +393,20 @@ function withHardCap(
       // The same key the pool is written under below — `league` is threaded
       // in for this one line. Peeking on the bare team id silently missed
       // every time, so this fallback could only ever return empty.
-      const stale = poolCache.peek(espnCacheKey(league, teamId));
+      const stale = poolCache.peek(poolCacheKey(league, teamId));
       // warn, not log: unlike the DEBUG_TIMING lines above, this one is
       // always on, because reaching it means a fetch outlived its own
       // timeout — a real anomaly worth seeing without flipping a flag.
       console.warn(
         `[pool] ⚠ hard cap hit for ${teamShortName} after ${HARD_CAP_MS}ms — one of the fetches never resolved despite its own timeout. Falling back to ${stale ? 'stale cached' : 'empty'} data.`,
       );
-      resolve(stale ?? { articles: [], failedSources: ['Timed out'] });
+      resolve(
+        stale ?? {
+          articles: [],
+          failedSources: ['Timed out'],
+          coverage: { configured: teamSourcesFor(league, teamShortName).length, contributed: 0 },
+        },
+      );
     }, HARD_CAP_MS);
 
     work.then(
@@ -407,7 +453,7 @@ export async function fetchTeamNewsPool(
   }
 
   return poolCache.get(
-    espnCacheKey(league, teamId),
+    poolCacheKey(league, teamId),
     () =>
       withHardCap(
         teamId,

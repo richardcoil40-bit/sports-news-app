@@ -32,7 +32,7 @@ import { withTeamMentions } from '@/lib/team-mentions';
 import { inkOn, visibleOn } from '@/lib/color';
 import { fetchTeamColor } from '@/lib/team-color';
 import { StatLeader, fetchTeamStatLeaders } from '@/lib/team-leaders';
-import { fetchTeamNewsPool } from '@/lib/team-news-pool';
+import { fetchTeamNewsPool, type TeamNewsPool } from '@/lib/team-news-pool';
 
 type TabKey = 'news' | 'schedule' | 'players';
 
@@ -123,10 +123,9 @@ export default function TeamScreen() {
   // grew into this screen made the same call on the same value.
   const shownColor = visibleOn(teamColor, theme.background);
 
-  const news = useAsync<Article[]>(async () => {
-    const pool = await fetchTeamNewsPool(params.id, poolName, league);
-    return pool.articles;
-  });
+  // The whole pool rather than just its articles: the News tab's empty
+  // state reads `coverage` to say *why* it's empty.
+  const news = useAsync<TeamNewsPool>(() => fetchTeamNewsPool(params.id, poolName, league));
 
   const schedule = useAsync<ScheduledGame[]>(async (publish) => {
     const games = await fetchTeamSchedule(params.id, league);
@@ -189,7 +188,7 @@ export default function TeamScreen() {
   // because this team's pool carries stories about its opponents and
   // neighbours too.
   const classifiedNews = useMemo(
-    () => withTeamMentions(withClaimTypes(news.data ?? []), teams),
+    () => withTeamMentions(withClaimTypes(news.data?.articles ?? []), teams),
     [news.data, teams],
   );
 
@@ -206,7 +205,7 @@ export default function TeamScreen() {
   const notablePlayers = useMemo(
     () =>
       roster.data
-        ? rankNotablePlayers(roster.data.players, news.data ?? [], roster.data.leaders, 10)
+        ? rankNotablePlayers(roster.data.players, news.data?.articles ?? [], roster.data.leaders, 10)
         : [],
     [roster.data, news.data],
   );
@@ -298,6 +297,7 @@ export default function TeamScreen() {
             articles={visibleNews}
             loading={news.data === null && !news.error && !unresolvableTeam}
             error={news.error || unresolvableTeam}
+            coverage={news.data?.coverage}
             claimFilter={claimFilter}
             onChangeClaim={setClaimFilter}
             onOpenArticle={openArticle}
