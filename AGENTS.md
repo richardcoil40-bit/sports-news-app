@@ -298,6 +298,37 @@ bearing and none of them are obvious from the failure they prevent:
   `fetchLeagueCatalog` make: an app that looks like it loaded correctly is
   worse than one that visibly didn't.
 
+**Xcode Cloud sets the build number itself, and `app.json` does not affect
+it.** Once the archive action has a `buildDistributionAudience`, Xcode Cloud
+overwrites `CFBundleVersion` with its own run counter at export — so run #25
+delivered `1.0.1 (25)` from a commit whose `app.json` said `"buildNumber":
+"5"`. This is documented Xcode Cloud behaviour, not a quirk of this repo,
+and `manageAppVersionAndBuildNumber` in ExportOptions is the only switch for
+it. The next number is settable in App Store Connect → Xcode Cloud →
+Settings → Build Number.
+
+Two things follow, and the first was briefly got wrong here:
+
+- **Don't add a script step to bump the build number.** It is redundant —
+  Xcode Cloud overrides whatever it writes — and it invents a second
+  counter that disagrees with the real one. A CI run cannot produce a
+  duplicate `CFBundleVersion`, so there is no problem to solve.
+- **`app.json`'s `buildNumber` now only governs a manual Xcode archive**,
+  and even there it doesn't reach an existing `ios/` — Expo writes it during
+  prebuild, which won't re-run. Bump the generated project directly:
+
+  ```
+  plutil -replace CFBundleVersion -string "N" ios/NoFrills/Info.plist
+  ```
+
+  Never `npx expo prebuild` to sync it; that destroys signing, per the
+  Environment-specific constraints section. And keep it above whatever
+  Xcode Cloud has reached, or the upload is rejected as a duplicate — the
+  two routes share one number space and only one of them counts for you.
+
+`version` is untouched by any of this. Only `CFBundleVersion` moves, so
+neither route starts a new App Review.
+
 ## Reading what the service did
 
 The Worker is the one component with live users and no screen to look at.
