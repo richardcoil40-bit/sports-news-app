@@ -47,6 +47,35 @@ npx wrangler secret put VET_TOKEN
 Local dev: `npm run dev` (runs `wrangler dev`). `npm run typecheck` runs
 `tsc --noEmit`.
 
+### After deploying, check it
+
+A `wrangler deploy` that succeeds tells you Cloudflare accepted the upload,
+not that the service works. This is the only component with users on the
+other end and no screen to look at, and it can break builds that **already
+shipped** — a bad deploy reaches every tester without an app release. Run
+this from the app repo root, straight after:
+
+```bash
+node --env-file=.env --env-file=.env.local scripts/worker-smoke.mjs
+```
+
+Three checks: `/health` answers, `/v1/leagues` yields at least one league the
+app would accept, and `/v1/classify` accepts the client token.
+
+**Both `--env-file` flags matter.** The URLs live in the tracked `.env` and
+the token in the gitignored `.env.local`, and the point of the third check is
+that *this machine's* token — the one Expo inlines into a build — still
+matches the `CLIENT_TOKEN` secret here. A rotated secret is the failure this
+catches, and it is invisible any other way: `ci_scripts/ci_post_clone.sh`
+fails a build when the token is **unset**, but a token that is set and wrong
+passes that gate, 401s on every classify, and drops the app back to local
+verdict rules with nothing on screen to say so.
+
+The classify check deliberately sends an **invalid body and expects 400**.
+Auth is checked before the body is parsed, so 400 proves the token was
+accepted while never reaching KV, the model, or `DAILY_CALL_CAP`. Don't
+"improve" it into sending a real headline.
+
 ## `POST /v1/classify`
 
 Request:
