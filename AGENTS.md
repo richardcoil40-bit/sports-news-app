@@ -235,6 +235,48 @@ different places:
 - **The Worker** is the only piece with users on the other end of it. See
   the logging section below.
 
+### One topic per branch, and `main` means integrated, not shipped
+
+Every branch here is a single topic — `brief-sections-when-team-filtered`,
+`add-nfl`, `hosted-league-catalog` — merged fast-forward so `main` stays
+linear. Keep it that way rather than accumulating unrelated changes on one
+branch, even when they are all headed for the same release:
+
+- **CI runs per merge.** `ci.yml` is lint plus the full suite in about a
+  minute on every push to `main`. Four topics merged separately get four
+  runs, each validating one change; four topics on one branch get one run,
+  and a failure doesn't say which change caused it.
+- **A bad change is one commit to revert**, not surgery on a branch with
+  three good changes tangled into it.
+- **A tester report points at a change.** This is the cost that is easy to
+  discount until it lands: the more that goes into a build, the less a
+  "this broke" report narrows down.
+
+A single branch is right only when the changes are genuinely one thing —
+interdependent, or meaningless apart. That is one topic, not several.
+
+**`main` is not a deploy target.** Nothing reaches a tester because it
+landed on `main`; it reaches them when someone asks for a build and then
+releases it (see Releasing, below). So merge as often as a change is ready,
+let `main` accumulate, and release once:
+
+```
+topic branch → main          often, cheap, CI-checked
+     (accumulate)
+--start-build → --release    rare, deliberate, one tester notification
+```
+
+Batching that way is not just tidier. At this repo's merge rate — twelve
+first-parent commits in a day is normal — a build per merge would be
+roughly 2.5 hours of Xcode Cloud time daily against a 25-hour monthly
+allowance, and four update prompts in an afternoon teaches six family
+testers to dismiss prompts.
+
+**The exception is a fix for something broken.** Don't let it wait behind
+three unrelated improvements; ship it alone and immediately, the way the
+brief-sectioning fix went from tester report to tester hands the same day.
+Batch what accumulates, not what is urgent.
+
 ### Xcode Cloud needs `ci_scripts/ci_post_clone.sh`, and `/ios` is why
 
 `/ios` and `/android` are gitignored (generated native folders). Xcode
