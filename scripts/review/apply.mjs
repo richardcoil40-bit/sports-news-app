@@ -35,13 +35,25 @@ function fail(message) {
   process.exit(1);
 }
 
+/**
+ * One single-quoted string literal, matching the tables' style.
+ *
+ * Backslashes first, then quotes — the other order re-escapes the backslash
+ * this function just added. Both places that emit a literal go through here:
+ * they are forty lines apart, which is exactly the distance at which a fix
+ * lands on one of them and not the other.
+ */
+function quoted(part) {
+  return `'${part.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+}
+
 /** `'a', 'b'` — single-quoted, matching the tables' style. */
 function quoteList(value) {
   return value
     .split(/[\n,]/)
     .map((part) => part.trim())
     .filter(Boolean)
-    .map((part) => `'${part.replace(/'/g, "\\'")}'`)
+    .map(quoted)
     .join(', ');
 }
 
@@ -59,7 +71,7 @@ function sourceLine(line, ownerHelpers) {
   const [owner, id, name, host, tier] = parts.map((part) => part.replace(/^"|"$/g, ''));
   const helper = ownerHelpers[owner?.toLowerCase()];
   if (!helper || !id || !name || !host) return `// unparsed, needs a verified URL: ${line}`;
-  const args = [id, name, host].map((part) => `'${part.replace(/'/g, "\\'")}'`);
+  const args = [id, name, host].map(quoted);
   if (tier) args.push(tier);
   return `${helper}(${args.join(', ')}),`;
 }
