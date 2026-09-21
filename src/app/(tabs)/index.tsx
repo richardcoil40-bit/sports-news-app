@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,6 +15,7 @@ import { BRIEF_MODE } from '@/constants/flags';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useBrief } from '@/hooks/use-brief';
 import { useFeed } from '@/hooks/use-feed';
+import { useReadArticles } from '@/hooks/use-read-articles';
 import { useTheme } from '@/hooks/use-theme';
 import {
   ClaimFilter,
@@ -23,7 +24,7 @@ import {
   filterByClaimType,
   withClaimTypes,
 } from '@/lib/claim-type';
-import { caughtUpMessage, splitBrief } from '@/lib/brief';
+import { briefEndCopy, splitBrief } from '@/lib/brief';
 import { clusterArticles, leadsWithDuplicates } from '@/lib/cluster';
 import { favoriteKey } from '@/lib/favorite-keys';
 import { Article } from '@/lib/feeds';
@@ -62,17 +63,12 @@ export default function FeedScreen() {
   // opposite things: one is "you haven't filtered", the other is "you
   // filtered everything out".
   const [teamSelection, setTeamSelection] = useState<string[] | null>(null);
-  const { ready: briefReady, cutoff, periodLabel, reachedEnd } = useBrief();
-  // "Did the reader actually get to the bottom?" — two ways for that to be
-  // true, and both are needed. Requiring a scroll alone means a brief that
-  // fits on one screen can never be marked read, so it would greet the
-  // reader with the same stories forever.
-  const hasScrolled = useRef(false);
-  const contentHeight = useRef(0);
-  const viewportHeight = useRef(0);
-  const briefWasSeen = () =>
-    hasScrolled.current ||
-    (viewportHeight.current > 0 && contentHeight.current <= viewportHeight.current);
+  const { cutoff } = useBrief();
+  // Which stories have been opened. Read off a store rather than the
+  // articles themselves, because it is device state that outlives any one
+  // fetch — and the same store the team and player screens read, so a story
+  // opened there is already marked when this tab next renders.
+  const { readLinks, hydrated: readHydrated } = useReadArticles();
 
   // Classified and tagged once, then filtered — every card needs both for
   // its badges whether or not a filter is active, so this is one pass
@@ -167,31 +163,15 @@ export default function FeedScreen() {
   );
 
   // Only when nothing is filtered by *claim*. Catching up and browsing are
-  // different intents: filtering to RUMOR and still seeing a "you're caught
-  // up" line above a collapsed section holding everything is nonsense, so an
-  // active claim filter renders one plain list instead.
-  //
-  // The team selection used to be in this condition too, for a second and
-  // harder reason: reaching the finish line calls markCaughtUp(), which
-  // writes one timestamp for the whole feed rather than one per team, so
-  // finishing *one* team's stories would silently retire every other team's
-  // unread news. That reasoning is sound, but it is about the write, and the
-  // write has its own gate below. Spending one boolean on both meant
-  // narrowing to a team also turned off the finish line and both collapsed
-  // sections — handing a filtered reader precisely the endless feed the
-  // brief exists to replace, which is what a tester reported on build 4.
+  // different intents: filtering to RUMOR and still seeing a finish line
+  // above a collapsed section holding everything is nonsense, so an active
+  // claim filter renders one plain list instead.
   //
   // Zero teams selected stays unsectioned, and not incidentally: an empty
-  // brief renders as a lone caught-up marker, which is a non-empty list, so
+  // brief renders as a lone finish line, which is a non-empty list, so
   // ListEmptyComponent never fires and "You're caught up" would replace the
   // copy telling the reader they just filtered everyone out.
-  const sectioned =
-    BRIEF_MODE && claimFilter === 'all' && cutoff !== null && selectedTeams.length > 0;
-
-  // Advancing the cutoff is the whole-feed operation the note above
-  // describes, so it stays scoped to the whole feed. Sectioning is a
-  // rendering choice; this is a write to storage that outlives the screen.
-  const mayMarkCaughtUp = sectioned && allTeamsSelected;
+  const sectioned = BRIEF_MODE && claimFilter === 'all' && selectedTeams.length > 0;
 
   // Named only where an unqualified count would be read as a claim about the
   // whole feed. A subset of several teams is left unnamed rather than
@@ -201,8 +181,8 @@ export default function FeedScreen() {
     !allTeamsSelected && selectedTeams.length === 1 ? selectedTeams[0].shortName : undefined;
 
   const sections = useMemo(
-    () => (cutoff ? splitBrief(visibleArticles, cutoff) : null),
-    [visibleArticles, cutoff],
+    () => splitBrief(visibleArticles, cutoff, (article) => readLinks.has(article.link)),
+    [visibleArticles, cutoff, readLinks],
   );
 
   // Which collapsed sections are open. It lives here rather than inside
@@ -216,7 +196,7 @@ export default function FeedScreen() {
 
   type FeedRow =
     | { kind: 'card'; key: string; article: (typeof visibleArticles)[number]; ruled: boolean }
-    | { kind: 'marker'; key: string; message: string }
+    | { kind: 'marker'; key: string; title: string; detail: string }
     | { kind: 'section'; key: string; id: string; label: string; count: number; open: boolean };
 
   /**
@@ -245,14 +225,10 @@ export default function FeedScreen() {
         ruled: index > 0,
       }));
 
-    if (!sectioned || !sections) return cards('feed', visibleArticles);
+    if (!sectioned) return cards('feed', visibleArticles);
 
     const out: FeedRow[] = cards('brief', sections.brief);
-    out.push({
-      kind: 'marker',
-      key: 'caught-up',
-      message: caughtUpMessage(sections, periodLabel, briefScope),
-    });
+    out.push({ kind: 'marker', key: 'caught-up', ...briefEndCopy(sections, briefScope) });
 
     for (const { id, label, items } of [
       { id: 'chatter', label: 'rumors & takes', items: sections.chatter },
@@ -266,7 +242,7 @@ export default function FeedScreen() {
     }
 
     return out;
-  }, [sectioned, sections, visibleArticles, periodLabel, briefScope, openSections]);
+  }, [sectioned, sections, visibleArticles, briefScope, openSections]);
 
   // Widened past Article because the detail screen shows the same claim
   // chip the row does, and re-classifying there would repeat a few hundred
@@ -299,13 +275,14 @@ export default function FeedScreen() {
       tagLabel={item.mentionedTeam?.shortName}
       claimType={item.claimType}
       onPressClaim={setClaimFilter}
+      read={readLinks.has(item.link)}
       duplicates={item.duplicates}
       onOpenDuplicate={openArticle}
     />
   );
 
   const renderRow = ({ item }: { item: FeedRow }) => {
-    if (item.kind === 'marker') return <CaughtUpMarker message={item.message} />;
+    if (item.kind === 'marker') return <CaughtUpMarker title={item.title} detail={item.detail} />;
     if (item.kind === 'section') {
       return (
         <CollapsibleSectionHeader
@@ -457,7 +434,13 @@ export default function FeedScreen() {
           <View style={[styles.separator, { backgroundColor: theme.text }]} />
         ) : null}
 
-        {!ready || loading || (BRIEF_MODE && !briefReady) ? (
+        {/*
+          Read marks are part of the gate, not an afterthought: without
+          them every card in the brief renders unread for a frame, which
+          is the feed flashing as new precisely for the reader who has
+          already been through it.
+        */}
+        {!ready || loading || !readHydrated ? (
           <View style={styles.centered}>
             <ActivityIndicator />
           </View>
@@ -485,23 +468,7 @@ export default function FeedScreen() {
             data={rows}
             keyExtractor={(item) => item.key}
             renderItem={renderRow}
-            // A brief longer than the viewport reaches its "end" during
-            // initial layout, so onEndReached alone would retire stories
-            // nobody scrolled to. briefWasSeen() distinguishes that from a
-            // brief that simply fit on screen, which genuinely was read.
-            onLayout={(e) => {
-              viewportHeight.current = e.nativeEvent.layout.height;
-            }}
-            onContentSizeChange={(_w, h) => {
-              contentHeight.current = h;
-            }}
-            onScroll={(e) => {
-              if (e.nativeEvent.contentOffset.y > 8) hasScrolled.current = true;
-            }}
-            scrollEventThrottle={200}
-            onEndReached={mayMarkCaughtUp ? () => reachedEnd(briefWasSeen()) : undefined}
-            onEndReachedThreshold={0.1}
-            // Suppressed in sectioned mode, where the caught-up marker is
+            // Suppressed in sectioned mode, where the finish line is
             // itself a row and already says there's nothing new. This copy
             // is written for the whole feed — it would claim the feed is
             // empty while Earlier sits one tap below holding two dozen

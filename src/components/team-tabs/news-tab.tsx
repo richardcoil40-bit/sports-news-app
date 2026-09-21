@@ -5,6 +5,7 @@ import { ArticleCard } from '@/components/article-card';
 import { FilterBar } from '@/components/filter-bar';
 import { Centered, Separator, tabStyles } from '@/components/team-tabs/shared';
 import { ThemedText } from '@/components/themed-text';
+import { useReadArticles } from '@/hooks/use-read-articles';
 import { ClaimFilter, ClaimType, CLAIM_FILTER_TABS, Classified } from '@/lib/claim-type';
 import { WithDuplicates } from '@/lib/cluster';
 import { Article } from '@/lib/feeds';
@@ -48,6 +49,11 @@ export function NewsTab({
   onOpenArticle: (a: Article & { claimType?: ClaimType }) => void;
   accentColor: string | null;
 }) {
+  // Before the early return below, or the hook order changes with `loading`.
+  // The same store the home tab reads, which is the point: a story opened
+  // here is marked there too, and vice versa.
+  const { readLinks } = useReadArticles();
+
   if (loading) {
     return (
       <Centered>
@@ -66,6 +72,7 @@ export function NewsTab({
             article={item}
             onPress={() => onOpenArticle(item)}
             claimType={item.claimType}
+            read={readLinks.has(item.link)}
             onPressClaim={onChangeClaim}
             duplicates={item.duplicates}
             onOpenDuplicate={onOpenArticle}

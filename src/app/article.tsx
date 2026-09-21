@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import { useEffect } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,6 +11,7 @@ import { claimBadgeColors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ClaimType, claimTypeLabel } from '@/lib/claim-type';
 import { formatRelativeTime } from '@/lib/format';
+import { markArticleRead } from '@/lib/read-articles';
 
 export default function ArticleScreen() {
   const theme = useTheme();
@@ -22,6 +24,22 @@ export default function ArticleScreen() {
     imageUrl: string;
     claimType: ClaimType | '';
   }>();
+
+  /**
+   * The one place a story counts as opened. Home, team and player screens
+   * all push here, so none of them has to know how a story was reached.
+   *
+   * Keyed on `link` because it is the only identifier consistent across
+   * sources — `id` is the link for RSS items and ESPN's numeric id for
+   * ESPN's, and every dedupe, cluster and list key in the app already
+   * settled on the link for that reason.
+   *
+   * Depends on the primitive rather than on `params`, which is a new object
+   * every render and would re-fire this forever.
+   */
+  useEffect(() => {
+    if (params.link) void markArticleRead(params.link);
+  }, [params.link]);
 
   const openInBrowser = () => {
     // params.link comes straight from a third-party RSS item — validate the

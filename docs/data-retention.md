@@ -7,7 +7,7 @@ from the code each time someone asks.
 ## Current state: five persisted stores, everything else in memory
 
 The app persists five things: which teams you follow, whether you've
-completed onboarding, when you last reached the end of a brief, which
+completed onboarding, which stories you've opened, which
 refresh window it last pulled fresh news for, and — since 2026-08-25 — a
 rolling per-team copy of your followed teams' recent articles, the one
 store that isn't a single small value. Nothing else. No analytics SDK, no
@@ -276,8 +276,8 @@ it, decided at the same time as the feature, not bolted on later:
 |---|---|---|---|
 | Followed teams (`nofrills.favoriteTeamIds`) | AsyncStorage, via `lib/storage.ts` | An array of short `"<leagueId>:<teamId>"` strings — bounded by the number of teams in the leagues the app ships, a few hundred bytes at most | No eviction policy needed: a user can only follow teams that exist, so this grows with the league catalog, never with use. Revisit if the catalog ever spans many sports |
 | Onboarding-complete flag (`nofrills.hasOnboarded`) | AsyncStorage, via `lib/storage.ts` | A single boolean | Nothing to cap |
-| Last caught-up mark (`nofrills.lastCaughtUpAt`) | AsyncStorage, via `lib/storage.ts` | A single ISO-8601 timestamp, overwritten in place | Deliberately **not** a history. Only the most recent mark is kept, so this can't accumulate into a log of when you read. It has to persist at all because a brief that means "since you last looked" would otherwise reset to a fixed window on every relaunch — see `lib/caught-up.ts` |
-| Last refreshed window (`nofrills.lastRefreshedPeriod`) | AsyncStorage, via `lib/storage.ts` | A single `"<date>-<morning\|noon\|night>"` string, overwritten in place | Same shape and the same rule as the row above: a marker, not a log. Only the current window is kept, so it can't accumulate into a record of when you opened the app. It persists because it was memory-only, which meant every cold launch read `null` and forced a full cache-bypassing pull of every national feed — the real cadence was "every cold start", not "3x a day". See `lib/refresh-schedule.ts` |
+| Opened stories (`nofrills.readArticles`) | AsyncStorage, via `lib/storage.ts` | A JSON array of `{ link, readAt }`; 500 entries; 7 days by `readAt`; FIFO oldest-out. Roughly 60 KB at full cap | This one **is** a reading history, and deliberately: its whole job is to remember which stories you opened so they can stay on screen marked read instead of being retired. What keeps it proportionate: links only (public URLs identical for every reader — no title, no team, no timestamp beyond the one that ages it out), a hard cap, a week's life, never transmitted, and cleared by the same Settings action as the article store. Rules in `lib/read-history.ts`, disk half in `lib/read-articles.ts` |
+| Last refreshed window (`nofrills.lastRefreshedPeriod`) | AsyncStorage, via `lib/storage.ts` | A single `"<date>-<morning\|noon\|night>"` string, overwritten in place | A marker, not a log — which is precisely what the row above deliberately isn't, and the contrast is the point: this one has no reason to accumulate. Only the current window is kept, so it can't accumulate into a record of when you opened the app. It persists because it was memory-only, which meant every cold launch read `null` and forced a full cache-bypassing pull of every national feed — the real cadence was "every cold start", not "3x a day". See `lib/refresh-schedule.ts` |
 | Followed-team article store (`nofrills.teamArticles.<key>` per team, plus `nofrills.teamArticles.index`) | AsyncStorage, via `lib/storage.ts` | 60 articles per team; 50 teams (matching the in-memory pool cache's bound); 7 days by age, with undated articles aged from first sight so nothing is immortal; descriptions truncated to ~300 chars on persist; LRU across teams via the index, FIFO by date within a team. Roughly 1–2 MB at full caps | Several sources are rolling windows (a news sitemap is ~48h, an SB Nation feed is ten items), so a thin team's feed was permanently capped at whatever exists *right now*; remembering what was already fetched turns that into a week's accumulation, and gives an offline launch last week's news instead of nothing. **A fetch cache, not a reading history**: entries exist only for teams you follow — the set of keys is derivable from the followed-teams list — never for screens you opened, and the index's per-team `lastUsedAt` is a single overwritten value (the refresh marker's rule, per team). An entry for a since-unfollowed team lingers until LRU eviction or the clear-all in Settings. Rules in `lib/article-retention.ts`, disk half in `lib/article-store.ts` |
 
 All five are written and read only through `lib/storage.ts`, which is the
@@ -286,7 +286,9 @@ table can't silently drift from reality. If a future feature needs
 persistence, it goes through that module, and it gets a row here at the
 same time it gets written, per the rule above. The article store is also
 the reason Settings now carries a "Clear cached articles" action — the
-clear-all that chokepoint was always meant to make possible.
+clear-all that chokepoint was always meant to make possible. That action
+empties the read marks in the same tap, since both are what this device
+remembers about your reading.
 
 None of the five is transmitted off the device, and none contains
 anything identifying — team IDs are ESPN's public identifiers, the same
@@ -294,14 +296,31 @@ for every user who follows that team, the refresh marker is a
 time-of-day bucket the app derives for itself rather than a record of
 anything the user did, and the article store holds public feed metadata
 (titles, links, teasers) identical for every user who follows that team.
+The read marks are links to those same public stories — which ones were
+opened is the point of them, and that is said plainly below rather than
+filed under "nothing identifying".
 
-The caught-up mark is the one persisted value that is *behavioral* rather
-than a preference: it records something about when the app was used, not
-just how it's configured. That's worth naming explicitly rather than
-filing it alongside the other two. What keeps it proportionate is that
-it's a single timestamp replaced on each write — the app can tell "was
-there anything new since your last read", and cannot reconstruct a reading
-history from it, because no prior value survives.
+The read marks are the one persisted value that is *behavioral* rather
+than a preference, and they are the strongest form of it this app has had:
+where the value they replaced was a single overwritten timestamp, this is a
+list of the stories you opened. That's worth naming explicitly rather than
+filing it alongside the others.
+
+It is a list because it has to be. The mark's entire purpose is that a
+story you read stays where it was, marked, instead of dropping out of the
+brief the moment you came back from it — and "which ones" is not a question
+one timestamp can answer. What keeps it proportionate is everything around
+it: each entry is a link and the time it was opened, nothing else; links
+are public URLs, identical for every reader who sees that story, so the
+list says what you opened and nothing about you; it holds at most 500
+entries for at most a week; it never leaves the device; and the "Clear
+cached articles" action in Settings empties it along with the article
+store.
+
+The mark it replaced (`nofrills.lastCaughtUpAt`, a single timestamp of when
+you last reached the end of a brief) is gone. Nothing reads it any more, so
+`hydrateReadArticles` deletes the key once on first run rather than leaving
+a value on disk that no code can explain.
 
 ### Format change: followed teams became league-qualified
 

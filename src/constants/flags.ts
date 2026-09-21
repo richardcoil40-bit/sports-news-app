@@ -12,9 +12,9 @@
  */
 
 /**
- * The finishable session: a brief of what's new since you last looked,
- * ending in a "you're caught up" line, with rumors/takes and older stories
- * collapsed beneath it.
+ * The finishable session: a brief of the last two days of reported news,
+ * opened stories marked read in place, ending in a finish line with
+ * rumors/takes and older stories collapsed beneath it.
  *
  * Off, the home screen is exactly what it was before — one endless
  * chronological feed. Everything else added alongside it (the claim
