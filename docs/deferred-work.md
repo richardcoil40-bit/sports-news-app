@@ -381,8 +381,8 @@ the conditional dateline separator, brief sectioning under a team filter,
 Cheaper than the above and worth more per hour, because the runner already
 exists — these are plain TypeScript the current Vitest setup would run today:
 
-`refresh-schedule.ts` (191 lines), `multi-team-feed.ts`, `article-store.ts`,
-`favorites.ts`, `team-slug.ts`, `source-balance.ts`, `caught-up.ts`,
+`refresh-schedule.ts` (153 lines), `multi-team-feed.ts`, `article-store.ts`,
+`favorites.ts`, `team-slug.ts`, `source-balance.ts`, `read-articles.ts`,
 `storage.ts`, `source-tier.ts`, `format.ts`.
 
 (Seven others — `roster.ts`, `schedule.ts`, `team-color.ts`,

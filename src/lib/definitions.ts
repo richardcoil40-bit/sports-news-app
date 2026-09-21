@@ -92,16 +92,20 @@ export const DEFINITION_SECTIONS: DefinitionSection[] = [
         body: 'How many other outlets ran the same story. One story takes one slot; tap the line to see who else has it.',
       },
       {
-        term: "You're caught up",
-        body: 'The end of what has arrived since you last reached this line. Everything older is still below it, not deleted.',
+        term: 'End of the brief',
+        body: 'Where the last two days of reported news ends. Stories you\u2019ve opened stay in place and are marked read; nothing moves out of the brief because you looked at it.',
+      },
+      {
+        term: 'Read',
+        body: 'You opened this story. It stays where it was \u2014 the mark is so you can find your place, not a reason to hide it.',
       },
       {
         term: 'Rumors & takes',
-        body: 'Speculation and opinion from the same stretch of time, kept out of the main list but one tap away.',
+        body: 'Speculation and opinion from the same two days, kept out of the main list but one tap away.',
       },
       {
         term: 'Earlier',
-        body: 'Everything from before the current brief, plus anything the brief was too long to show.',
+        body: 'Everything older than two days, plus unread stories the brief was too long to show.',
       },
     ],
   },

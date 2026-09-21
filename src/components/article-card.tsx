@@ -20,6 +20,16 @@ export function ArticleCard({
    * where it would just repeat the header.
    */
   tagLabel,
+  /**
+   * Whether the reader has opened this story. Where tagLabel says what the
+   * story is about, this says what the reader has *done* with it — a third
+   * vocabulary, and deliberately a colourless one. The palette keeps its
+   * two accents apart on purpose (see the note in theme.ts: brick red is
+   * links and the outbound CTA, teal is a control actively narrowing
+   * something), so a third meaning gets no hue at all: the headline drops
+   * to the secondary ink and the meta line gains a word.
+   */
+  read,
   duplicates,
   onOpenDuplicate,
   /**
@@ -33,6 +43,7 @@ export function ArticleCard({
   article: Article;
   onPress: () => void;
   tagLabel?: string;
+  read?: boolean;
   claimType: ClaimType;
   onPressClaim?: (type: ClaimType) => void;
   /**
@@ -110,7 +121,10 @@ export function ArticleCard({
             {article.source}
           </ThemedText>
         </View>
-        <ThemedText numberOfLines={3} style={styles.title}>
+        <ThemedText
+          numberOfLines={3}
+          themeColor={read ? 'textSecondary' : undefined}
+          style={styles.title}>
           {article.title}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
@@ -123,7 +137,13 @@ export function ArticleCard({
             still lands here. article.tsx guards the same pair the same way.
           */}
           {article.publishedAt ? `${formatRelativeTime(article.publishedAt)} · ` : ''}
+          {/*
+            Appended to the tier rather than given a chip of its own: the
+            two chips above are judgments about the story, and a third
+            block would read as a third one. The style already uppercases.
+          */}
           {tierLabel(article.tier)}
+          {read ? ' · Read' : ''}
         </ThemedText>
 
         {/*
@@ -145,6 +165,10 @@ export function ArticleCard({
           </TouchableOpacity>
         ) : null}
 
+        {/*
+          The rows inside are a list of who else ran the story, not cards —
+          so they carry no read mark even when one has been opened.
+        */}
         {expanded
           ? duplicates?.map((duplicate) => (
               <TouchableOpacity

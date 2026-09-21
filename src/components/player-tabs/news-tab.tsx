@@ -5,6 +5,7 @@ import { playerTabStyles } from '@/components/player-tabs/shared';
 import { Centered, Separator, tabStyles } from '@/components/team-tabs/shared';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { useReadArticles } from '@/hooks/use-read-articles';
 import { ClaimType, Classified } from '@/lib/claim-type';
 import { Article } from '@/lib/feeds';
 
@@ -21,6 +22,9 @@ export function NewsTab({
   error: boolean;
   onOpenArticle: (a: Article & { claimType?: ClaimType }) => void;
 }) {
+  // Before the early return below, or the hook order changes with `loading`.
+  const { readLinks } = useReadArticles();
+
   if (loading) {
     return (
       <Centered>
@@ -34,7 +38,12 @@ export function NewsTab({
       data={matches}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
-        <ArticleCard article={item} onPress={() => onOpenArticle(item)} claimType={item.claimType} />
+        <ArticleCard
+          article={item}
+          onPress={() => onOpenArticle(item)}
+          claimType={item.claimType}
+          read={readLinks.has(item.link)}
+        />
       )}
       ItemSeparatorComponent={Separator}
       ListHeaderComponent={

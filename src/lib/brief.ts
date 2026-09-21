@@ -5,7 +5,7 @@ import { Article } from '@/lib/feeds';
  * Splits a feed into a finishable session.
  *
  * The premise: an endless feed can't tell you when you're done, so it never
- * lets you be. The brief is what arrived since you last looked, it ends, and
+ * lets you be. The brief is the last two days of reported news, it ends, and
  * everything else stays reachable behind a deliberate tap.
  *
  *   brief   — reported news in the window. What you came for.
@@ -13,6 +13,16 @@ import { Article } from '@/lib/feeds';
  *   earlier — everything older. Collapsed too.
  *
  * Nothing is hidden; infinite scroll just stops being the default gesture.
+ *
+ * **The window no longer moves on its own.** It used to start at whichever
+ * was later of the current morning/noon/night boundary and the last time
+ * the reader reached the finish line, which meant opening a story and
+ * coming back — a focus, which recomputed the window — dropped everything
+ * that had just been on screen into "earlier". Nothing was deleted and the
+ * reader still watched the feed empty itself several times a day. So the
+ * cutoff is a plain two days now, and the app marks the stories you opened
+ * instead: a read story stays exactly where it is, wearing a mark, and only
+ * unread ones count against the cap. See read-history.ts.
  */
 
 /** Two days back, so returning after a week is a readable brief, not 400 items. */
@@ -21,55 +31,29 @@ export const MAX_BRIEF_AGE_MS = 48 * 60 * 60 * 1000;
 /** Enough to be worth reading, few enough to finish. */
 const DEFAULT_BRIEF_CAP = 12;
 
-export interface BriefWindow {
-  now: Date;
-  /** Start of the current morning/noon/night window. */
-  periodStart: Date;
-  /** When the reader last reached the end of a brief, if ever. */
-  lastCaughtUpAt: Date | null;
-}
-
 /**
- * The moment the brief starts from: the **later** of the period start and
- * the last catch-up.
+ * The moment the brief starts from.
  *
- * An earlier version took whichever was further back, reasoning that
- * re-showing something is a smaller error than hiding it. Running it proved
- * that wrong in a way the reasoning missed: the period start is almost
- * always the earlier of the two, so it always won, and catching up could
- * never shrink the brief. Read everything at 11:30 and come back at 12:00
- * and the whole 11:00 window is still sitting there — the finish line was
- * honest but "since you last looked" never actually engaged.
- *
- * Taking the later of the two hides nothing unseen, because the mark is
- * only written once the reader has reached the end of the brief. It moves
- * forward within a period, and the period start takes over again whenever
- * the mark is older than it — which is what makes a new morning bring back
- * a full window.
- *
- * With no catch-up recorded, the floor does the work: a first launch gets a
- * full two days rather than whatever happens to have landed since the
- * window opened, which at 5:01am would be nothing.
+ * A floor and nothing else. Callers still freeze it per focus rather than
+ * deriving it live (see use-brief.ts), but only so the memo below has a
+ * stable input — there is no longer anything here that could retire a story
+ * while the reader is looking at it.
  */
-export function briefCutoff({ now, periodStart, lastCaughtUpAt }: BriefWindow): Date {
-  const floor = new Date(now.getTime() - MAX_BRIEF_AGE_MS);
-  if (!lastCaughtUpAt) return floor;
-
-  // Clock skew, or a device whose time moved backwards: a mark in the
-  // future would otherwise produce a permanently empty brief.
-  const mark = lastCaughtUpAt.getTime() > now.getTime() ? now : lastCaughtUpAt;
-  const start = new Date(Math.max(periodStart.getTime(), mark.getTime()));
-
-  return start < floor ? floor : start;
+export function briefCutoff(now: Date): Date {
+  return new Date(now.getTime() - MAX_BRIEF_AGE_MS);
 }
 
 export interface BriefSections<T> {
   brief: T[];
   chatter: T[];
   earlier: T[];
-  /** Reported items in the window before the cap, so the marker can be honest. */
+  /** Every reported item in the window, read or not. */
   briefTotal: number;
-  /** True when the cap hid some of them. */
+  /** How many of those are unread, before the cap. */
+  unread: number;
+  /** How many unread ones the cap left room for. */
+  unreadShown: number;
+  /** True when the cap held some unread ones back. */
   truncated: boolean;
 }
 
@@ -88,14 +72,32 @@ function isWithin(article: Splittable, cutoff: Date): boolean {
   return !Number.isNaN(t) && t >= cutoff.getTime();
 }
 
+/**
+ * `isRead` is asked per item rather than read off the article, because
+ * whether a story has been opened is device state that lives in a store
+ * (read-articles.ts) rather than a property of the article — and this file
+ * has to stay free of anything that touches disk or React.
+ *
+ * The cap counts **unread only**. A story you have already read can't push
+ * anything out of the brief: it is occupying a slot you have finished with,
+ * and having it shove a story you haven't seen down into "earlier" would
+ * recreate, one card at a time, exactly the disappearing act this rewrite
+ * removed.
+ */
 export function splitBrief<T extends Splittable>(
   articles: T[],
   cutoff: Date,
+  isRead: (article: T) => boolean,
   cap: number = DEFAULT_BRIEF_CAP,
 ): BriefSections<T> {
-  const reported: T[] = [];
+  const brief: T[] = [];
   const chatter: T[] = [];
   const earlier: T[] = [];
+  const overflow: T[] = [];
+
+  let briefTotal = 0;
+  let unread = 0;
+  let unreadShown = 0;
 
   for (const article of articles) {
     if (!isWithin(article, cutoff)) {
@@ -106,7 +108,7 @@ export function splitBrief<T extends Splittable>(
       case 'rumor':
       case 'take':
         chatter.push(article);
-        break;
+        continue;
       case 'reported':
       // Unlabeled surfaces with reported on purpose: the no-signal pile is
       // mostly ordinary news, and demoting it to chatter would recreate
@@ -114,55 +116,99 @@ export function splitBrief<T extends Splittable>(
       // (see claim-type.ts). The badge's honesty changes; placement
       // doesn't.
       case 'unlabeled':
-        reported.push(article);
         break;
       default:
         // Exhaustiveness: a fifth ClaimType must decide its routing here.
         article.claimType satisfies never;
-        reported.push(article);
+        break;
+    }
+
+    briefTotal += 1;
+
+    if (isRead(article)) {
+      // In place, always. The mark is what tells the reader they've been
+      // here; moving the row as well would make it a retirement with extra
+      // steps.
+      brief.push(article);
+      continue;
+    }
+
+    unread += 1;
+    if (cap < 0 || unreadShown < cap) {
+      unreadShown += 1;
+      brief.push(article);
+    } else {
+      overflow.push(article);
     }
   }
 
-  const briefTotal = reported.length;
-  const brief = cap >= 0 ? reported.slice(0, cap) : reported;
-
-  // The overflow goes to Earlier rather than being dropped. The cap limits
-  // how much the brief *shows*, never how much the app keeps.
-  if (briefTotal > brief.length) earlier.unshift(...reported.slice(brief.length));
+  // The overflow goes to Earlier rather than being dropped, at the front so
+  // it stays ahead of genuinely older news. The cap limits how much the
+  // brief *shows*, never how much the app keeps.
+  if (overflow.length > 0) earlier.unshift(...overflow);
 
   return {
     brief,
     chatter,
     earlier,
     briefTotal,
-    truncated: briefTotal > brief.length,
+    unread,
+    unreadShown,
+    truncated: unread > unreadShown,
   };
 }
 
 /**
  * What the finish line says.
  *
- * Never claims you're caught up when the cap truncated the list — the
- * marker is worth having only if it's true, and one overstatement teaches
- * the reader to stop believing it.
+ * Two lines, because the heading has a job the detail can't do: it is the
+ * thing the reader sees from the corner of their eye, so it must not claim
+ * they are caught up while a dozen unread stories sit one tap below.
+ * "End of the brief" is the honest version of that, and "You're caught up"
+ * is reserved for when it is literally true.
  *
  * `scope` names what is being counted, for when the marker sits over a
  * narrowed list. The counts always come from what is actually on screen, so
- * an unqualified line is never *false* — but "3 stories since you last
- * looked" above one team's feed reads as a claim about the whole feed, and
- * the caller is what knows the difference. Omitted when the reader hasn't
- * narrowed, where naming the scope is noise rather than precision.
+ * an unqualified line is never *false* — but "9 unread of 14 stories" above
+ * one team's feed reads as a claim about the whole feed, and the caller is
+ * what knows the difference. Omitted when the reader hasn't narrowed, where
+ * naming the scope is noise rather than precision.
  */
-export function caughtUpMessage(
+export function briefEndCopy(
   sections: BriefSections<unknown>,
-  periodLabel: string,
   scope?: string,
-): string {
+): { title: string; detail: string } {
   const forScope = scope ? ` for ${scope}` : '';
+
   if (sections.truncated) {
-    return `Showing ${sections.brief.length} of ${sections.briefTotal}${forScope} since ${periodLabel}`;
+    return {
+      title: 'End of the brief',
+      detail: `Showing ${sections.unreadShown} of ${sections.unread} unread${forScope}`,
+    };
   }
-  if (sections.briefTotal === 0) return `Nothing new${forScope} since ${periodLabel}`;
+
+  if (sections.briefTotal === 0) {
+    return {
+      title: "You're caught up",
+      detail: `Nothing new${forScope} in the last two days`,
+    };
+  }
+
+  if (sections.unread === 0) {
+    // Singular reads as a list rather than a sentence — "The 1 story read"
+    // is the shape the plural form wants, and it isn't English.
+    return {
+      title: "You're caught up",
+      detail:
+        sections.briefTotal === 1
+          ? `1 story${forScope}, read`
+          : `All ${sections.briefTotal} stories${forScope} read`,
+    };
+  }
+
   const noun = sections.briefTotal === 1 ? 'story' : 'stories';
-  return `${sections.briefTotal} ${noun}${forScope} since ${periodLabel}`;
+  return {
+    title: 'End of the brief',
+    detail: `${sections.unread} unread of ${sections.briefTotal} ${noun}${forScope}`,
+  };
 }

@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { clearStoredArticles } from '@/lib/article-store';
+import { clearReadArticles } from '@/lib/read-articles';
 
 /**
  * The three things there are to say about this app: which teams it's
@@ -57,15 +58,21 @@ export default function SettingsScreen() {
   const confirmClearArticles = () => {
     Alert.alert(
       'Clear cached articles?',
-      'Removes the stored copies of your followed teams’ recent articles. They rebuild as feeds are fetched again.',
+      'Removes the stored copies of your followed teams’ recent articles and the record of which stories you’ve opened. Articles rebuild as feeds are fetched again.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Clear',
           style: 'destructive',
           onPress: () => {
-            clearStoredArticles()
-              .then((count) =>
+            // Both stores, because both are "what this device remembers
+            // about your reading" — leaving the read marks behind would
+            // make the one clear-all half a clear-all.
+            Promise.all([clearStoredArticles(), clearReadArticles()])
+              // The count is still the article store's — teams are what
+              // that one is keyed by, and "cleared 3 teams" is the part
+              // there is anything to say about.
+              .then(([count]) =>
                 setClearedNote(
                   count === 0 ? 'Nothing was stored' : `Cleared ${count} team${count === 1 ? '' : 's'}`,
                 ),
@@ -112,7 +119,7 @@ export default function SettingsScreen() {
           <View style={styles.rowText}>
             <ThemedText style={styles.rowLabel}>Clear cached articles</ThemedText>
             <ThemedText font="mono" themeColor="textSecondary" style={styles.rowDetail}>
-              {clearedNote ?? 'Stored copies of your teams’ recent articles'}
+              {clearedNote ?? 'Stored articles and what you’ve opened'}
             </ThemedText>
           </View>
         </TouchableOpacity>
