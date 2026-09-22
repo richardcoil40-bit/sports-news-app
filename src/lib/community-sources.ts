@@ -327,13 +327,23 @@ const BIG_TEN_SOURCES_BY_SLUG: Record<string, FeedSource[]> = {
   ],
   washington: [
     SB_NATION('uw-dawg-pound', 'UW Dawg Pound', 'uwdawgpound.com'),
-    // WordPress, and the section feed is the program's own beat: the sports
-    // front gave six articles against this one's 29, because Seattle has
-    // two pro teams that outproduce the Huskies in the offseason.
+    // WordPress, and a UW section rather than the sports front: that front
+    // gave six articles against this section's 29, because Seattle has two
+    // pro teams that outproduce the Huskies in the offseason.
+    //
+    // This was `uw-husky-football` until that section was retired, some time
+    // between 2026-08-25 and 2026-09-21 — and it failed in the one way this
+    // app works hardest to tell apart from a quiet publisher: WordPress
+    // serves an empty but well-formed feed for a category it no longer has,
+    // so the URL answered 200 with zero items for a month while the page
+    // behind it 404'd. `uw-huskies` is the surviving section and carries the
+    // same 35 items the old one did. It spans every UW sport rather than
+    // football alone, which `scope: 'broad'` already handles — team matching
+    // and off-sport.ts filter it the way they do any broad source.
     {
       id: 'seattle-times',
       name: 'The Seattle Times',
-      url: 'https://www.seattletimes.com/sports/uw-husky-football/feed/',
+      url: 'https://www.seattletimes.com/sports/uw-huskies/feed/',
       tier: 1,
       scope: 'broad',
     },
