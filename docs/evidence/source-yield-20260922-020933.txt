@@ -1,0 +1,107 @@
+Source yield report — Big Ten only
+  generated  2026-09-22 02:09:33 UTC
+  commit     516ede8 (seattle-times-section-renamed)
+  script     node scripts/review/yield.mjs big-ten
+
+  Run to confirm the Seattle Times section change contributes: the
+  entry moved from the retired uw-husky-football section to uw-huskies.
+
+  ⚠ The five Lee/TownNews sources reading 0 → 0 → 0 below are an
+    artifact of this run, not dead sources. scripts/check-feeds.sh had
+    just swept all 98 sources, and these hosts rate-limit a non-browser
+    User-Agent hard: minutes later, madison.com answered 200 with 50
+    items to the same default-UA request that had just returned 429.
+    The 2026-08-25 report has The News-Gazette at 50 → 33 → 32.
+    Leave a gap between the two sweeps, or read their zeros as unknown.
+
+(node:47439) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/rijo/Documents/sports-news-app/src/lib/feeds.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/rijo/Documents/sports-news-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+## Big Ten
+
+Illinois — 9 articles
+    The Champaign Room           team             10 →  10 →   9   90%
+    The News-Gazette             broad/beat        0 →   0 →   0      
+        source failed — check-feeds.sh territory, not this report
+
+Indiana — 23 articles
+    The Crimson Quarry           team             10 →  10 →   9   90%
+    The Indianapolis Star        broad/beat       68 →  19 →  14   21%
+
+Iowa — 17 articles
+    Black Heart Gold Pants       team             10 →  10 →   8   80%
+    The Des Moines Register      broad/beat       11 →   9 →   9   82%
+
+Maryland — 4 articles
+    Testudo Times                team             10 →  10 →   4   40%
+
+Michigan — 27 articles
+    Maize n Brew                 team             10 →  10 →  10  100%
+    MLive                        broad/beat       50 →  17 →  17   34%
+
+Michigan St — 13 articles
+    The Only Colors              team             10 →  10 →   9   90%
+    MLive                        broad/beat       50 →   4 →   4    8%
+
+Minnesota — 10 articles
+    The Daily Gopher             team             10 →  10 →   9   90%
+    Star Tribune                 broad/beat       10 →   5 →   1   10%
+
+Nebraska — 9 articles
+    Corn Nation                  team             10 →  10 →   9   90%
+    Lincoln Journal Star         broad/beat        0 →   0 →   0      
+        source failed — check-feeds.sh territory, not this report
+    Omaha World-Herald           broad/beat        0 →   0 →   0      
+        source failed — check-feeds.sh territory, not this report
+    Daily Nebraskan              broad/beat        0 →   0 →   0      
+        source failed — check-feeds.sh territory, not this report
+
+Northwestern — 8 articles
+    Inside NU                    team             10 →  10 →   8   80%
+
+Ohio State — 23 articles
+    Land-Grant Holy Land         team             10 →  10 →  10  100%
+    Eleven Warriors              team             10 →  10 →   9   90%
+    Cleveland.com                broad/beat       50 →   5 →   4    8%
+
+Oregon — 29 articles
+    Addicted To Quack            team             10 →  10 →   7   70%
+    OregonLive                   broad/beat       50 →  22 →  22   44%
+
+Penn State — 18 articles
+    Black Shoe Diaries           team             10 →  10 →  10  100%
+    PennLive                     broad/beat       50 →   9 →   8   16%
+
+Purdue — 13 articles
+    Hammer and Rails             team             10 →  10 →  10  100%
+    Journal & Courier            broad/beat        5 →   4 →   3   60%
+
+Rutgers — 7 articles
+    On the Banks                 team             10 →  10 →   6   60%
+    NJ.com                       broad/beat       50 →   1 →   1    2%
+
+UCLA — 26 articles
+    Los Angeles Times            broad/beat       60 →  30 →  26   43%
+
+USC — 28 articles
+    Los Angeles Times            broad/beat       60 →  28 →  28   47%
+
+Washington — 35 articles
+    UW Dawg Pound                team             10 →  10 →  10  100%
+    The Seattle Times            broad/beat       35 →  31 →  25   71%
+
+Wisconsin — 8 articles
+    Bucky's 5th Quarter          team             10 →  10 →   8   80%
+    Wisconsin State Journal      broad/beat        0 →   0 →   0      
+        source failed — check-feeds.sh territory, not this report
+
+
+## Below the floor
+
+Every team ends at 3 or more.
+
+## Naming gaps
+
+None — every live broad source named its team at least once.
