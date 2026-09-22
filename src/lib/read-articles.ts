@@ -40,7 +40,33 @@ let entries: ReadEntry[] = [];
  * `readLinks.has(article.link)`.
  */
 let readLinks: ReadonlySet<string> = new Set();
+
+/**
+ * Whether in-memory state has been established — by a disk read, or by a
+ * clear, which establishes it just as definitively. Everything that could
+ * overwrite `entries` from disk checks this first.
+ */
 let hydrated = false;
+
+/**
+ * The in-flight disk read, shared rather than issued per caller.
+ *
+ * The `hydrated` flag alone is not enough, because it can only be set
+ * *after* an await: two callers arriving in the same tick both passed the
+ * guard and both read, and whichever resolved second reassigned `entries`
+ * from disk — discarding a mark written in between. That is reachable on a
+ * cold launch where the article screen mounts before the home tab's read
+ * comes back (a deep link, or a tap on a restored screen): the mark landed
+ * on disk and then vanished from memory until the next launch, so the card
+ * read unread while the file said otherwise.
+ *
+ * `refresh-schedule.ts` holds its persisted marker the same way and for the
+ * same reason — see the note on `loadLastRefreshedKey`. `favorites.ts` has
+ * the same pre-await guard and is safe only because nothing writes to it
+ * during hydration; this is the first store here with a writer racing its
+ * own read.
+ */
+let hydration: Promise<void> | null = null;
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -73,24 +99,35 @@ async function persist() {
 }
 
 /**
- * Loads the marks into memory. Safe to call more than once — later calls
- * are no-ops, so the home screen, a team screen and the article screen
- * don't have to coordinate over who hydrates first.
+ * Loads the marks into memory. Safe to call more than once, and from
+ * several screens at once — later callers await the first call's read
+ * rather than issuing their own, so the home screen, a team screen and the
+ * article screen don't have to coordinate over who hydrates first.
  */
-export async function hydrateReadArticles(): Promise<void> {
-  if (hydrated) return;
+export function hydrateReadArticles(): Promise<void> {
+  hydration ??= loadFromDisk();
+  return hydration;
+}
 
+async function loadFromDisk(): Promise<void> {
   const raw = await readValue(READ_KEY);
-  entries = pruneReadEntries(parseReadEntries(raw), Date.now());
-  snapshot();
 
-  hydrated = true;
+  // Nothing may overwrite state that was established while this read was in
+  // flight. In practice that is a clear-all from Settings — a deliberate act
+  // by the reader, against what is by then a stale copy of the file it just
+  // removed. Losing that argument would put every mark back until relaunch.
+  if (!hydrated) {
+    entries = pruneReadEntries(parseReadEntries(raw), Date.now());
+    snapshot();
+    hydrated = true;
+
+    // Write the pruned list back so expiry runs once rather than on every
+    // launch. Skipped when nothing changed, so an ordinary launch doesn't
+    // touch disk, and not awaited: losing it costs one repeated prune.
+    if (raw && raw !== JSON.stringify(entries)) persist();
+  }
+
   emit();
-
-  // Write the pruned list back so expiry runs once rather than on every
-  // launch. Skipped when nothing changed, so an ordinary launch doesn't
-  // touch disk, and not awaited: losing it costs one repeated prune.
-  if (raw && raw !== JSON.stringify(entries)) persist();
 
   // One-time tidy, fire and forget. A failure costs a stale key nothing
   // reads.
@@ -123,10 +160,18 @@ export async function markArticleRead(link: string): Promise<void> {
   persist();
 }
 
-/** Drops every mark. Wired to the clear-all in Settings. */
+/**
+ * Drops every mark. Wired to the clear-all in Settings.
+ *
+ * Counts as hydration, so a read still in flight can't repopulate what this
+ * just emptied, and a later `hydrateReadArticles()` doesn't go back to disk
+ * for a key that is no longer there.
+ */
 export async function clearReadArticles(): Promise<void> {
   entries = [];
   readLinks = new Set();
+  hydrated = true;
+  hydration ??= Promise.resolve();
   emit();
   await removeValue(READ_KEY);
 }
