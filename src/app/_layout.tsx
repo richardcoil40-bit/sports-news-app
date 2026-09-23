@@ -174,6 +174,7 @@ export default function RootLayout() {
           <Stack.Screen name="article" />
           <Stack.Screen name="team/[id]" />
           <Stack.Screen name="player/[id]" />
+          <Stack.Screen name="game/[id]" />
         </Stack>
       </ThemeProvider>
     </ErrorBoundary>

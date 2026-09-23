@@ -7,6 +7,7 @@ import { ArticleCard } from '@/components/article-card';
 import { CaughtUpMarker } from '@/components/caught-up-marker';
 import { CollapsibleSectionHeader } from '@/components/collapsible-section';
 import { DropdownPill, type DropdownOption } from '@/components/dropdown-pill';
+import { LiveTicker } from '@/components/live-ticker';
 import { SettingsButton } from '@/components/settings-button';
 import { Logo } from '@/components/logo';
 import { ThemedText } from '@/components/themed-text';
@@ -14,6 +15,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BRIEF_MODE, TRUST_LABELS } from '@/constants/flags';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useFeed } from '@/hooks/use-feed';
+import { useLiveGames } from '@/hooks/use-live-games';
 import { useReadArticles } from '@/hooks/use-read-articles';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -55,6 +57,10 @@ export default function FeedScreen() {
     hasFollowedTeams,
     ready,
   } = useFeed();
+  // The one instance of the live-games poll, fed the followed teams the
+  // feed already resolved rather than resolving them again. It polls only
+  // while a followed game is on and this screen's app is in the foreground.
+  const { games: liveGames, checkedAt } = useLiveGames(followedTeams);
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
   // `null` is "all teams" — the default, and deliberately a different
   // value from an explicit empty selection. The two look identical as a
@@ -379,6 +385,25 @@ export default function FeedScreen() {
             numberOfLines={1}>
             {subtitle}
           </ThemedText>
+
+          {/*
+            Between whose news this is and the controls that narrow it:
+            a followed team's game today is the most time-bound thing on
+            the screen, so it sits above everything that scrolls. Absent
+            entirely when nobody you follow is playing.
+          */}
+          {hasFollowedTeams ? (
+            <LiveTicker
+              games={liveGames}
+              checkedAt={checkedAt}
+              onOpen={(game) =>
+                router.push({
+                  pathname: '/game/[id]',
+                  params: { id: game.id, leagueId: game.leagueId, teamId: game.followedTeamId },
+                })
+              }
+            />
+          ) : null}
 
           {/*
             Which teams, then what kind of claim — scope above refinement,
