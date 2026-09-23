@@ -20,9 +20,11 @@
  * answer now is the one the reader can check for themselves: have I opened
  * this? The older split is in git history if it is ever wanted back.
  *
- * The feed stays bounded without a window: the on-device store ages
- * articles out after a week and keeps at most 60 per team (see
- * article-retention.ts).
+ * The feed is bounded before it gets here, not by this file: screens cap
+ * what they show at a week (`withinFeedWindow` in article-retention.ts).
+ * The store's own week and 60-per-team limits are not enough on their own —
+ * they govern what is persisted, and a live feed can keep serving a story
+ * for months.
  */
 
 export interface BriefSections<T> {

@@ -10,6 +10,7 @@ import {
   parseStoredArticles,
   touchIndex,
   truncateDescription,
+  withinFeedWindow,
 } from '@/lib/article-retention';
 import { Article } from '@/lib/feeds';
 
@@ -153,6 +154,35 @@ describe('mergeWithStored', () => {
     expect(nextStored).toHaveLength(MAX_ARTICLES_PER_TEAM);
     // Newest survive the trim.
     expect(nextStored[0].link).toBe('https://a.test/0');
+  });
+});
+
+describe('withinFeedWindow', () => {
+  it('keeps a week and drops anything older', () => {
+    const fresh = article('fresh', { publishedAt: iso(1 * DAYS) });
+    const edge = article('edge', { publishedAt: iso(7 * DAYS) });
+    const stale = article('stale', { publishedAt: iso(7 * DAYS + 60_000) });
+    const january = article('january', { publishedAt: '2026-01-13T15:00:00.000Z' });
+
+    expect(withinFeedWindow([fresh, edge, stale, january], NOW).map((a) => a.link)).toEqual([
+      'fresh',
+      'edge',
+    ]);
+  });
+
+  // An undated item is a date that failed to parse at least as often as a
+  // publisher that sent none. Dropping it hid a whole source once already.
+  it('keeps undated and unparseable articles', () => {
+    const undated = article('undated', { publishedAt: null });
+    const garbled = article('garbled', { publishedAt: 'not a date' });
+
+    expect(withinFeedWindow([undated, garbled], NOW)).toEqual([undated, garbled]);
+  });
+
+  it('keeps the input order', () => {
+    const items = ['c', 'a', 'b'].map((link, n) => article(link, { publishedAt: iso(n * DAYS) }));
+
+    expect(withinFeedWindow(items, NOW).map((a) => a.link)).toEqual(['c', 'a', 'b']);
   });
 });
 
