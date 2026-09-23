@@ -59,3 +59,29 @@ export const KEEP_MIXED_SPORT_ROUNDUPS = true;
  * branch it isn't taking — `source-balance.ts` and its callers included.
  */
 export const BALANCE_SOURCES = false;
+
+/**
+ * Whether the app shows its trust labels.
+ *
+ * Claim and tier are the "two axes of honesty" `claim-type.ts` describes:
+ * is this particular claim credible, and is the source reliable. On, the
+ * app shows both — the solid REPORTED / RUMOR / TAKE / UNLABELED chip on
+ * every row and on the article screen, the NEWSROOM / COMMUNITY / UNRATED
+ * word in the row's meta line, the claim filter on the home and team
+ * screens, and Settings → Definitions, the glossary for those words.
+ *
+ * Off because together they were more clutter than signal on a row that
+ * already carries a team, a source and a time. Rendering only:
+ * classification and the verdict service's `/v1/classify` call run either
+ * way, and with the filter hidden the screens' `claimFilter` state can
+ * never leave `'all'`, so everything keyed on it takes its default path.
+ *
+ * If it stays off, the branch to delete is `claimBadgeColors`,
+ * `CLAIM_FILTER_TABS`, `filterByClaimType`, `FilterBar` (the team news tab
+ * is its only caller), `definitions.ts`, the `claimFilter` state on the home
+ * and team screens, and `tierLabel`'s one render site. The classifier
+ * itself would then have no reader on screen — the brief stopped routing
+ * on claim type — and could go too. The verdict call stays regardless: it
+ * also decides relevance (`isRelevantVerdict` in `verdicts.ts`).
+ */
+export const TRUST_LABELS = false;

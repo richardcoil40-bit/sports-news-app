@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { TRUST_LABELS } from '@/constants/flags';
 import { claimBadgeColors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ClaimType, claimTypeLabel } from '@/lib/claim-type';
@@ -58,6 +59,13 @@ export function ArticleCard({
   const [expanded, setExpanded] = useState(false);
   const duplicateCount = duplicates?.length ?? 0;
   const badge = claimBadgeColors(claimType, theme);
+  const metaLine = [
+    article.publishedAt ? formatRelativeTime(article.publishedAt) : '',
+    TRUST_LABELS ? tierLabel(article.tier) : '',
+    read ? 'Read' : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
@@ -86,19 +94,24 @@ export function ArticleCard({
             glance rather than only by reading the word. The hues live in
             claimBadgeColors beside the palette, not here: the article
             screen draws the same badge and the two must not drift.
+
+            Hidden while TRUST_LABELS is off (constants/flags.ts). The prop
+            stays wired so flipping the flag brings it back unchanged.
           */}
-          <TouchableOpacity
-            onPress={() => onPressClaim?.(claimType)}
-            disabled={!onPressClaim}
-            activeOpacity={0.6}
-            accessibilityRole={onPressClaim ? 'button' : undefined}
-            accessibilityLabel={`${claimTypeLabel(claimType)} — filter by this`}
-            hitSlop={6}
-            style={[styles.claimChip, { backgroundColor: badge.background }]}>
-            <ThemedText font="mono" style={[styles.chipText, { color: badge.text }]}>
-              {claimTypeLabel(claimType)}
-            </ThemedText>
-          </TouchableOpacity>
+          {TRUST_LABELS ? (
+            <TouchableOpacity
+              onPress={() => onPressClaim?.(claimType)}
+              disabled={!onPressClaim}
+              activeOpacity={0.6}
+              accessibilityRole={onPressClaim ? 'button' : undefined}
+              accessibilityLabel={`${claimTypeLabel(claimType)} — filter by this`}
+              hitSlop={6}
+              style={[styles.claimChip, { backgroundColor: badge.background }]}>
+              <ThemedText font="mono" style={[styles.chipText, { color: badge.text }]}>
+                {claimTypeLabel(claimType)}
+              </ThemedText>
+            </TouchableOpacity>
+          ) : null}
 
           {/*
             Outlined rather than solid, so the two chips don't compete. The
@@ -127,24 +140,25 @@ export function ArticleCard({
           style={styles.title}>
           {article.title}
         </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
-          {/*
-            Separator is conditional because formatRelativeTime returns '' for
-            a null date, and an unconditional ` · ` renders the tier with a
-            leading bullet and nothing before it. A tester caught it on Eleven
-            Warriors, whose dates parsed to null until parsePubDate learned its
-            format — the cause is fixed, but any item with no <pubDate> at all
-            still lands here. article.tsx guards the same pair the same way.
-          */}
-          {article.publishedAt ? `${formatRelativeTime(article.publishedAt)} · ` : ''}
-          {/*
-            Appended to the tier rather than given a chip of its own: the
-            two chips above are judgments about the story, and a third
-            block would read as a third one. The style already uppercases.
-          */}
-          {tierLabel(article.tier)}
-          {read ? ' · Read' : ''}
-        </ThemedText>
+        {/*
+          Joined from whichever parts are present, because any of them
+          can be missing: formatRelativeTime returns '' for a null date,
+          the tier is off with TRUST_LABELS, and Read only applies once
+          opened. Fixed separators rendered a leading bullet with nothing
+          before it — a tester caught it on Eleven Warriors, whose dates
+          parsed to null until parsePubDate learned its format, and any
+          item with no <pubDate> at all still has no date. With all three
+          absent, the line is left out rather than drawn empty.
+
+          Read is a word here rather than a chip of its own: the chips
+          above are judgments about the story, and a third block would
+          read as a third one. The style already uppercases.
+        */}
+        {metaLine ? (
+          <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
+            {metaLine}
+          </ThemedText>
+        ) : null}
 
         {/*
           On its own line rather than appended to the meta above: that line
