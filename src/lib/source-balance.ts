@@ -1,3 +1,4 @@
+import { BALANCE_SOURCES } from '@/constants/flags';
 import { Article } from '@/lib/feeds';
 
 /**
@@ -35,6 +36,9 @@ export function balanceBySource<T extends Pick<Article, 'source'>>(
   articles: T[],
   options?: { windowSize?: number; maxPerWindow?: number },
 ): T[] {
+  // Switched off in constants/flags.ts: feeds render strictly newest first.
+  if (!BALANCE_SOURCES) return articles;
+
   const windowSize = options?.windowSize ?? DEFAULT_WINDOW_SIZE;
   const maxPerWindow = options?.maxPerWindow ?? DEFAULT_MAX_PER_WINDOW;
 
