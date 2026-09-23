@@ -3,7 +3,7 @@ import { list, num, str } from '@/lib/espn-raw';
 import { DriveOutcome, driveOutcome, GameState, LiveCompetitor, parseDriveDescription } from '@/lib/game';
 import { fetchWithTimeout } from '@/lib/http';
 import { espnCacheKey, espnSitePath, League } from '@/lib/leagues';
-import { parseSides, parseState, RawStatus } from '@/lib/scoreboard';
+import { parseNetwork, parseSides, parseState, RawStatus } from '@/lib/scoreboard';
 
 export interface SummaryPlay {
   id: string;
@@ -42,6 +42,9 @@ export interface WinProbPoint {
 
 export interface GameHeader {
   state: GameState;
+  /** ISO kickoff, for the pre-game view. */
+  startDate: string | null;
+  network: string | null;
   statusDetail: string;
   completed: boolean;
   period: number | null;
@@ -135,13 +138,20 @@ function parseDrive(raw: RawDrive | null, current: boolean): SummaryDrive | null
 }
 
 function parseHeader(raw: RawSummary['header']): GameHeader | null {
-  const competition = list<{ competitors?: unknown; status?: RawStatus | null } | null>(raw?.competitions)[0];
+  const competition = list<{
+    competitors?: unknown;
+    status?: RawStatus | null;
+    date?: unknown;
+    broadcasts?: unknown;
+  } | null>(raw?.competitions)[0];
   if (!competition) return null;
   const sides = parseSides(competition.competitors);
   if (!sides) return null;
   const status = competition.status;
   return {
     state: parseState(status?.type),
+    startDate: str(competition.date),
+    network: parseNetwork(competition),
     statusDetail: str(status?.type?.shortDetail) ?? str(status?.type?.detail) ?? '',
     completed: status?.type?.completed === true,
     period: num(status?.period),

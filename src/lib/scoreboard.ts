@@ -134,7 +134,7 @@ export function parseState(type: RawStatus['type']): GameState {
   return type?.completed === true ? 'post' : 'pre';
 }
 
-function parseNetwork(competition: RawCompetition): string | null {
+export function parseNetwork(competition: { broadcasts?: unknown; geoBroadcasts?: unknown }): string | null {
   const broadcasts = list<{ media?: { shortName?: unknown } | null; names?: unknown } | null>(competition.broadcasts);
   const geo = list<{ media?: { shortName?: unknown } | null } | null>(competition.geoBroadcasts);
   // The scoreboard carries `names: ["FOX"]`; the team schedule endpoint

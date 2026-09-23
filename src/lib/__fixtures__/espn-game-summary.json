@@ -1,5 +1,5 @@
 {
-  "header": {"competitions":[{"status":{"type":{"state":"post","completed":true,"detail":"Final/OT","shortDetail":"Final/OT"}},"competitors":[{"homeAway":"home","score":"33","team":{"id":"12","abbreviation":"KC","location":"Kansas City","displayName":"Kansas City Chiefs"}},{"homeAway":"away","score":"30","team":{"id":"11","abbreviation":"IND","location":"Indianapolis","displayName":"Indianapolis Colts"}}]}]},
+  "header": {"competitions":[{"date":"2026-09-21T00:20Z","broadcasts":[{"media":{"shortName":"NBC"}}],"status":{"type":{"state":"post","completed":true,"detail":"Final/OT","shortDetail":"Final/OT"}},"competitors":[{"homeAway":"home","score":"33","team":{"id":"12","abbreviation":"KC","location":"Kansas City","displayName":"Kansas City Chiefs"}},{"homeAway":"away","score":"30","team":{"id":"11","abbreviation":"IND","location":"Indianapolis","displayName":"Indianapolis Colts"}}]}]},
   "drives": {
     "previous": [
       {

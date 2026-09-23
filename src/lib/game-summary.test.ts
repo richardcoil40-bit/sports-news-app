@@ -10,6 +10,8 @@ describe('parseGameSummary on a real game', () => {
   it('reads the header', () => {
     expect(summary.header).toEqual({
       state: 'post',
+      startDate: '2026-09-21T00:20Z',
+      network: 'NBC',
       statusDetail: 'Final/OT',
       completed: true,
       period: null,

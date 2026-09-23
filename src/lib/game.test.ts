@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  cleanPlayText,
   driveOutcome,
   inTickerWindow,
   isClockEvent,
@@ -177,5 +178,23 @@ describe('kickoffLabel', () => {
     expect(later.length).toBeGreaterThan(today.length);
     expect(later.endsWith(today)).toBe(true);
     expect(kickoffLabel('nope', KICKOFF)).toBe('');
+  });
+});
+
+describe('cleanPlayText', () => {
+  it.each([
+    [
+      '(Shotgun) P.Mahomes pass short middle to R.Rice to IND 23 for 31 yards (C.Taylor-Britt; H.Wohler).',
+      'P.Mahomes pass short middle to R.Rice to IND 23 for 31 yards.',
+    ],
+    ['(No Huddle, Shotgun) D.Jones sacked at IND 30 for -5 yards (G.Karlaftis).', 'D.Jones sacked at IND 30 for -5 yards.'],
+    ['J.Taylor right tackle to KC 1 for no gain (D.Tranquill).', 'J.Taylor right tackle to KC 1 for no gain.'],
+    // Plays with no clutter, and parentheticals that aren't tacklers, are left alone.
+    ['H.Butker 45 yard field goal is GOOD, Center-J.Winchester, Holder-M.Araiza.', 'H.Butker 45 yard field goal is GOOD, Center-J.Winchester, Holder-M.Araiza.'],
+    ['PENALTY on KC-J.Smith, False Start, 5 yards, enforced at KC 25 - No Play.', 'PENALTY on KC-J.Smith, False Start, 5 yards, enforced at KC 25 - No Play.'],
+    ['END QUARTER 4', 'END QUARTER 4'],
+    ['', ''],
+  ])('%j', (raw, clean) => {
+    expect(cleanPlayText(raw)).toBe(clean);
   });
 });

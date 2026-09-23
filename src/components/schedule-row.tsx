@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -11,12 +11,27 @@ function moneylineLabel(value: number | null): string {
   return value > 0 ? `+${value}` : `${value}`;
 }
 
-export function ScheduleRow({ game }: { game: ScheduledGame }) {
+/**
+ * `onPress` is passed only for a game close enough to now that its game
+ * screen has something to show — see `isRecentOrUpcoming`. Every other row
+ * stays inert rather than opening an empty screen for a game in November.
+ */
+export function ScheduleRow({ game, onPress }: { game: ScheduledGame; onPress?: () => void }) {
   const theme = useTheme();
   const vsAt = game.homeAway === 'away' ? '@' : game.homeAway === 'neutral' ? 'vs' : 'vs';
+  const Container = onPress ? TouchableOpacity : View;
 
   return (
-    <View style={styles.container}>
+    <Container
+      style={styles.container}
+      {...(onPress
+        ? {
+            onPress,
+            activeOpacity: 0.6,
+            accessibilityRole: 'button' as const,
+            accessibilityLabel: `${vsAt} ${game.opponentShortName}. Open the game.`,
+          }
+        : {})}>
       <View style={styles.row}>
         {game.opponentLogoUrl ? (
           <Image source={{ uri: game.opponentLogoUrl }} style={styles.logo} contentFit="contain" />
@@ -31,6 +46,7 @@ export function ScheduleRow({ game }: { game: ScheduledGame }) {
           <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
             {game.statusDetail || 'Date TBD'}
             {game.network ? ` · ${game.network}` : ''}
+            {onPress ? ' · Game day ›' : ''}
           </ThemedText>
         </View>
       </View>
@@ -52,7 +68,7 @@ export function ScheduleRow({ game }: { game: ScheduledGame }) {
           </ThemedText>
         </View>
       ) : null}
-    </View>
+    </Container>
   );
 }
 

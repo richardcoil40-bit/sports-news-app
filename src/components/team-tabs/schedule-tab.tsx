@@ -4,6 +4,7 @@ import { AccentRow } from '@/components/accent-row';
 import { ScheduleRow } from '@/components/schedule-row';
 import { Centered, Separator, tabStyles } from '@/components/team-tabs/shared';
 import { ThemedText } from '@/components/themed-text';
+import { isRecentOrUpcoming } from '@/lib/game';
 import { ScheduledGame } from '@/lib/schedule';
 
 export function ScheduleTab({
@@ -11,12 +12,18 @@ export function ScheduleTab({
   loading,
   error,
   accentColor,
+  checkedAt,
+  onOpenGame,
 }: {
   games: ScheduledGame[] | null;
+  /** When `games` was fetched — which game is today's is judged against it. */
+  checkedAt: number;
   loading: boolean;
   error: boolean;
   accentColor: string | null;
+  onOpenGame?: (game: ScheduledGame) => void;
 }) {
+
   if (loading && !games) {
     return (
       <Centered>
@@ -31,7 +38,10 @@ export function ScheduleTab({
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
         <AccentRow color={accentColor}>
-          <ScheduleRow game={item} />
+          <ScheduleRow
+            game={item}
+            onPress={onOpenGame && isRecentOrUpcoming(item.date, checkedAt) ? () => onOpenGame(item) : undefined}
+          />
         </AccentRow>
       )}
       ItemSeparatorComponent={Separator}

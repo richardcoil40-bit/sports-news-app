@@ -441,3 +441,68 @@ whose deadline is set by someone else:
   rather than silently falling back to a toolchain nobody chose.
 - The issue carries the rollback: re-pin and rebuild, one relationship on
   the workflow.
+
+## Live games: what the first version left out
+
+The ticker and the game screen (2026-09-22) are client-only: ESPN's free
+scoreboard and summary endpoints, polled in the foreground, with nothing
+new on the Worker and no spend. Four things were scoped out on purpose, and
+the research behind each is recorded here so it isn't redone.
+
+**Fan reactions under the game.** The question was whether anything like X
+can be read for free. As of 2026-09-22, checked against live endpoints:
+
+| Source | Free read path | Verdict |
+|---|---|---|
+| X | None. Pay-per-read since February 2026 | Out |
+| Reddit | `.json` returns 403 since May 2026. RSS still answers, but rate-limits after one or two requests per IP and Reddit has named it as the next thing to close | Out |
+| Threads | Keyword search needs Meta app review and business verification | Out |
+| Mastodon, Lemmy | Open, but about 40 `#nfl` posts in 3.5 hours; a whole Sunday game thread on Lemmy had 44 comments | Too quiet |
+| Bluesky | Search needs any logged-in account, which is free; custom feeds read with no login. Real NFL chatter, volume during a college slate unmeasured | The only candidate |
+
+The next step is a measurement, not a feature: a script that samples
+Bluesky search through one Saturday slate and reports posts per minute per
+game, committed to `docs/evidence/`. If the volume is real, the read belongs
+on the Worker with an app-owned account and a short Cache API cache, so
+users cost one search per game per minute rather than one each. That route
+would put team names in a query string, which lands in the three-day Workers
+Logs — not personal data, but `data-retention.md` has to say so in the same
+change.
+
+**Push notifications with the same blurbs.** Free to run: Expo's push
+service costs nothing, and a Worker cron on the free plan can poll ESPN
+every minute. The blurbs already exist — `blurbFor` in `catch-up.ts` is
+deterministic, so a notification is the same sentence the screen shows and
+no model call. Two things make it a decision rather than a task:
+
+- **It widens the one-way door above.** Push needs a device token and the
+  list of followed teams stored on the Worker — the first per-device record
+  anywhere off the phone. `data-retention.md` would need its first
+  server-side row: what is stored, for how long, and how it is deleted.
+- **KV's free tier allows 1,000 writes a day**, so game state must be
+  written only when a score or state changes, never per poll.
+
+It is already on the backend's trigger list in the scaling plan.
+
+**Live Activities (the lock-screen score).** `expo-widgets` can draw one,
+but the app can only update it while it is running. Updating it from the
+background needs direct APNs pushes signed with the `.p8` key, from the
+Worker. Real, and after push.
+
+**Fans writing reactions in the app.** App Store guideline 1.2 requires
+filtering, reporting, blocking and a published contact path for any
+user-generated content, plus an identity of some kind, which this app has
+none of. At the current number of users every game thread would be an
+empty room. Revisit when a thread would have people in it; a text-free
+tap-to-react count is the cheap version if something communal is wanted
+sooner.
+
+**Smaller things, recorded so they aren't mistaken for gaps:**
+
+- The "since you looked" marker is in memory. A cold launch mid-game shows
+  the whole game. Persisting it is a `data-retention.md` row and a clear-all
+  hook, worth doing only if testers ask.
+- The in-progress event in `espn-scoreboard.json` is hand-written. Run
+  `node scripts/capture-game-fixture.mjs football/nfl --force` during a live
+  game to replace both fixtures with real in-progress shapes, then re-add
+  the malformed events the README lists.

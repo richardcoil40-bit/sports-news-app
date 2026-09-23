@@ -308,6 +308,18 @@ const LIVE_RULES: Rule[] = [
     },
   },
   {
+    // A first look mid-game has nothing to compare against, so any drive
+    // fact would be one moment picked from the whole game. The standing is
+    // the thing to know; the drives below carry the rest.
+    id: 'standing',
+    when: (ctx) => {
+      if (ctx.hasMarker) return null;
+      const ahead = leader(ctx.now);
+      if (!ahead) return ctx.now.home === 0 ? 'Scoreless so far.' : `It's tied at ${ctx.now.home}.`;
+      return `${nameOf(ctx, ahead)} leads by ${Math.abs(ctx.now.home - ctx.now.away)}.`;
+    },
+  },
+  {
     id: 'lead-change',
     when: (ctx) => {
       if (!ctx.hasMarker) return null;

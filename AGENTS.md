@@ -29,7 +29,8 @@ inventing a new one:
   — same result shape, same order, same tolerate-partial-failure posture
   — with a ceiling on how many run at once. Use it wherever the list
   being mapped grows with the catalog or with what the user follows
-  (`feeds.ts`, `multi-team-feed.ts`, `teams.ts`, `refresh-schedule.ts`).
+  (`feeds.ts`, `multi-team-feed.ts`, `teams.ts`, `refresh-schedule.ts`,
+  `use-live-games.ts`).
   These limits **multiply**: followed teams → source groups → feeds is
   three levels deep, so an unbounded `map` at any one of them is
   hundreds of sockets on one phone. `DEFAULT_CONCURRENCY` (6) is above
@@ -121,6 +122,12 @@ Two habits keep it true:
   Favorites are stored league-qualified precisely so the set of leagues
   worth asking about is known before any network call. `leagueIdsFrom`
   is the one place that derivation lives.
+- **Anything that polls does it in the foreground, only while there is
+  something live.** The ticker (`use-live-games.ts`) reads one scoreboard
+  per followed league every 30 seconds only while a followed game is in
+  progress; the game screen reads its summary every 20 seconds only while
+  it is focused. Backgrounding the app clears every timer. A poll with no
+  end condition is a per-device cost that runs whether anyone is looking.
 - **A per-league `map()` over `getLeagues()` is the smell.** It reads
   as free at two leagues and is forty-five requests at forty-five. If
   something genuinely needs breadth, it should be a picker — see the
