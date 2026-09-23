@@ -575,8 +575,8 @@ Two things to hold onto:
 `src/constants/flags.ts` holds compile-time booleans for changes big
 enough that you'd want to see the app both ways before committing.
 `BRIEF_MODE` is the current one: off, the home screen is the endless
-chronological feed it always was; on, it's the brief with a finish line
-and collapsed sections below.
+chronological feed it always was; on, it's the unread stories with a
+finish line and a collapsed Read section below.
 
 They're JS-only constants on purpose — flipping one is a Metro reload
 rather than a rebuild, so rejecting an idea costs a boolean instead of a

@@ -12,14 +12,13 @@
  */
 
 /**
- * The finishable session: a brief of the last two days of reported news,
- * opened stories marked read in place, ending in a finish line with
- * rumors/takes and older stories collapsed beneath it.
+ * The finishable session: every story you haven't opened, newest first,
+ * ending in a finish line, with the stories you have opened collapsed
+ * beneath it as Read. See `src/lib/brief.ts`.
  *
- * Off, the home screen is exactly what it was before — one endless
- * chronological feed. Everything else added alongside it (the claim
- * labels, the team tags, clustering, the filter) is unaffected either way;
- * this flag governs only the sectioning.
+ * Off, the home screen is one endless chronological feed with read stories
+ * marked in place. Everything else (the team tags, clustering, the filters)
+ * is unaffected either way; this flag governs only the sectioning.
  */
 export const BRIEF_MODE = true;
 

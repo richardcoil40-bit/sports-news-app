@@ -13,7 +13,6 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BRIEF_MODE } from '@/constants/flags';
 import { BottomTabInset, Spacing } from '@/constants/theme';
-import { useBrief } from '@/hooks/use-brief';
 import { useFeed } from '@/hooks/use-feed';
 import { useReadArticles } from '@/hooks/use-read-articles';
 import { useTheme } from '@/hooks/use-theme';
@@ -63,7 +62,6 @@ export default function FeedScreen() {
   // opposite things: one is "you haven't filtered", the other is "you
   // filtered everything out".
   const [teamSelection, setTeamSelection] = useState<string[] | null>(null);
-  const { cutoff } = useBrief();
   // Which stories have been opened. Read off a store rather than the
   // articles themselves, because it is device state that outlives any one
   // fetch — and the same store the team and player screens read, so a story
@@ -181,14 +179,14 @@ export default function FeedScreen() {
     !allTeamsSelected && selectedTeams.length === 1 ? selectedTeams[0].shortName : undefined;
 
   const sections = useMemo(
-    () => splitBrief(visibleArticles, cutoff, (article) => readLinks.has(article.link)),
-    [visibleArticles, cutoff, readLinks],
+    () => splitBrief(visibleArticles, (article) => readLinks.has(article.link)),
+    [visibleArticles, readLinks],
   );
 
   // Which collapsed sections are open. It lives here rather than inside
   // each header because the stories under a header are rows of the list
   // below, not children of it — see CollapsibleSectionHeader. Still only
-  // for as long as this screen is mounted: a remembered "earlier" would
+  // for as long as this screen is mounted: a remembered open "read" would
   // quietly turn the endless feed back on.
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const toggleSection = (id: string) =>
@@ -201,14 +199,14 @@ export default function FeedScreen() {
 
   /**
    * One flat list of rows, rather than a list of the brief plus a footer
-   * holding the other two sections.
+   * holding the Read section.
    *
-   * A FlatList only virtualizes what is in `data`. Chatter and Earlier used
-   * to be `.map()`ed into plain Views inside ListFooterComponent, which
-   * makes the whole of each one a single list item — so opening Earlier
-   * mounted every card in it at once, and `splitBrief` puts most of a
-   * multi-team feed there. Section headers and the finish line are rows of
-   * their own now, and a *closed* section costs exactly one row.
+   * A FlatList only virtualizes what is in `data`. The collapsed sections
+   * used to be `.map()`ed into plain Views inside ListFooterComponent, which
+   * makes the whole of each one a single list item — so opening one mounted
+   * every card in it at once, and after a week of use most of a multi-team
+   * feed has been read. Section headers and the finish line are rows of
+   * their own, and a *closed* section costs exactly one row.
    */
   const rows = useMemo<FeedRow[]>(() => {
     // Each card draws its own top rule instead of leaning on
@@ -219,7 +217,7 @@ export default function FeedScreen() {
       items.map((article, index) => ({
         kind: 'card',
         // Qualified by section, since a link is only unique within one and
-        // all three are now keys in the same list.
+        // every section's keys share the same list.
         key: `${group}:${article.link}`,
         article,
         ruled: index > 0,
@@ -227,14 +225,11 @@ export default function FeedScreen() {
 
     if (!sectioned) return cards('feed', visibleArticles);
 
-    const out: FeedRow[] = cards('brief', sections.brief);
+    const out: FeedRow[] = cards('brief', sections.unread);
     out.push({ kind: 'marker', key: 'caught-up', ...briefEndCopy(sections, briefScope) });
 
-    for (const { id, label, items } of [
-      { id: 'chatter', label: 'rumors & takes', items: sections.chatter },
-      { id: 'earlier', label: 'earlier', items: sections.earlier },
-    ]) {
-      // Omitted rather than rendered as a header reading "0 earlier".
+    for (const { id, label, items } of [{ id: 'read', label: 'read', items: sections.read }]) {
+      // Omitted rather than rendered as a header reading "0 read".
       if (items.length === 0) continue;
       const open = openSections[id] ?? false;
       out.push({ kind: 'section', key: `section:${id}`, id, label, count: items.length, open });
@@ -435,8 +430,9 @@ export default function FeedScreen() {
         ) : null}
 
         {/*
-          Read marks are part of the gate, not an afterthought: without
-          them every card in the brief renders unread for a frame, which
+          Read marks are part of the gate, not an afterthought: they decide
+          which section every story sits in. Without them every story
+          renders in the brief for a frame and then drops into Read, which
           is the feed flashing as new precisely for the reader who has
           already been through it.
         */}
@@ -471,7 +467,7 @@ export default function FeedScreen() {
             // Suppressed in sectioned mode, where the finish line is
             // itself a row and already says there's nothing new. This copy
             // is written for the whole feed — it would claim the feed is
-            // empty while Earlier sits one tap below holding two dozen
+            // empty while Read sits one tap below holding two dozen
             // stories.
             ListEmptyComponent={
               sectioned ? null : (
