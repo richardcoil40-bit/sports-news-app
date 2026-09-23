@@ -41,3 +41,22 @@ export const BRIEF_MODE = true;
  * roundups both ways, then delete the flag once the question is settled.
  */
 export const KEEP_MIXED_SPORT_ROUNDUPS = true;
+
+/**
+ * Whether feeds are re-spread by outlet after sorting.
+ *
+ * On, `balanceBySource` (`src/lib/source-balance.ts`) lets no outlet hold
+ * more than 2 of any 5 consecutive slots, so ESPN's publishing volume can't
+ * wall off the top of the screen above the beat writer. Off, every feed is
+ * strictly newest first — the order `dedupeAndSort`, `multi-team-feed.ts`
+ * and `clusterArticles` already produce, untouched.
+ *
+ * Off because the reshuffled order read as a jumble: a two-hour-old story
+ * above a ten-minute-old one, for a reason nothing on screen explains.
+ * Gated inside the function rather than at its three call sites, so it
+ * stays one switch.
+ *
+ * Delete the flag once the question is settled, along with whichever
+ * branch it isn't taking — `source-balance.ts` and its callers included.
+ */
+export const BALANCE_SOURCES = false;
