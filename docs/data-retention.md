@@ -17,16 +17,18 @@ single overwritten value rather than a log, and what bounds the article
 store.
 
 Every other cache in the codebase is in-memory only and exists for the
-lifetime of the running app process. All but two are created through
+lifetime of the running app process. All but three are created through
 `createEntityCache` in `lib/cache.ts` — one helper,
 so what's cached and for how long is visible in one place rather than
 hand-rolled per module. One exception is the league catalog, which isn't
 keyed by anything: it's a single fetched list held in a module variable and
 replaced at most once per launch, so there is no key to evict and nothing
-for that helper to do. The other is `lib/diagnostics.ts` (below), whose three
+for that helper to do. Another is `lib/diagnostics.ts` (below), whose three
 logs aren't a resolved-value-per-key cache at all — they're bounded arrays
 and a map, capped by splicing off the oldest entries rather than by LRU
-eviction, since nothing about them is ever "refetched."
+eviction, since nothing about them is ever "refetched." The third is
+`lib/game-markers.ts`, which holds no fetched data: one play id per game
+screen you have left, so the next visit can say what happened since.
 
 Two independent limits apply, and the distinction matters: **`ttlMs` bounds
 staleness, `maxEntries` bounds size.** An expired entry keeps its payload
@@ -41,6 +43,9 @@ least-recently-used on insert.
 | National feed pool | `lib/source-catalog.ts` | League — one entry per league with a national pool (curated RSS feeds plus ESPN's league-wide news API, merged), 4 today (Big Ten, SEC, Big 12, NFL). A league with neither returns uncached and takes no slot | 50 | 3 minutes |
 | Per-team news pool | `lib/team-news-pool.ts` | Sport + league path + team ID | 50 | 3 minutes |
 | Team schedules | `lib/schedule.ts` | Sport + league path + team ID | 100 | 3 minutes |
+| Live scoreboards | `lib/scoreboard.ts` | League — one board per league you follow something in, fetched only while the home screen is open and a followed game is on or near. Keyed by league rather than sport path, since conferences of one sport have separate boards | 50 (headroom; the catalog is the real ceiling) | 30 seconds |
+| Game summaries | `lib/game-summary.ts` | Sport + league path + event ID — one per game screen opened. Each entry is a whole game's drives and plays, so the cap is small | 20 | 15 seconds |
+| Last-looked markers | `lib/game-markers.ts` | Sport + league path + event ID. Not a fetch cache: a single play id per game, overwritten each time you leave that game's screen and dropped when the game ends. Not persisted, so a cold launch mid-game shows the whole game instead | 20, oldest out | None (process lifetime) |
 | Team list | `lib/teams.ts` | League — 3 entries today | None needed (see below) | 30 minutes |
 | Rosters | `lib/roster.ts` | Sport + league path + team ID | 100 | None (process lifetime) |
 | Stat leaders | `lib/team-leaders.ts` | Sport + league path + team ID | 100 | None (process lifetime) |
@@ -119,6 +124,15 @@ build from this repo — the verdicts service described below. Since
 `GET /v1/leagues` per launch for the league catalog, wherever
 `EXPO_PUBLIC_CATALOG_URL` is set. It sends no body and no query string, so
 unlike the verdicts calls it carries nothing at all — see below.
+
+Since 2026-09-22 the device also polls two more of ESPN's public endpoints
+while a followed team is playing: the league **scoreboard** (one request per
+league you follow something in, every 30 seconds, only while the app is in
+the foreground and a followed game is in progress) and a game's **summary**
+(every 20 seconds, only while that game's screen is open and focused). Both
+are the same kind of anonymous public read as every other ESPN call here:
+the query string is a conference id or an event id, never anything about
+you. Nothing polls in the background — backgrounding the app stops both.
 
 ## What the verdicts service sees
 

@@ -1,0 +1,416 @@
+{
+  "header": {"competitions":[{"status":{"type":{"state":"post","completed":true,"detail":"Final/OT","shortDetail":"Final/OT"}},"competitors":[{"homeAway":"home","score":"33","team":{"id":"12","abbreviation":"KC","location":"Kansas City","displayName":"Kansas City Chiefs"}},{"homeAway":"away","score":"30","team":{"id":"11","abbreviation":"IND","location":"Indianapolis","displayName":"Indianapolis Colts"}}]}]},
+  "drives": {
+    "previous": [
+      {
+        "id": "4018729451",
+        "description": "11 plays, 65 yards, 6:35",
+        "result": "TD",
+        "displayResult": "Touchdown",
+        "offensivePlays": 11,
+        "yards": 65,
+        "timeElapsed": {"displayValue":"6:35"},
+        "team": {"id":"11","abbreviation":"IND"},
+        "plays": [
+          {"id":"40187294539","text":"H.Butker kicks 65 yards from KC 35 to end zone, Touchback to the IND 35.","type":{"text":"Kickoff"},"clock":{"displayValue":"15:00"},"period":{"number":1},"scoringPlay":false,"homeScore":0,"awayScore":0,"end":{"downDistanceText":"1st & 10 at IND 35"}},
+          {"id":"401872945318","text":"J.Taylor right tackle to KC 1 for no gain (D.Tranquill).","type":{"text":"Rush"},"clock":{"displayValue":"9:08"},"period":{"number":1},"scoringPlay":false,"homeScore":0,"awayScore":0,"end":{"downDistanceText":"2nd & Goal at KC 1"}},
+          {"id":"401872945340","text":"D.Jones pass short middle to T.Warren for 1 yard, TOUCHDOWN. S.Shrader extra point is GOOD, Center-L.Rhodes, Holder-R.Sanchez.","type":{"text":"Passing Touchdown"},"clock":{"displayValue":"8:25"},"period":{"number":1},"scoringPlay":true,"homeScore":0,"awayScore":7},
+          {"id":"401872945374","text":"Official Timeout at 08:25.","type":{"text":"Official Timeout"},"clock":{"displayValue":"8:25"},"period":{"number":1},"scoringPlay":false,"homeScore":0,"awayScore":7}
+        ]
+      },
+      {
+        "id": "4018729452",
+        "description": "6 plays, 36 yards, 2:16",
+        "result": "FG",
+        "displayResult": "Field Goal",
+        "offensivePlays": 6,
+        "yards": 36,
+        "timeElapsed": {"displayValue":"2:16"},
+        "team": {"id":"12","abbreviation":"KC"},
+        "plays": [
+          {"id":"401872945381","text":"S.Shrader kicks 54 yards from IND 35 to KC 11. B.Smith to KC 36 for 25 yards (A.Ogletree).","type":{"text":"Kickoff"},"clock":{"displayValue":"8:25"},"period":{"number":1},"scoringPlay":false,"homeScore":0,"awayScore":7,"end":{"downDistanceText":"1st & 10 at KC 36"}},
+          {"id":"401872945508","text":"(Shotgun) P.Mahomes pass incomplete short left to K.Walker (J.Walley).","type":{"text":"Pass Incompletion"},"clock":{"displayValue":"6:17"},"period":{"number":1},"scoringPlay":false,"homeScore":0,"awayScore":7,"end":{"downDistanceText":"4th & 9 at IND 28"}},
+          {"id":"401872945531","text":"H.Butker 46 yard field goal is GOOD, Center-J.Winchester, Holder-M.Araiza.","type":{"text":"Field Goal Good"},"clock":{"displayValue":"6:09"},"period":{"number":1},"scoringPlay":true,"homeScore":3,"awayScore":7},
+          {"id":"401872945541","text":"Official Timeout at 06:09.","type":{"text":"Official Timeout"},"clock":{"displayValue":"6:09"},"period":{"number":1},"scoringPlay":false,"homeScore":3,"awayScore":7}
+        ]
+      },
+      {
+        "id": "4018729453",
+        "description": "2 plays, 4 yards, 0:51",
+        "result": "INT",
+        "displayResult": "Interception",
+        "offensivePlays": 2,
+        "yards": 4,
+        "timeElapsed": {"displayValue":"0:51"},
+        "team": {"id":"11","abbreviation":"IND"},
+        "plays": [
+          {"id":"401872945551","text":"H.Butker kicks 65 yards from KC 35 to IND 0. S.McGowan to IND 27 for 27 yards (E.Johnson).PENALTY on IND-J.Tuimoloau, Illegal Block Above the Waist, 10 yards, enforced at IND 20.","type":{"text":"Kickoff"},"clock":{"displayValue":"6:09"},"period":{"number":1},"scoringPlay":false,"homeScore":3,"awayScore":7,"end":{"downDistanceText":"1st & 10 at IND 10"}},
+          {"id":"401872945592","text":"J.Taylor right end to IND 14 for 4 yards (N.Bolton).","type":{"text":"Rush"},"clock":{"displayValue":"6:03"},"period":{"number":1},"scoringPlay":false,"homeScore":3,"awayScore":7,"end":{"downDistanceText":"2nd & 6 at IND 14"}},
+          {"id":"401872945614","text":"(Shotgun) D.Jones pass short left intended for K.Allen INTERCEPTED by K.Fulton at IND 16. K.Fulton to IND 16 for no gain.","type":{"text":"Pass Interception Return"},"clock":{"displayValue":"5:25"},"period":{"number":1},"scoringPlay":false,"homeScore":3,"awayScore":7,"end":{"downDistanceText":"1st & 10 at IND 16"}}
+        ]
+      },
+      {
+        "id": "4018729454",
+        "description": "2 plays, 16 yards, 0:44",
+        "result": "TD",
+        "displayResult": "Touchdown",
+        "offensivePlays": 2,
+        "yards": 16,
+        "timeElapsed": {"displayValue":"0:44"},
+        "team": {"id":"12","abbreviation":"KC"},
+        "plays": [
+          {"id":"401872945641","text":"(Shotgun) K.Walker up the middle to IND 13 for 3 yards (A.Davis-Gaither; G.Stewart).","type":{"text":"Rush"},"clock":{"displayValue":"5:18"},"period":{"number":1},"scoringPlay":false,"homeScore":3,"awayScore":7,"end":{"downDistanceText":"2nd & 7 at IND 13"}},
+          {"id":"401872945663","text":"(Shotgun) P.Mahomes pass short right to T.Kelce for 13 yards, TOUCHDOWN. H.Butker extra point is GOOD, Center-J.Winchester, Holder-M.Araiza.","type":{"text":"Passing Touchdown"},"clock":{"displayValue":"4:34"},"period":{"number":1},"scoringPlay":true,"homeScore":10,"awayScore":7},
+          {"id":"401872945697","text":"Official Timeout at 04:34.","type":{"text":"Official Timeout"},"clock":{"displayValue":"4:34"},"period":{"number":1},"scoringPlay":false,"homeScore":10,"awayScore":7}
+        ]
+      },
+      {
+        "id": "4018729455",
+        "description": "11 plays, 34 yards, 4:46",
+        "result": "FG",
+        "displayResult": "Field Goal",
+        "offensivePlays": 11,
+        "yards": 34,
+        "timeElapsed": {"displayValue":"4:46"},
+        "team": {"id":"11","abbreviation":"IND"},
+        "plays": [
+          {"id":"401872945704","text":"H.Butker kicks 61 yards from KC 35 to IND 4. S.McGowan to IND 42 for 38 yards (J.Canady; H.Butker).","type":{"text":"Kickoff"},"clock":{"displayValue":"4:34"},"period":{"number":1},"scoringPlay":false,"homeScore":10,"awayScore":7,"end":{"downDistanceText":"1st & 10 at IND 42"}},
+          {"id":"401872945958","text":"(Shotgun) D.Jones pass incomplete short left to J.Downs (L.Sneed).","type":{"text":"Pass Incompletion"},"clock":{"displayValue":"15:00"},"period":{"number":2},"scoringPlay":false,"homeScore":10,"awayScore":7,"end":{"downDistanceText":"3rd & 12 at KC 24"}},
+          {"id":"401872945981","text":"(Shotgun) D.Jones pass incomplete short left to K.Allen (A.Gilman).","type":{"text":"Pass Incompletion"},"clock":{"displayValue":"14:57"},"period":{"number":2},"scoringPlay":false,"homeScore":10,"awayScore":7,"end":{"downDistanceText":"4th & 12 at KC 24"}},
+          {"id":"4018729451004","text":"S.Shrader 42 yard field goal is GOOD, Center-L.Rhodes, Holder-R.Sanchez.","type":{"text":"Field Goal Good"},"clock":{"displayValue":"14:48"},"period":{"number":2},"scoringPlay":true,"homeScore":10,"awayScore":10}
+        ]
+      },
+      {
+        "id": "4018729456",
+        "description": "5 plays, 37 yards, 2:06",
+        "result": "MISSED FG",
+        "displayResult": "Missed FG",
+        "offensivePlays": 5,
+        "yards": 37,
+        "timeElapsed": {"displayValue":"2:06"},
+        "team": {"id":"12","abbreviation":"KC"},
+        "plays": [
+          {"id":"4018729451024","text":"S.Shrader kicks 64 yards from IND 35 to KC 1. E.Johnson pushed ob at KC 35 for 34 yards (T.Chambers).PENALTY on KC-C.Roland-Wallace, Illegal Formation, 5 yards, enforced at KC 35.","type":{"text":"Kickoff"},"clock":{"displayValue":"14:48"},"period":{"number":2},"scoringPlay":false,"homeScore":10,"awayScore":10,"end":{"downDistanceText":"1st & 10 at KC 30"}},
+          {"id":"4018729451135","text":"(Shotgun) P.Mahomes pass incomplete deep right to T.Kelce.","type":{"text":"Pass Incompletion"},"clock":{"displayValue":"12:52"},"period":{"number":2},"scoringPlay":false,"homeScore":10,"awayScore":10,"end":{"downDistanceText":"4th & 3 at IND 33"}},
+          {"id":"4018729451158","text":"H.Butker 51 yard field goal is No Good, Wide Left, Center-J.Winchester, Holder-M.Araiza.","type":{"text":"Field Goal Missed"},"clock":{"displayValue":"12:47"},"period":{"number":2},"scoringPlay":false,"homeScore":10,"awayScore":10,"end":{"downDistanceText":"1st & 10 at IND 33"}},
+          {"id":"4018729451169","text":"Official Timeout at 12:42.","type":{"text":"Official Timeout"},"clock":{"displayValue":"12:42"},"period":{"number":2},"scoringPlay":false,"homeScore":10,"awayScore":10,"end":{"downDistanceText":"1st & 10 at IND 41"}}
+        ]
+      },
+      {
+        "id": "4018729457",
+        "description": "6 plays, 28 yards, 2:58",
+        "result": "FG",
+        "displayResult": "Field Goal",
+        "offensivePlays": 6,
+        "yards": 28,
+        "timeElapsed": {"displayValue":"2:58"},
+        "team": {"id":"11","abbreviation":"IND"},
+        "plays": [
+          {"id":"4018729451179","text":"S.McGowan left tackle to IND 42 for 1 yard (P.Woods; N.Bolton).","type":{"text":"Rush"},"clock":{"displayValue":"12:42"},"period":{"number":2},"scoringPlay":false,"homeScore":10,"awayScore":10,"end":{"downDistanceText":"2nd & 9 at IND 42"}},
+          {"id":"4018729451372","text":"(Shotgun) D.Jones pass short right to J.Taylor to KC 31 for 4 yards (G.Karlaftis; N.Williams).","type":{"text":"Pass Reception"},"clock":{"displayValue":"10:26"},"period":{"number":2},"scoringPlay":false,"homeScore":10,"awayScore":10,"end":{"downDistanceText":"4th & 17 at KC 31"}},
+          {"id":"4018729451397","text":"S.Shrader 49 yard field goal is GOOD, Center-L.Rhodes, Holder-R.Sanchez.","type":{"text":"Field Goal Good"},"clock":{"displayValue":"9:44"},"period":{"number":2},"scoringPlay":true,"homeScore":10,"awayScore":13},
+          {"id":"4018729451407","text":"Official Timeout at 09:44.","type":{"text":"Official Timeout"},"clock":{"displayValue":"9:44"},"period":{"number":2},"scoringPlay":false,"homeScore":10,"awayScore":13}
+        ]
+      },
+      {
+        "id": "4018729458",
+        "description": "12 plays, 70 yards, 7:19",
+        "result": "TD",
+        "displayResult": "Touchdown",
+        "offensivePlays": 12,
+        "yards": 70,
+        "timeElapsed": {"displayValue":"7:19"},
+        "team": {"id":"12","abbreviation":"KC"},
+        "plays": [
+          {"id":"4018729451417","text":"S.Shrader kicks 61 yards from IND 35 to KC 4. B.Smith to KC 30 for 26 yards (C.Curry; B.Boettcher).","type":{"text":"Kickoff"},"clock":{"displayValue":"9:44"},"period":{"number":2},"scoringPlay":false,"homeScore":10,"awayScore":13,"end":{"downDistanceText":"1st & 10 at KC 30"}},
+          {"id":"4018729451752","text":"(Shotgun) P.Mahomes pass short right to X.Worthy to IND 1 for 4 yards (L.Latu).","type":{"text":"Pass Reception"},"clock":{"displayValue":"3:09"},"period":{"number":2},"scoringPlay":false,"homeScore":10,"awayScore":13,"end":{"downDistanceText":"2nd & Goal at IND 1"}},
+          {"id":"4018729451782","text":"(Shotgun) P.Mahomes pass short right to X.Worthy for 1 yard, TOUCHDOWN. H.Butker extra point is GOOD, Center-J.Winchester, Holder-M.Araiza.","type":{"text":"Passing Touchdown"},"clock":{"displayValue":"2:25"},"period":{"number":2},"scoringPlay":true,"homeScore":17,"awayScore":13},
+          {"id":"4018729451816","text":"Official Timeout at 02:25.","type":{"text":"Official Timeout"},"clock":{"displayValue":"2:25"},"period":{"number":2},"scoringPlay":false,"homeScore":17,"awayScore":13}
+        ]
+      },
+      {
+        "id": "4018729459",
+        "description": "6 plays, 72 yards, 1:26",
+        "result": "TD",
+        "displayResult": "Touchdown",
+        "offensivePlays": 6,
+        "yards": 72,
+        "timeElapsed": {"displayValue":"1:26"},
+        "team": {"id":"11","abbreviation":"IND"},
+        "plays": [
+          {"id":"4018729451823","text":"H.Butker kicks 60 yards from KC 35 to IND 5. A.Gould to IND 28 for 23 yards (J.Royals; J.Bassa).","type":{"text":"Kickoff"},"clock":{"displayValue":"2:25"},"period":{"number":2},"scoringPlay":false,"homeScore":17,"awayScore":13,"end":{"downDistanceText":"1st & 10 at IND 28"}},
+          {"id":"4018729451993","text":"(Shotgun) D.Jones pass short right to J.Downs pushed ob at KC 24 for 7 yards (L.Sneed) [C.Jones].Penalty on IND-J.Downs, Unnecessary Roughness, offsetting.Penalty on KC-L.Sneed, Unnecessary Roughness, offsetting.","type":{"text":"Pass Reception"},"clock":{"displayValue":"1:10"},"period":{"number":2},"scoringPlay":false,"homeScore":17,"awayScore":13,"end":{"downDistanceText":"1st & 10 at KC 24"}},
+          {"id":"4018729452035","text":"J.Taylor right end for 24 yards, TOUCHDOWN. S.Shrader extra point is GOOD, Center-L.Rhodes, Holder-R.Sanchez.","type":{"text":"Rushing Touchdown"},"clock":{"displayValue":"0:59"},"period":{"number":2},"scoringPlay":true,"homeScore":17,"awayScore":20},
+          {"id":"4018729452066","text":"Official Timeout at 00:59.","type":{"text":"Official Timeout"},"clock":{"displayValue":"0:59"},"period":{"number":2},"scoringPlay":false,"homeScore":17,"awayScore":20}
+        ]
+      },
+      {
+        "id": "40187294510",
+        "description": "3 plays, 0 yards, 0:24",
+        "result": "PUNT",
+        "displayResult": "Punt",
+        "offensivePlays": 3,
+        "yards": 0,
+        "timeElapsed": {"displayValue":"0:24"},
+        "team": {"id":"12","abbreviation":"KC"},
+        "plays": [
+          {"id":"4018729452073","text":"S.Shrader kicks 65 yards from IND 35 to landing zone to end zone, Touchback to the KC 20.","type":{"text":"Kickoff"},"clock":{"displayValue":"0:59"},"period":{"number":2},"scoringPlay":false,"homeScore":17,"awayScore":20,"end":{"downDistanceText":"1st & 10 at KC 20"}},
+          {"id":"4018729452162","text":"(Shotgun) P.Mahomes sacked at KC 20 for -8 yards (D.Buckner).","type":{"text":"Sack"},"clock":{"displayValue":"0:51"},"period":{"number":2},"scoringPlay":false,"homeScore":17,"awayScore":20,"end":{"downDistanceText":"4th & 10 at KC 20"}},
+          {"id":"4018729452172","text":"Timeout #2 by IND at 00:46.","type":{"text":"Timeout"},"clock":{"displayValue":"0:46"},"period":{"number":2},"scoringPlay":false,"homeScore":17,"awayScore":20,"end":{"downDistanceText":"4th & 10 at KC 20"}},
+          {"id":"4018729452182","text":" M.Araiza punts 69 yards to IND 11, Center-J.Winchester, downed by KC-J.Canady.","type":{"text":"Punt"},"clock":{"displayValue":"0:46"},"period":{"number":2},"scoringPlay":false,"homeScore":17,"awayScore":20,"end":{"downDistanceText":"1st & 10 at IND 11"}}
+        ]
+      },
+      {
+        "id": "40187294511",
+        "description": "1 play, 1 yard, 0:35",
+        "result": "END OF HALF",
+        "displayResult": "End of Half",
+        "offensivePlays": 1,
+        "yards": 1,
+        "timeElapsed": {"displayValue":"0:35"},
+        "team": {"id":"11","abbreviation":"IND"},
+        "plays": [{"id":"4018729452209","text":"J.Taylor right guard to IND 12 for 1 yard (N.Bolton; P.Woods).","type":{"text":"Rush"},"clock":{"displayValue":"0:35"},"period":{"number":2},"scoringPlay":false,"homeScore":17,"awayScore":20,"end":{"downDistanceText":"2nd & 9 at IND 12"}},{"id":"4018729452231","text":"END QUARTER 2","type":{"text":"End of Half"},"clock":{"displayValue":"0:00"},"period":{"number":2},"scoringPlay":false,"homeScore":17,"awayScore":20}]
+      },
+      {
+        "id": "40187294512",
+        "description": "14 plays, 80 yards, 6:59",
+        "result": "TD",
+        "displayResult": "Touchdown",
+        "offensivePlays": 14,
+        "yards": 80,
+        "timeElapsed": {"displayValue":"6:59"},
+        "team": {"id":"12","abbreviation":"KC"},
+        "plays": [
+          {"id":"4018729452251","text":"S.Shrader kicks 65 yards from IND 35 to landing zone to end zone, Touchback to the KC 20.","type":{"text":"Kickoff"},"clock":{"displayValue":"15:00"},"period":{"number":3},"scoringPlay":false,"homeScore":17,"awayScore":20,"end":{"downDistanceText":"1st & 10 at KC 20"}},
+          {"id":"4018729452558","text":"H.Nourzad and K.Tonga reported in as eligible.  K.Walker right guard to IND 1 for no gain (A.Davis-Gaither; L.Latu). KC-J.Moore was injured during the play.","type":{"text":"Rush"},"clock":{"displayValue":"8:36"},"period":{"number":3},"scoringPlay":false,"homeScore":17,"awayScore":20,"end":{"downDistanceText":"4th & Goal at IND 1"}},
+          {"id":"4018729452584","text":"M.Caliendo and K.Tonga reported in as eligible.  P.Mahomes pass short right to J.Royals for 1 yard, TOUCHDOWN. H.Butker extra point is GOOD, Center-J.Winchester, Holder-M.Araiza.","type":{"text":"Passing Touchdown"},"clock":{"displayValue":"8:01"},"period":{"number":3},"scoringPlay":true,"homeScore":24,"awayScore":20},
+          {"id":"4018729452625","text":"Official Timeout at 08:01.","type":{"text":"Official Timeout"},"clock":{"displayValue":"8:01"},"period":{"number":3},"scoringPlay":false,"homeScore":24,"awayScore":20}
+        ]
+      },
+      {
+        "id": "40187294513",
+        "description": "4 plays, 21 yards, 2:22",
+        "result": "PUNT",
+        "displayResult": "Punt",
+        "offensivePlays": 4,
+        "yards": 21,
+        "timeElapsed": {"displayValue":"2:22"},
+        "team": {"id":"11","abbreviation":"IND"},
+        "plays": [
+          {"id":"4018729452632","text":"H.Butker kicks 60 yards from KC 35 to IND 5. A.Gould to IND 27 for 22 yards (C.Christiansen).","type":{"text":"Kickoff"},"clock":{"displayValue":"8:01"},"period":{"number":3},"scoringPlay":false,"homeScore":24,"awayScore":20,"end":{"downDistanceText":"1st & 10 at IND 27"}},
+          {"id":"4018729452739","text":"(Shotgun) D.Jones pass incomplete deep right to K.Allen.","type":{"text":"Pass Incompletion"},"clock":{"displayValue":"5:53"},"period":{"number":3},"scoringPlay":false,"homeScore":24,"awayScore":20,"end":{"downDistanceText":"4th & 4 at IND 48"}},
+          {"id":"4018729452762","text":"R.Sanchez punts 45 yards to KC 7, Center-L.Rhodes. N.Remigio to KC 9 for 2 yards (C.Taylor-Britt).","type":{"text":"Punt"},"clock":{"displayValue":"5:48"},"period":{"number":3},"scoringPlay":false,"homeScore":24,"awayScore":20,"end":{"downDistanceText":"1st & 10 at KC 9"}},
+          {"id":"4018729452775","text":"Official Timeout at 05:39.","type":{"text":"Official Timeout"},"clock":{"displayValue":"5:39"},"period":{"number":3},"scoringPlay":false,"homeScore":24,"awayScore":20,"end":{"downDistanceText":"1st & 10 at KC 9"}}
+        ]
+      },
+      {
+        "id": "40187294514",
+        "description": "13 plays, 81 yards, 6:24",
+        "result": "FG",
+        "displayResult": "Field Goal",
+        "offensivePlays": 13,
+        "yards": 81,
+        "timeElapsed": {"displayValue":"6:24"},
+        "team": {"id":"12","abbreviation":"KC"},
+        "plays": [
+          {"id":"4018729452788","text":"P.Mahomes pass short left to T.Kelce to KC 20 for 11 yards (B.Boettcher). ** Injury Update: KC-J.Moore has returned to the game. Penalty on IND-G.Stewart, Defensive Offside, declined.","type":{"text":"Pass Reception"},"clock":{"displayValue":"5:39"},"period":{"number":3},"scoringPlay":false,"homeScore":24,"awayScore":20,"end":{"downDistanceText":"1st & 10 at KC 20"}},
+          {"id":"4018729453149","text":"(Shotgun) P.Mahomes pass short right to R.Rice to IND 10 for 6 yards (J.Carlies; A.Davis-Gaither).","type":{"text":"Pass Reception"},"clock":{"displayValue":"15:00"},"period":{"number":4},"scoringPlay":false,"homeScore":24,"awayScore":20,"end":{"downDistanceText":"4th & 6 at IND 10"}},
+          {"id":"4018729453179","text":"H.Butker 28 yard field goal is GOOD, Center-J.Winchester, Holder-M.Araiza.","type":{"text":"Field Goal Good"},"clock":{"displayValue":"14:15"},"period":{"number":4},"scoringPlay":true,"homeScore":27,"awayScore":20},
+          {"id":"4018729453189","text":"Official Timeout at 14:15.","type":{"text":"Official Timeout"},"clock":{"displayValue":"14:15"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":20}
+        ]
+      },
+      {
+        "id": "40187294515",
+        "description": "13 plays, 64 yards, 8:38",
+        "result": "TD",
+        "displayResult": "Touchdown",
+        "offensivePlays": 13,
+        "yards": 64,
+        "timeElapsed": {"displayValue":"8:38"},
+        "team": {"id":"11","abbreviation":"IND"},
+        "plays": [
+          {"id":"4018729453199","text":"H.Butker kicks 58 yards from KC 35 to IND 7. A.Gould to IND 36 for 29 yards (J.Royals; J.Cochrane).","type":{"text":"Kickoff"},"clock":{"displayValue":"14:15"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":20,"end":{"downDistanceText":"1st & 10 at IND 36"}},
+          {"id":"4018729453554","text":"D.Jones pass short left to T.Warren to KC 5 for 7 yards (J.Hicks; A.Gilman).","type":{"text":"Pass Reception"},"clock":{"displayValue":"6:23"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":20,"end":{"downDistanceText":"2nd & 3 at KC 5"}},
+          {"id":"4018729453579","text":"J.Taylor left end for 5 yards, TOUCHDOWN. S.Shrader extra point is GOOD, Center-L.Rhodes, Holder-R.Sanchez.","type":{"text":"Rushing Touchdown"},"clock":{"displayValue":"5:37"},"period":{"number":4},"scoringPlay":true,"homeScore":27,"awayScore":27},
+          {"id":"4018729453610","text":"Official Timeout at 05:37.","type":{"text":"Official Timeout"},"clock":{"displayValue":"5:37"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27}
+        ]
+      },
+      {
+        "id": "40187294516",
+        "description": "5 plays, 16 yards, 2:22",
+        "result": "PUNT",
+        "displayResult": "Punt",
+        "offensivePlays": 5,
+        "yards": 16,
+        "timeElapsed": {"displayValue":"2:22"},
+        "team": {"id":"12","abbreviation":"KC"},
+        "plays": [
+          {"id":"4018729453617","text":"S.Shrader kicks 65 yards from IND 35 to KC 0. B.Smith to KC 26 for 26 yards (A.Ogletree).","type":{"text":"Kickoff"},"clock":{"displayValue":"5:37"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"1st & 10 at KC 26"}},
+          {"id":"4018729453745","text":"(Shotgun) P.Mahomes pass incomplete short left to R.Rice (K.Gushiken).","type":{"text":"Pass Incompletion"},"clock":{"displayValue":"3:28"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"4th & 7 at KC 42"}},
+          {"id":"4018729453768","text":"M.Araiza punts 40 yards to IND 18, Center-J.Winchester, out of bounds.","type":{"text":"Punt"},"clock":{"displayValue":"3:22"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"1st & 10 at IND 18"}},
+          {"id":"4018729453778","text":"Official Timeout at 03:15.","type":{"text":"Official Timeout"},"clock":{"displayValue":"3:15"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"1st & 10 at IND 18"}}
+        ]
+      },
+      {
+        "id": "40187294517",
+        "description": "7 plays, 31 yards, 2:51",
+        "result": "PUNT",
+        "displayResult": "Punt",
+        "offensivePlays": 7,
+        "yards": 31,
+        "timeElapsed": {"displayValue":"2:51"},
+        "team": {"id":"11","abbreviation":"IND"},
+        "plays": [
+          {"id":"4018729453787","text":"D.Jones pass short left to J.Taylor pushed ob at IND 32 for 14 yards (D.Tranquill).","type":{"text":"Pass Reception"},"clock":{"displayValue":"3:15"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"1st & 10 at IND 32"}},
+          {"id":"4018729453934","text":"Timeout #2 by IND at 00:40.","type":{"text":"Timeout"},"clock":{"displayValue":"0:40"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"3rd & 4 at IND 49"}},
+          {"id":"4018729453945","text":"(Shotgun) D.Jones pass incomplete short right [F.Anudike-Uzomah].","type":{"text":"Pass Incompletion"},"clock":{"displayValue":"0:40"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"4th & 4 at IND 49"}},
+          {"id":"4018729453975","text":"R.Sanchez punts 41 yards to KC 10, Center-L.Rhodes. N.Remigio to KC 16 for 6 yards (D.Burks; C.Taylor-Britt).","type":{"text":"Punt"},"clock":{"displayValue":"0:34"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"1st & 10 at KC 16"}}
+        ]
+      },
+      {
+        "id": "40187294518",
+        "description": "5 plays, 61 yards, 0:24",
+        "result": "END OF HALF",
+        "displayResult": "End of Half",
+        "offensivePlays": 5,
+        "yards": 61,
+        "timeElapsed": {"displayValue":"0:24"},
+        "team": {"id":"12","abbreviation":"KC"},
+        "plays": [
+          {"id":"4018729454001","text":"(Shotgun) P.Mahomes pass incomplete short right.","type":{"text":"Pass Incompletion"},"clock":{"displayValue":"0:24"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"2nd & 10 at KC 16"}},
+          {"id":"4018729454099","text":"Timeout #3 by IND at 00:03.","type":{"text":"Timeout"},"clock":{"displayValue":"0:03"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"1st & 10 at KC 46"}},
+          {"id":"4018729454107","text":"(Shotgun) P.Mahomes pass short middle to R.Rice to IND 23 for 31 yards (C.Taylor-Britt; H.Wohler).","type":{"text":"Pass Reception"},"clock":{"displayValue":"0:03"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"1st & 10 at IND 23"}},
+          {"id":"4018729454146","text":"END QUARTER 4","type":{"text":"End of Regulation"},"clock":{"displayValue":"0:00"},"period":{"number":4},"scoringPlay":false,"homeScore":27,"awayScore":27}
+        ]
+      },
+      {
+        "id": "40187294519",
+        "description": "11 plays, 55 yards, 4:51",
+        "result": "FG",
+        "displayResult": "Field Goal",
+        "offensivePlays": 11,
+        "yards": 55,
+        "timeElapsed": {"displayValue":"4:51"},
+        "team": {"id":"12","abbreviation":"KC"},
+        "plays": [
+          {"id":"4018729454176","text":"S.Shrader kicks 64 yards from IND 35 to KC 1. B.Smith to KC 32 for 31 yards (J.Owens).","type":{"text":"Kickoff"},"clock":{"displayValue":"10:00"},"period":{"number":5},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"1st & 10 at KC 32"}},
+          {"id":"4018729454432","text":"(Shotgun) P.Mahomes pass incomplete short right to K.Walker.","type":{"text":"Pass Incompletion"},"clock":{"displayValue":"5:18"},"period":{"number":5},"scoringPlay":false,"homeScore":27,"awayScore":27,"end":{"downDistanceText":"4th & 9 at IND 13"}},
+          {"id":"4018729454455","text":"H.Butker 31 yard field goal is GOOD, Center-J.Winchester, Holder-M.Araiza.","type":{"text":"Field Goal Good"},"clock":{"displayValue":"5:09"},"period":{"number":5},"scoringPlay":true,"homeScore":30,"awayScore":27},
+          {"id":"4018729454465","text":"Official Timeout at 05:09.","type":{"text":"Official Timeout"},"clock":{"displayValue":"5:09"},"period":{"number":5},"scoringPlay":false,"homeScore":30,"awayScore":27}
+        ]
+      },
+      {
+        "id": "40187294520",
+        "description": "5 plays, 45 yards, 1:58",
+        "result": "FG",
+        "displayResult": "Field Goal",
+        "offensivePlays": 5,
+        "yards": 45,
+        "timeElapsed": {"displayValue":"1:58"},
+        "team": {"id":"11","abbreviation":"IND"},
+        "plays": [
+          {"id":"4018729454475","text":"H.Butker kicks 58 yards from KC 35 to IND 7. A.Gould to IND 35 for 28 yards (C.Christiansen).","type":{"text":"Kickoff"},"clock":{"displayValue":"5:09"},"period":{"number":5},"scoringPlay":false,"homeScore":30,"awayScore":27,"end":{"downDistanceText":"1st & 10 at IND 35"}},
+          {"id":"4018729454667","text":"(Shotgun) PENALTY on IND, Delay of Game, 5 yards, enforced at KC 15 - No Play.","type":{"text":"Penalty"},"clock":{"displayValue":"3:15"},"period":{"number":5},"scoringPlay":false,"homeScore":30,"awayScore":27,"end":{"downDistanceText":"4th & 13 at KC 20"}},
+          {"id":"4018729454698","text":"S.Shrader 38 yard field goal is GOOD, Center-L.Rhodes, Holder-R.Sanchez.","type":{"text":"Field Goal Good"},"clock":{"displayValue":"3:11"},"period":{"number":5},"scoringPlay":true,"homeScore":30,"awayScore":30},
+          {"id":"4018729454708","text":"Official Timeout at 03:11.","type":{"text":"Official Timeout"},"clock":{"displayValue":"3:11"},"period":{"number":5},"scoringPlay":false,"homeScore":30,"awayScore":30}
+        ]
+      },
+      {
+        "id": "40187294521",
+        "description": "7 plays, 46 yards, 3:11",
+        "result": "FG",
+        "displayResult": "Field Goal",
+        "offensivePlays": 7,
+        "yards": 46,
+        "timeElapsed": {"displayValue":"3:11"},
+        "team": {"id":"12","abbreviation":"KC"},
+        "plays": [
+          {"id":"4018729454718","text":"S.Shrader kicks 58 yards from IND 35 to KC 7. B.Smith to KC 32 for 25 yards (H.Wohler; L.Treadwell).","type":{"text":"Kickoff"},"clock":{"displayValue":"3:11"},"period":{"number":5},"scoringPlay":false,"homeScore":30,"awayScore":30,"end":{"downDistanceText":"1st & 10 at KC 32"}},
+          {"id":"4018729454892","text":"Timeout #2 by KC at 00:01.","type":{"text":"Timeout"},"clock":{"displayValue":"0:01"},"period":{"number":5},"scoringPlay":false,"homeScore":30,"awayScore":30,"end":{"downDistanceText":"2nd & 8 at IND 22"}},
+          {"id":"4018729454908","text":" H.Butker 40 yard field goal is GOOD, Center-J.Winchester, Holder-M.Araiza.","type":{"text":"Field Goal Good"},"clock":{"displayValue":"0:00"},"period":{"number":5},"scoringPlay":true,"homeScore":33,"awayScore":30},
+          {"id":"4018729454935","text":"END GAME","type":{"text":"End of Game"},"clock":{"displayValue":"0:00"},"period":{"number":5},"scoringPlay":false,"homeScore":33,"awayScore":30}
+        ]
+      }
+    ]
+  },
+  "winprobability": [
+    {"playId":"4018729451","homeWinPercentage":0.7693},
+    {"playId":"40187294539","homeWinPercentage":0.7469},
+    {"playId":"401872945318","homeWinPercentage":0.6385},
+    {"playId":"401872945340","homeWinPercentage":0.6116},
+    {"playId":"401872945374","homeWinPercentage":0.6093},
+    {"playId":"401872945381","homeWinPercentage":0.6282},
+    {"playId":"401872945508","homeWinPercentage":0.623},
+    {"playId":"401872945531","homeWinPercentage":0.6502},
+    {"playId":"401872945541","homeWinPercentage":0.6502},
+    {"playId":"401872945551","homeWinPercentage":0.6645},
+    {"playId":"401872945592","homeWinPercentage":0.6685},
+    {"playId":"401872945614","homeWinPercentage":0.7596},
+    {"playId":"401872945641","homeWinPercentage":0.7512},
+    {"playId":"401872945663","homeWinPercentage":0.7937},
+    {"playId":"401872945697","homeWinPercentage":0.795},
+    {"playId":"401872945704","homeWinPercentage":0.7769},
+    {"playId":"401872945958","homeWinPercentage":0.7587},
+    {"playId":"401872945981","homeWinPercentage":0.7702},
+    {"playId":"4018729451004","homeWinPercentage":0.7517},
+    {"playId":"4018729451024","homeWinPercentage":0.7601},
+    {"playId":"4018729451135","homeWinPercentage":0.7558},
+    {"playId":"4018729451158","homeWinPercentage":0.7047},
+    {"playId":"4018729451169","homeWinPercentage":0.6948},
+    {"playId":"4018729451179","homeWinPercentage":0.7098},
+    {"playId":"4018729451372","homeWinPercentage":0.6991},
+    {"playId":"4018729451397","homeWinPercentage":0.6677},
+    {"playId":"4018729451407","homeWinPercentage":0.6677},
+    {"playId":"4018729451417","homeWinPercentage":0.6774},
+    {"playId":"4018729451752","homeWinPercentage":0.7654},
+    {"playId":"4018729451782","homeWinPercentage":0.7951},
+    {"playId":"4018729451816","homeWinPercentage":0.7969},
+    {"playId":"4018729451823","homeWinPercentage":0.7902},
+    {"playId":"4018729451993","homeWinPercentage":0.7228},
+    {"playId":"4018729452035","homeWinPercentage":0.625},
+    {"playId":"4018729452066","homeWinPercentage":0.6219},
+    {"playId":"4018729452073","homeWinPercentage":0.6189},
+    {"playId":"4018729452162","homeWinPercentage":0.5775},
+    {"playId":"4018729452172","homeWinPercentage":0.5783},
+    {"playId":"4018729452182","homeWinPercentage":0.6158},
+    {"playId":"4018729452209","homeWinPercentage":0.6285},
+    {"playId":"4018729452231","homeWinPercentage":0.6097},
+    {"playId":"4018729452251","homeWinPercentage":0.6436},
+    {"playId":"4018729452558","homeWinPercentage":0.6594},
+    {"playId":"4018729452584","homeWinPercentage":0.7795},
+    {"playId":"4018729452625","homeWinPercentage":0.7818},
+    {"playId":"4018729452632","homeWinPercentage":0.7751},
+    {"playId":"4018729452739","homeWinPercentage":0.8013},
+    {"playId":"4018729452762","homeWinPercentage":0.7859},
+    {"playId":"4018729452775","homeWinPercentage":0.7862},
+    {"playId":"4018729452788","homeWinPercentage":0.8033},
+    {"playId":"4018729453149","homeWinPercentage":0.8516},
+    {"playId":"4018729453179","homeWinPercentage":0.8621},
+    {"playId":"4018729453189","homeWinPercentage":0.8621},
+    {"playId":"4018729453199","homeWinPercentage":0.8479},
+    {"playId":"4018729453554","homeWinPercentage":0.7186},
+    {"playId":"4018729453579","homeWinPercentage":0.6208},
+    {"playId":"4018729453610","homeWinPercentage":0.6121},
+    {"playId":"4018729453617","homeWinPercentage":0.6252},
+    {"playId":"4018729453745","homeWinPercentage":0.5271},
+    {"playId":"4018729453768","homeWinPercentage":0.5415},
+    {"playId":"4018729453778","homeWinPercentage":0.5379},
+    {"playId":"4018729453787","homeWinPercentage":0.4813},
+    {"playId":"4018729453934","homeWinPercentage":0.3866},
+    {"playId":"4018729453945","homeWinPercentage":0.5476},
+    {"playId":"4018729453975","homeWinPercentage":0.5282},
+    {"playId":"4018729454001","homeWinPercentage":0.4483},
+    {"playId":"4018729454099","homeWinPercentage":0.5082},
+    {"playId":"4018729454107","homeWinPercentage":0.9024},
+    {"playId":"4018729454146","homeWinPercentage":0.5},
+    {"playId":"4018729454176","homeWinPercentage":0.5425},
+    {"playId":"4018729454432","homeWinPercentage":0.7158},
+    {"playId":"4018729454455","homeWinPercentage":0.7555},
+    {"playId":"4018729454475","homeWinPercentage":0.7006},
+    {"playId":"4018729454667","homeWinPercentage":0.6228},
+    {"playId":"4018729454718","homeWinPercentage":0.5937},
+    {"playId":"4018729454892","homeWinPercentage":0.9025},
+    {"playId":"4018729454908","homeWinPercentage":1},
+    {"playId":"4018729454935","homeWinPercentage":1}
+  ]
+}
