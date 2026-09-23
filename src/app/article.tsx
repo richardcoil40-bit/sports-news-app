@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { TRUST_LABELS } from '@/constants/flags';
 import { claimBadgeColors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ClaimType, claimTypeLabel } from '@/lib/claim-type';
@@ -71,10 +72,11 @@ export default function ArticleScreen() {
               Same solid chip as the feed row, so the claim you tapped
               through on is still the first thing you see here. Absent
               when the caller had no classification to hand on rather
-              than re-run one — see the screens that push here.
+              than re-run one — see the screens that push here. Hidden
+              with the row's while TRUST_LABELS is off.
             */}
             <View style={styles.metaRow}>
-              {params.claimType ? (
+              {TRUST_LABELS && params.claimType ? (
                 <View
                   style={[
                     styles.claimChip,

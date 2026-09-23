@@ -5,6 +5,7 @@ import { ArticleCard } from '@/components/article-card';
 import { FilterBar } from '@/components/filter-bar';
 import { Centered, Separator, tabStyles } from '@/components/team-tabs/shared';
 import { ThemedText } from '@/components/themed-text';
+import { TRUST_LABELS } from '@/constants/flags';
 import { useReadArticles } from '@/hooks/use-read-articles';
 import { ClaimFilter, ClaimType, CLAIM_FILTER_TABS, Classified } from '@/lib/claim-type';
 import { WithDuplicates } from '@/lib/cluster';
@@ -80,8 +81,12 @@ export function NewsTab({
         </AccentRow>
       )}
       ItemSeparatorComponent={Separator}
+      // Hidden with the claim chips while TRUST_LABELS is off. claimFilter
+      // then can't leave 'all', so emptyMessage takes its default path.
       ListHeaderComponent={
-        <FilterBar tabs={CLAIM_FILTER_TABS} active={claimFilter} onChange={onChangeClaim} />
+        TRUST_LABELS ? (
+          <FilterBar tabs={CLAIM_FILTER_TABS} active={claimFilter} onChange={onChangeClaim} />
+        ) : null
       }
       ListEmptyComponent={
         <Centered>

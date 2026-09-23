@@ -11,7 +11,7 @@ import { SettingsButton } from '@/components/settings-button';
 import { Logo } from '@/components/logo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BRIEF_MODE } from '@/constants/flags';
+import { BRIEF_MODE, TRUST_LABELS } from '@/constants/flags';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useFeed } from '@/hooks/use-feed';
 import { useReadArticles } from '@/hooks/use-read-articles';
@@ -405,17 +405,25 @@ export default function FeedScreen() {
                 accessibilityLabel="Filter by team"
                 style={styles.teamsPill}
               />
-              <DropdownPill
-                label={claimPillLabel}
-                active={claimFilter !== 'all'}
-                options={claimOptions}
-                onSelect={(key) => setClaimFilter(key as ClaimFilter)}
-                align="right"
-                panelWidth={190}
-                closeOnSelect
-                accessibilityLabel="Filter by claim type"
-                style={styles.claimPill}
-              />
+              {/*
+                Hidden with the claim chips while TRUST_LABELS is off —
+                filtering by a label the rows don't show is nonsense. With
+                no way to set it, claimFilter stays 'all', so the sectioning
+                and empty-state logic keyed on it take their default path.
+              */}
+              {TRUST_LABELS ? (
+                <DropdownPill
+                  label={claimPillLabel}
+                  active={claimFilter !== 'all'}
+                  options={claimOptions}
+                  onSelect={(key) => setClaimFilter(key as ClaimFilter)}
+                  align="right"
+                  panelWidth={190}
+                  closeOnSelect
+                  accessibilityLabel="Filter by claim type"
+                  style={styles.claimPill}
+                />
+              ) : null}
             </View>
           ) : null}
         </View>

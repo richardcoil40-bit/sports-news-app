@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { TRUST_LABELS } from '@/constants/flags';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { clearStoredArticles } from '@/lib/article-store';
@@ -25,11 +26,17 @@ const ITEMS = [
     label: 'Favorites',
     detail: 'The teams your feed is built from',
   },
-  {
-    href: '/settings/definitions' as const,
-    label: 'Definitions',
-    detail: 'What the labels on each story mean',
-  },
+  // Only while the labels it defines are on screen: definitions.ts's first
+  // rule is that every term in the glossary is one the app actually shows.
+  ...(TRUST_LABELS
+    ? [
+        {
+          href: '/settings/definitions' as const,
+          label: 'Definitions',
+          detail: 'What the labels on each story mean',
+        },
+      ]
+    : []),
   {
     href: '/settings/developer' as const,
     label: 'Developer Info',
