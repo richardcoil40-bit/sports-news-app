@@ -835,7 +835,8 @@ async function startBuild(token, app, creds) {
 }
 
 /**
- * The commit behind the last build that actually reached testers.
+ * The two ends of a release's change list: the commit the target build was
+ * made from, and the commit behind the last build delivered before it.
  *
  * Derived rather than tracked. Every Xcode Cloud run records its source
  * commit, and `ciBuildRuns/{id}/builds` says which run *delivered* — most
@@ -843,15 +844,25 @@ async function startBuild(token, app, creds) {
  * readable off what shipped, and can't drift the way a changelog file
  * someone has to remember to update does.
  *
- * Returns null rather than throwing: a missing range should cost the note
- * a convenience, never the release.
+ * **Both ends come from Apple, not from this clone.** The range used to end
+ * at local HEAD, which is only the built commit if the working tree happens
+ * to be sitting on it. Releasing build 30 from a checkout on a feature
+ * branch listed that branch's two unmerged commits as "app changes — testers
+ * may notice", in a build that contained neither.
+ *
+ * "Before" means an older run than the target's, not merely a different
+ * one, so releasing an older build doesn't diff against a newer one.
+ *
+ * Either end is null rather than a throw: a missing range should cost the
+ * note a convenience, never the release. `target` is null for a manual
+ * archive, which has no run, and for a build older than the 25 runs read.
  */
-async function lastReleasedCommit(token, app, targetBuildId, creds) {
+async function releaseRange(token, app, targetBuildId, creds) {
   let workflow;
   try {
     ({ workflow } = await resolveWorkflow(token, app, creds));
   } catch {
-    return null;
+    return { target: null, since: null };
   }
 
   const runs = await get(
@@ -860,19 +871,29 @@ async function lastReleasedCommit(token, app, targetBuildId, creds) {
     creds,
   );
 
+  let target = null;
   for (const run of runs?.data ?? []) {
     const sha = run.attributes?.sourceCommit?.commitSha;
+    const number = run.attributes?.number;
     if (!sha) continue;
+    // Runs are newest first. Until the target's run is found, a delivered
+    // run is newer than the target and says nothing about what it contains.
+    if (target && number >= target.run) continue;
 
     const delivered = await get(token, `/v1/ciBuildRuns/${run.id}/builds?limit=5`, creds);
     const builds = delivered?.data ?? [];
-    // Skip runs that delivered nothing, and the run that made this build.
-    if (!builds.length || builds.some((b) => b.id === targetBuildId)) continue;
+    if (!builds.length) continue;
 
-    return { sha, version: builds[0]?.attributes?.version, run: run.attributes?.number };
+    if (builds.some((b) => b.id === targetBuildId)) {
+      target = { sha, run: number };
+      continue;
+    }
+    if (!target) continue;
+
+    return { target, since: { sha, version: builds[0]?.attributes?.version, run: number } };
   }
 
-  return null;
+  return { target, since: null };
 }
 
 /**
@@ -881,24 +902,26 @@ async function lastReleasedCommit(token, app, targetBuildId, creds) {
  * those in a release note is noise — but the split is a path heuristic,
  * not a judgement, so both halves are shown and the human picks.
  */
-function commitsSince(sha) {
+function commitsSince(sha, until) {
   const git = (args) =>
     execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 
-  try {
-    git(['cat-file', '-e', `${sha}^{commit}`]);
-  } catch {
-    return { error: `commit ${sha.slice(0, 8)} isn't in this clone — try git fetch` };
+  for (const commit of [sha, until]) {
+    try {
+      git(['cat-file', '-e', `${commit}^{commit}`]);
+    } catch {
+      return { error: `commit ${commit.slice(0, 8)} isn't in this clone — try git fetch` };
+    }
   }
 
   let ancestor = true;
   try {
-    git(['merge-base', '--is-ancestor', sha, 'HEAD']);
+    git(['merge-base', '--is-ancestor', sha, until]);
   } catch {
     ancestor = false;
   }
 
-  const out = git(['log', `${sha}..HEAD`, '--first-parent', '--format=%h\t%s']).trim();
+  const out = git(['log', `${sha}..${until}`, '--first-parent', '--format=%h\t%s']).trim();
   const commits = out
     ? out.split('\n').map((line) => {
         const tab = line.indexOf('\t');
@@ -984,13 +1007,20 @@ async function releaseBuild(token, app, creds) {
   console.log(`Releasing ${label} — internal=${detail.internalBuildState ?? '?'} ` +
     `external=${detail.externalBuildState ?? '?'}\n`);
 
-  const since = await lastReleasedCommit(token, app, target.id, creds);
-  if (!since) {
+  const { target: built, since } = await releaseRange(token, app, target.id, creds);
+  if (!built) {
+    // A manual archive has no run to read its commit off, and local HEAD is
+    // not a stand-in for it — see releaseRange.
+    console.log('  built from   : unknown (no Xcode Cloud run in the last 25 delivered this build)');
+    console.log('  no change list — nothing records which commit it was built from\n');
+  } else if (!since) {
     // True for the first CI delivery: earlier builds were manual archives,
     // which leave no run to read a commit off.
+    console.log(`  built from   : ${built.sha.slice(0, 7)} (run #${built.run})`);
     console.log('  no earlier CI-delivered build to diff against\n');
   } else {
-    const { commits, ancestor, error } = commitsSince(since.sha);
+    console.log(`  built from   : ${built.sha.slice(0, 7)} (run #${built.run})`);
+    const { commits, ancestor, error } = commitsSince(since.sha, built.sha);
     const from = `build ${since.version} (${since.sha.slice(0, 7)})`;
     if (error) {
       console.log(`  changes since ${from}: ${error}\n`);
@@ -998,7 +1028,7 @@ async function releaseBuild(token, app, creds) {
       console.log(`  nothing has landed since ${from}\n`);
     } else {
       console.log(`  ${commits.length} commit${commits.length === 1 ? '' : 's'} since ${from}` +
-        `${ancestor ? '' : ' — NOT an ancestor of HEAD, range may be wrong'}`);
+        `${ancestor ? '' : ` — ${since.sha.slice(0, 7)} is NOT an ancestor of ${built.sha.slice(0, 7)}, range may be wrong`}`);
       const visible = commits.filter((c) => c.visible);
       const rest = commits.filter((c) => !c.visible);
       if (visible.length) {
