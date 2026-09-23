@@ -376,6 +376,60 @@ Two things follow, and the first was briefly got wrong here:
 `version` is untouched by any of this. Only `CFBundleVersion` moves, so
 neither route starts a new App Review.
 
+### The workflow's Xcode is pinned, and "Latest Release" is why
+
+**Build 27 uploaded, processed to `VALID`, and would not launch.** Splash,
+then straight back to the home screen, on every device that installed it,
+with **no crash report written** — nothing in `Analytics Data`, nothing in
+the device's crash-log domain. It reached all six testers before anyone
+opened it.
+
+Nothing in the source caused it. The workflow's Xcode version was set to
+**"Latest Release"**, which is a *moving* selection: it resolved to Xcode
+26.6 (`17F113`) when build 26 shipped and to Xcode 27 (`27A266a`) a month
+later, so build 27 was the first binary this project ever produced against
+the iOS 27.0 SDK. The workflow now pins **Xcode 26.6** explicitly, and
+`--start-build` refuses an unpinned workflow unless you pass `--confirm`.
+
+Three things made it hard to find, and they are the reason this is written
+down rather than left as a fixed setting:
+
+- **Every signal said fine.** CI green, archive succeeded, upload
+  succeeded, Apple's own processing said `VALID`. That state means "the
+  binary is well-formed", and it is routinely mistaken for "the app runs".
+- **It does not reproduce locally** if your Xcode is the old one. This
+  laptop is on 26.6 — build 26's exact toolchain — so a local Release build
+  with Hermes bytecode launched perfectly while the shipped build opened
+  for nobody. Check `xcodebuild -version` against the build's `DTXcode`
+  before concluding the code is at fault.
+- **The cause is invisible in the diff.** Nine commits, none responsible.
+  The temptation is to bisect the source; the answer was not in it.
+
+**The artifact says which compiler made it, and that is the fastest
+diagnostic.** Pull the build's `app-store.zip` from the Xcode Cloud
+artifacts (`/v1/ciBuildActions/{id}/artifacts`), unzip the `.ipa`, and read
+the app's `Info.plist`:
+
+```
+plutil -p Payload/NoFrills.app/Info.plist | grep -E 'DTXcode|DTSDKName'
+```
+
+| | build 26 (works) | build 27 (crashed) | build 28 (works) |
+|---|---|---|---|
+| `DTXcode` | `2660` | `2700` | `2660` |
+| `DTXcodeBuild` | `17F113` | `27A266a` | `17F113` |
+| `DTSDKName` | `iphoneos26.5` | `iphoneos27.0` | `iphoneos26.5` |
+
+Everything else in those two IPAs is identical — same 14 frameworks, same
+file layout, same Hermes bytecode version (98), same single arm64 slice.
+When a build won't launch and the source looks innocent, diff the artifacts
+before you doubt the code.
+
+**Pinning is a freeze, not a fix.** Apple eventually requires a minimum SDK
+for App Store submission, and the pin has to be lifted before that lands —
+which means getting Expo/RN building clean under the newer Xcode. That is
+tracked, with its trigger, in `docs/deferred-work.md`.
+
 ### Releasing: builds are asked for, never automatic
 
 The workflow has **no automatic branch trigger** — `branchStartCondition`
@@ -393,14 +447,31 @@ submit external groups for beta review — and `--release` is those three.
 ```
 node scripts/testflight-feedback.mjs --start-build
 node scripts/testflight-feedback.mjs --builds            # wait for VALID
-node scripts/testflight-feedback.mjs --release --notes "…"          # dry run
-node scripts/testflight-feedback.mjs --release --notes "…" --confirm
+                                                         # then install it and open it
+node scripts/testflight-feedback.mjs --release --notes "…"                      # dry run
+node scripts/testflight-feedback.mjs --release --notes "…" --confirm --launched
 ```
 
 `--release` prints its plan and changes nothing without `--confirm`, the
 same split as `--new` / `--mark` and for a stronger reason: this one
 reaches real people. Every step re-checks first, so a re-run after a
 partial failure reports what is already done rather than erroring.
+
+**`--launched` is your assertion that you installed the build and opened
+it**, and `--confirm` alone will not release without it. Unlike the CI
+preflight on `--start-build`, it has no override: that gate is about a
+commit, where an urgent fix is a real reason to skip ahead, and this one is
+about a binary Apple has already built and you already have. Installing it
+costs two minutes and there is no emergency that makes shipping an unopened
+build the better call. Build 27 is why — see the toolchain section above.
+
+**A build attached to no group is invisible to you as well.** "Held back
+from testers" and "installable for testing" are not the same state, and
+conflating them wastes a round of confusion: TestFlight shows a tester only
+the builds assigned to a group they are in, so a build sitting at zero
+groups shows nobody anything, including the account holder. Attach it to
+the **internal** group first — that is the pre-release smoke test — then
+release to everyone once it opens.
 
 Two things that look like faults and aren't. Beta review is required for
 external testers on **every** build, but under an already-approved version
@@ -411,7 +482,7 @@ Cloud assigns it; see the note above.
 
 #### What checks the build, and where
 
-Four things verify a release, and they fire at three different moments.
+Five things verify a release, and they fire at three different moments.
 Knowing which is which matters, because for a long time the middle column
 was empty:
 
@@ -419,9 +490,15 @@ was empty:
 |---|---|---|---|
 | `tsc`, lint, Vitest, worker typecheck | ci.yml | — | — |
 | `expo export` bundle check | ci.yml | — | — |
-| `--start-build` preflight | — | automatic | — |
+| `--start-build` CI preflight | — | automatic | — |
+| `--start-build` toolchain check | — | automatic | — |
 | `check-feeds.sh`, worker smoke | — | by hand | — |
-| install it and launch it | — | — | by hand |
+| install it and launch it | — | — | by hand, gated by `--launched` |
+
+**The bottom row is the only one that catches a build that won't start**,
+and everything above it passed on build 27. It is also the only row no
+script can perform, which is why `--release` makes you assert it rather
+than trusting the checklist to be remembered.
 
 **`--start-build` refuses a commit CI hasn't passed.** It resolves the head
 of `origin/<branch>` with `git ls-remote` — the remote, not the local ref,
@@ -453,12 +530,23 @@ Three things a script can't check, before `--release --confirm`:
 2. **`node --env-file=.env --env-file=.env.local scripts/worker-smoke.mjs`**
    if the Worker changed. See the Worker section below for why the env files
    are not optional there.
-3. **Install the build and launch it.** `--builds` reporting `VALID` means
-   Apple finished *processing the binary* — nothing anywhere checks that the
-   app launches. Cold launch, one team screen, one article. Six family
-   testers get one notification per release, and the triage record already
-   shows build lag polluting the feedback signal; five minutes is cheap
-   against that.
+3. **Install the build and launch it**, then pass `--launched`. `--builds`
+   reporting `VALID` means Apple finished *processing the binary* — nothing
+   anywhere checks that the app launches. Cold launch, one team screen, one
+   article. Six family testers get one notification per release, and the
+   triage record already shows build lag polluting the feedback signal;
+   five minutes is cheap against that.
+
+   Attach the build to the **internal** group to test it — a build attached
+   to no group is invisible to you too. Build 27 is the case that turned
+   this from advice into a gate: it cleared CI, archived, uploaded,
+   processed to `VALID`, went to all six testers, and opened for none of
+   them.
+
+Two of these run against a running feed or service; the third is about the
+binary. When the third fails, read the toolchain section above before
+reaching for the diff — a build that won't start is much more often the
+compiler than the commit.
 
 ## Reading what the service did
 

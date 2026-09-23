@@ -161,6 +161,12 @@ const PREP_ARCHIVE = flag('prep-archive');
 const START_BUILD = flag('start-build');
 const RELEASE = flag('release');
 const CONFIRM = flag('confirm');
+/**
+ * Your assertion that you installed this build and opened it. Required by
+ * `--release`, because it is the one check in the whole pipeline that no
+ * script can perform — see the note on releaseBuild.
+ */
+const LAUNCHED = flag('launched');
 const NOTES = value('notes', null);
 const BRANCH = value('branch', 'main');
 const BUILD_FILTER = value('build', null);
@@ -599,6 +605,33 @@ async function resolveWorkflow(token, app, creds) {
 }
 
 /**
+ * Which Xcode the workflow will actually compile with.
+ *
+ * Worth a call of its own because this is the setting that silently
+ * changed underneath build 27 and produced a binary that uploaded,
+ * processed to VALID, and would not launch — see the toolchain note in
+ * AGENTS.md. `Latest Release` is a *moving* selection: it was Xcode 26.6
+ * when build 26 shipped and Xcode 27 a month later, and nothing in this
+ * repo, in CI, or in Apple's own processing reports the difference.
+ *
+ * Returns null rather than throwing. A missing answer should cost the
+ * preflight its opinion, never the build.
+ */
+async function workflowToolchain(token, workflow, creds) {
+  try {
+    const json = await get(token, `/v1/ciWorkflows/${workflow.id}?include=xcodeVersion`, creds);
+    const xcode = (json?.included ?? []).find((i) => i.type === 'ciXcodeVersions');
+    if (!xcode) return null;
+    const { name, version } = xcode.attributes ?? {};
+    // Apple's two moving selections. Anything else names a fixed release.
+    const moving = name === 'Latest Release' || name === 'Latest Beta or Release';
+    return { name, version, pinned: !moving };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Does the commit Xcode Cloud is about to build actually pass CI?
  *
  * This is the one gate between `main` and production, and until it existed
@@ -739,6 +772,30 @@ async function startBuild(token, app, creds) {
   }
 
   const { product, workflow } = await resolveWorkflow(token, app, creds);
+
+  // The second thing that can hand testers a build nobody can open, and
+  // unlike a red CI check it leaves no trace anywhere else: an unpinned
+  // Xcode means Apple chooses the compiler, and it changes without notice.
+  const toolchain = await workflowToolchain(token, workflow, creds);
+  if (toolchain?.pinned) {
+    console.log(`Toolchain: ${toolchain.name} (${toolchain.version}).\n`);
+  } else if (toolchain && CONFIRM) {
+    console.log(
+      `Toolchain: ${toolchain.name} — Apple picks the compiler, currently ${toolchain.version}.\n` +
+        `  Overridden by --confirm.\n`,
+    );
+  } else if (toolchain) {
+    throw new Error(
+      `Not starting a build.\n` +
+        `  The workflow's Xcode is "${toolchain.name}", which is a moving selection —\n` +
+        `  right now it resolves to ${toolchain.version}, and it changes when Apple ships.\n\n` +
+        `Build 27 was the first binary this project made against a new SDK that way. It\n` +
+        `archived, uploaded, processed to VALID and would not launch, with no crash report\n` +
+        `on the device. Pin the workflow to a specific Xcode in App Store Connect →\n` +
+        `Xcode Cloud → Manage Workflows → Environment, or re-run with --confirm if moving\n` +
+        `to a new toolchain is the point of this build.`,
+    );
+  }
 
   const repos = await get(
     token,
@@ -966,9 +1023,37 @@ async function releaseBuild(token, app, creds) {
   console.log('  beta review  :', !hasExternal ? 'not needed, no external group'
     : needsReview ? 'submit' : `already ${detail.externalBuildState}`);
 
+  console.log(
+    '  launched     :',
+    LAUNCHED ? 'asserted by --launched' : 'NOT asserted — install it and open it first',
+  );
+
   if (!CONFIRM) {
-    console.log(`\nDry run — nothing changed. Re-run with --confirm to do it.`);
+    console.log(`\nDry run — nothing changed. Re-run with --confirm --launched to do it.`);
     return;
+  }
+
+  // The one check no script can do, so the script makes you say you did it.
+  //
+  // Everything else about a release is verifiable from here: CI is green,
+  // the archive succeeded, Apple processed the binary to VALID. None of
+  // that is evidence the app *starts*. Build 27 cleared all three and
+  // opened for nobody — splash, then the home screen, no crash report —
+  // because the compiler had changed underneath it.
+  //
+  // Deliberately not overridable by --confirm, unlike the CI preflight in
+  // startBuild. That gate is about a commit, and an urgent fix is a real
+  // reason to skip it. This one is about a binary Apple has already built
+  // and you already have, so installing it costs two minutes and there is
+  // no emergency that makes shipping an unopened build the better call.
+  if (!LAUNCHED) {
+    throw new Error(
+      `Not releasing ${label}.\n` +
+        `  Install it from TestFlight, open it, and re-run with --launched.\n\n` +
+        `If it isn't showing in TestFlight, it is attached to no group yet — which is\n` +
+        `what "held back from testers" actually means, and it hides the build from you\n` +
+        `too. Attach it to the internal group first, test, then release to everyone.`,
+    );
   }
 
   console.log('');
