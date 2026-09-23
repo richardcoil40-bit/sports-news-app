@@ -401,3 +401,43 @@ Two are worth doing first for reasons beyond line count:
   of classify volume — one pool per followed team, each its own classify
   request. A regression there spends real money against `DAILY_CALL_CAP` and
   then degrades the feed quietly once the cap binds.
+
+## The build toolchain is pinned, and that is a debt with a deadline
+
+**Tracked as [#52](https://github.com/richardcoil40-bit/sports-news-app/issues/52).**
+
+Xcode Cloud's workflow pins **Xcode 26.6** (`17F113`) rather than following
+"Latest Release". That is not a preference. Build 27 was produced when
+"Latest Release" moved to Xcode 27 and the iOS 27.0 SDK; it archived,
+uploaded, processed to `VALID`, went to all six testers, and would not
+launch on any of them — splash, then the home screen, with no crash report
+written. Build 28 shipped the same source on the pinned toolchain and
+launches. `AGENTS.md` has the full account under "The workflow's Xcode is
+pinned, and 'Latest Release' is why".
+
+**What is deferred is the unpinning**, and unlike the service block above,
+this one has an external clock. Apple periodically raises the minimum SDK
+required for App Store submission. When that lands, the pin has to come off
+and the app has to build *and start* under the newer Xcode — which means an
+Expo/RN upgrade (`expo ~57.0.15`, `react-native 0.86.2` today) and a pod
+re-resolve, with an actual root cause found rather than a version bumped
+hopefully. Nobody has diagnosed why Xcode 27 produces a binary that will
+not launch; "the toolchain changed" is where the investigation stopped,
+because pinning made it stop being urgent.
+
+**Why waiting is right anyway.** Doing it now costs a native upgrade, a
+pod re-resolve, and at least one cloud build to verify, for zero
+user-visible benefit — and dependency changes are precisely the class of
+work that just cost a release. The pin holds until something forces it, and
+the triggers are written on the issue: an Apple SDK deadline, a dependency
+that needs the newer Xcode, or Xcode Cloud dropping 26.6 from its list.
+
+**What keeps it from being forgotten**, which is the real risk with a debt
+whose deadline is set by someone else:
+
+- `--start-build` refuses an unpinned workflow, so the pin cannot quietly
+  come off without someone reading why.
+- If Xcode Cloud stops offering 26.6, the next build fails on the pin
+  rather than silently falling back to a toolchain nobody chose.
+- The issue carries the rollback: re-pin and rebuild, one relationship on
+  the workflow.
