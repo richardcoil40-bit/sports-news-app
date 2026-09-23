@@ -32,6 +32,7 @@ import { withTeamMentions } from '@/lib/team-mentions';
 import { inkOn, visibleOn } from '@/lib/color';
 import { fetchTeamColor } from '@/lib/team-color';
 import { StatLeader, fetchTeamStatLeaders } from '@/lib/team-leaders';
+import { withinFeedWindow } from '@/lib/article-retention';
 import { fetchTeamNewsPoolWithStore } from '@/lib/article-store';
 import type { TeamNewsPool } from '@/lib/team-news-pool';
 
@@ -126,7 +127,15 @@ export default function TeamScreen() {
 
   // The whole pool rather than just its articles: the News tab's empty
   // state reads `coverage` to say *why* it's empty.
-  const news = useAsync<TeamNewsPool>(() => fetchTeamNewsPoolWithStore(params.id, poolName, league));
+  // `recent` is what the News tab shows: the pool capped at a week (see
+  // withinFeedWindow). Computed here, when the pool lands, because reading
+  // the clock during render is impure. `articles` stays whole on purpose:
+  // notable players rank on the full pool, and the player screen's list has
+  // to agree with those counts.
+  const news = useAsync<TeamNewsPool & { recent: Article[] }>(async () => {
+    const pool = await fetchTeamNewsPoolWithStore(params.id, poolName, league);
+    return { ...pool, recent: withinFeedWindow(pool.articles, Date.now()) };
+  });
 
   const schedule = useAsync<ScheduledGame[]>(async (publish) => {
     const games = await fetchTeamSchedule(params.id, league);
@@ -189,7 +198,7 @@ export default function TeamScreen() {
   // because this team's pool carries stories about its opponents and
   // neighbours too.
   const classifiedNews = useMemo(
-    () => withTeamMentions(withClaimTypes(news.data?.articles ?? []), teams),
+    () => withTeamMentions(withClaimTypes(news.data?.recent ?? []), teams),
     [news.data, teams],
   );
 

@@ -38,6 +38,38 @@ export interface StoredArticle extends Article {
 
 /** Cap by age: a week, then out. */
 export const MAX_ARTICLE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * What a feed *shows*: the same week, applied to everything on screen.
+ *
+ * The expiry above only governs the store — it drops stored articles the
+ * live feeds no longer serve, and deliberately never touches a fresh one.
+ * But a feed can keep serving an item for months: the Daily Nebraskan and
+ * the Omaha World-Herald both still carried January stories in late
+ * September. The brief's old two-day window hid that tail in "Earlier";
+ * once the brief became "everything unread", it filled the bottom of the
+ * feed. So screens apply the same week at render time, with the same
+ * constant, so "a week" means one thing.
+ *
+ * Undated articles stay. They can't be placed on the calendar, the store
+ * already ages them out a week after first sight, and dropping them would
+ * silently lose a source whose dates merely failed to parse — exactly how
+ * Eleven Warriors went missing before. An unparseable date is treated the
+ * same way.
+ *
+ * Not applied to player-ranking inputs: `notable-players.ts` counts across
+ * the whole pool, and the player screen's list has to agree with that count.
+ */
+export function withinFeedWindow<T extends Pick<Article, 'publishedAt'>>(
+  articles: T[],
+  now: number,
+): T[] {
+  return articles.filter((article) => {
+    if (!article.publishedAt) return true;
+    const published = Date.parse(article.publishedAt);
+    return Number.isNaN(published) || now - published <= MAX_ARTICLE_AGE_MS;
+  });
+}
+
 /** Cap by count, per team. */
 export const MAX_ARTICLES_PER_TEAM = 60;
 /**

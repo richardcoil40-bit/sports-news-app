@@ -4,6 +4,7 @@ import { useFavorites } from '@/hooks/use-favorites';
 import { useTeams } from '@/hooks/use-teams';
 import { favoriteKey } from '@/lib/favorite-keys';
 import { fetchMultiTeamFeed, FeedArticle } from '@/lib/multi-team-feed';
+import { withinFeedWindow } from '@/lib/article-retention';
 
 /**
  * The home feed. Resolves followed team IDs against the live team list
@@ -49,7 +50,11 @@ export function useFeed() {
       try {
         const result = await fetchMultiTeamFeed(followedTeams, { force: isRefresh });
         if (id !== requestId.current) return;
-        setArticles(result.articles);
+        // Capped at a week here, where the fetch lands, rather than in the
+        // screen's render — see withinFeedWindow for why the store's own
+        // expiry doesn't already do it. The error check below still reads
+        // the uncapped result: a pool with only old stories loaded fine.
+        setArticles(withinFeedWindow(result.articles, Date.now()));
         if (result.articles.length === 0 && result.failedSources.length > 0) {
           setError('Could not load your feed. Check your connection and try again.');
         }
