@@ -7,11 +7,13 @@ import standingsFixture from '@/lib/__fixtures__/espn-standings.json';
 import teamFixture from '@/lib/__fixtures__/espn-team.json';
 import teamLeadersFixture from '@/lib/__fixtures__/espn-team-leaders.json';
 import teamNewsFixture from '@/lib/__fixtures__/espn-team-news.json';
+import { emptySummary, fetchGameSummary } from '@/lib/game-summary';
 import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import { League } from '@/lib/leagues';
 import { fetchPlayerSeasonStats } from '@/lib/player-stats';
 import { fetchTeamRoster } from '@/lib/roster';
 import { fetchGameOdds, fetchTeamSchedule } from '@/lib/schedule';
+import { fetchScoreboard } from '@/lib/scoreboard';
 import { fetchTeamColor } from '@/lib/team-color';
 import { fetchTeamStatLeaders } from '@/lib/team-leaders';
 import { fetchLeagueArticles, fetchTeamArticles } from '@/lib/team-news';
@@ -56,6 +58,14 @@ const MALFORMED_SHAPES: [string, unknown][] = [
   ],
   ['articles as an object instead of an array', { articles: { headline: 'x' } }],
   ['standings entries with no team', { standings: { entries: [{}] } }],
+  [
+    'a drive whose plays are a string, and win probability with a numeric id and no value',
+    { drives: { previous: [{ id: '1', team: { id: '2' }, plays: 'nope' }], current: 'nope' }, winprobability: [{ playId: 1 }] },
+  ],
+  [
+    'a header whose competitors are a string, and drives as an array',
+    { header: { competitions: [{ competitors: 'nope', status: 'nope' }] }, drives: [] },
+  ],
 ];
 
 afterEach(() => {
@@ -99,6 +109,31 @@ describe('ESPN parsers degrade to empty on a malformed response', () => {
       it(`returns null for ${label}`, async () => {
         respondWith(body);
         await expect(fetchGameOdds(freshId(), DEFAULT_LEAGUE)).resolves.toBeNull();
+      });
+    }
+  });
+
+  describe('fetchScoreboard', () => {
+    for (const [label, body] of MALFORMED_SHAPES) {
+      it(`returns [] for ${label}`, async () => {
+        respondWith(body);
+        // force, because the board caches per league rather than per id.
+        await expect(fetchScoreboard(DEFAULT_LEAGUE, { force: true })).resolves.toEqual([]);
+      });
+    }
+  });
+
+  describe('fetchGameSummary', () => {
+    for (const [label, body] of MALFORMED_SHAPES) {
+      it(`returns an empty summary for ${label}`, async () => {
+        respondWith(body);
+        const id = freshId();
+        const summary = await fetchGameSummary(id, DEFAULT_LEAGUE);
+        // One junk shape carries a drive with an id and a team but no
+        // plays; that is a well-formed empty drive, not a crash, so only
+        // the parts that can't be salvaged are asserted empty.
+        expect({ ...summary, drives: [] }).toEqual(emptySummary(id));
+        expect(summary.drives.every((d) => d.plays.length === 0)).toBe(true);
       });
     }
   });
@@ -299,6 +334,10 @@ describe('ESPN parsers on a non-OK response', () => {
     ['fetchTeamSchedule', () => fetchTeamSchedule(freshId(), DEFAULT_LEAGUE)],
     ['fetchTeamArticles', () => fetchTeamArticles(freshId(), DEFAULT_LEAGUE)],
     ['fetchLeagueArticles', () => fetchLeagueArticles(DEFAULT_LEAGUE)],
+    // A live poll that fails should retry on the next tick, not cache a
+    // board with no games or a summary with no drives for the TTL.
+    ['fetchScoreboard', () => fetchScoreboard(DEFAULT_LEAGUE, { force: true })],
+    ['fetchGameSummary', () => fetchGameSummary(freshId(), DEFAULT_LEAGUE)],
   ])('%s throws so the caller can show an error state', async (_name, call) => {
     respondWith(null, { ok: false, status: 503 });
     await expect(call()).rejects.toThrow(/responded 503/);
