@@ -51,10 +51,12 @@ import type { Article } from '@/lib/feeds';
  * local writer's own scoop is more likely to be phrased with hedges than an
  * ESPN wire piece is. Bias every rule toward leaving things alone.
  *
- * The same asymmetry governs `unlabeled`: it surfaces wherever `reported`
- * does (see brief.ts), because the no-signal pile is mostly real news —
- * routing it to chatter would recreate the misfiled-scoop error at scale.
- * It changes what the badge claims, never what gets shown.
+ * The same asymmetry governs `unlabeled`: it is treated like `reported`
+ * everywhere a claim type decides anything, because the no-signal pile is
+ * mostly real news — routing it with rumors would recreate the
+ * misfiled-scoop error at scale. It changes what the badge claims, never
+ * what gets shown. (The brief no longer routes on claim type at all; see
+ * brief.ts.)
  */
 export type ClaimType = 'reported' | 'rumor' | 'take' | 'unlabeled';
 

@@ -1,190 +1,56 @@
 import { describe, expect, it } from 'vitest';
 
-import { briefCutoff, briefEndCopy, MAX_BRIEF_AGE_MS, splitBrief } from '@/lib/brief';
-import { ClaimType } from '@/lib/claim-type';
+import { BriefSections, briefEndCopy, splitBrief } from '@/lib/brief';
 
-const NOW = new Date('2026-08-18T12:00:00.000Z');
-const ago = (ms: number) => new Date(NOW.getTime() - ms);
-const HOUR = 60 * 60 * 1000;
-
-const item = (claimType: ClaimType, hoursAgo: number, id = '') => ({
-  claimType,
-  publishedAt: ago(hoursAgo * HOUR).toISOString(),
-  id,
-});
-
-/** The common case: nothing has been opened. */
-const unread = () => false;
-
-describe('briefCutoff', () => {
-  // All that is left of a rule that used to take the later of a period
-  // boundary and a catch-up mark. Both are gone: the window stopped moving
-  // when read marks took over, so a story can no longer leave the brief
-  // because the reader came back to it.
-  it('is two days back and nothing else', () => {
-    expect(briefCutoff(NOW)).toEqual(ago(MAX_BRIEF_AGE_MS));
-  });
-});
+const items = (...ids: string[]) => ids.map((id) => ({ id }));
+const readSet =
+  (...ids: string[]) =>
+  (item: { id: string }) =>
+    ids.includes(item.id);
 
 describe('splitBrief', () => {
-  const cutoff = ago(6 * HOUR);
+  it('puts unopened stories in the brief and opened ones in read', () => {
+    const sections = splitBrief(items('a', 'b', 'c', 'd'), readSet('b', 'd'));
 
-  it('separates reported news from chatter inside the window', () => {
-    const sections = splitBrief(
-      [
-        item('reported', 1, 'a'),
-        item('rumor', 2, 'b'),
-        item('take', 3, 'c'),
-        item('reported', 4, 'd'),
-      ],
-      cutoff,
-      unread,
-    );
-
-    expect(sections.brief.map((a) => a.id)).toEqual(['a', 'd']);
-    expect(sections.chatter.map((a) => a.id)).toEqual(['b', 'c']);
-    expect(sections.earlier).toEqual([]);
+    expect(sections.unread.map((i) => i.id)).toEqual(['a', 'c']);
+    expect(sections.read.map((i) => i.id)).toEqual(['b', 'd']);
+    expect(sections.total).toBe(4);
   });
 
-  it('puts everything older in earlier, whatever its claim type', () => {
-    const sections = splitBrief(
-      [item('reported', 20, 'old'), item('reported', 1, 'new')],
-      cutoff,
-      unread,
-    );
+  // The input is already newest first; the split must not re-sort either half.
+  it('keeps feed order within both halves', () => {
+    const sections = splitBrief(items('e', 'd', 'c', 'b', 'a'), readSet('a', 'd'));
 
-    expect(sections.brief.map((a) => a.id)).toEqual(['new']);
-    expect(sections.earlier.map((a) => a.id)).toEqual(['old']);
+    expect(sections.unread.map((i) => i.id)).toEqual(['e', 'c', 'b']);
+    expect(sections.read.map((i) => i.id)).toEqual(['d', 'a']);
   });
 
-  // Treating unknown dates as recent would let a feed with bad timestamps
-  // fill the brief with arbitrary content.
-  it('treats a missing timestamp as older', () => {
-    const sections = splitBrief(
-      [{ claimType: 'reported' as const, publishedAt: null, id: 'x' }],
-      cutoff,
-      unread,
-    );
-    expect(sections.earlier.map((a) => a.id)).toEqual(['x']);
+  it('places every story in exactly one half', () => {
+    const input = items('a', 'b', 'c', 'd', 'e', 'f');
+    const sections = splitBrief(input, readSet('a', 'c', 'f'));
+
+    expect([...sections.unread, ...sections.read]).toHaveLength(input.length);
+    expect(new Set([...sections.unread, ...sections.read])).toEqual(new Set(input));
   });
 
-  it('treats an unparseable timestamp as older', () => {
-    const sections = splitBrief(
-      [{ claimType: 'reported' as const, publishedAt: 'not a date', id: 'x' }],
-      cutoff,
-      unread,
-    );
-    expect(sections.earlier.map((a) => a.id)).toEqual(['x']);
-  });
+  it('has no cap: a long unread feed stays in the brief', () => {
+    const input = items(...Array.from({ length: 40 }, (_, n) => `s${n}`));
+    const sections = splitBrief(input, () => false);
 
-  describe('read marks', () => {
-    const isRead = (ids: string[]) => (a: { id: string }) => ids.includes(a.id);
-
-    // The whole point of the rewrite: opening a story must not move it.
-    it('leaves a read story exactly where it was', () => {
-      const sections = splitBrief(
-        [item('reported', 1, 'a'), item('reported', 2, 'b'), item('reported', 3, 'c')],
-        cutoff,
-        isRead(['b']),
-      );
-
-      expect(sections.brief.map((a) => a.id)).toEqual(['a', 'b', 'c']);
-      expect(sections.earlier).toEqual([]);
-    });
-
-    it('counts unread separately from the total', () => {
-      const sections = splitBrief(
-        [item('reported', 1, 'a'), item('reported', 2, 'b'), item('reported', 3, 'c')],
-        cutoff,
-        isRead(['b']),
-      );
-
-      expect(sections.briefTotal).toBe(3);
-      expect(sections.unread).toBe(2);
-      expect(sections.unreadShown).toBe(2);
-      expect(sections.truncated).toBe(false);
-    });
-
-    // A story you finished can't push one you haven't seen out of the
-    // brief — that would be the old disappearing act, one card at a time.
-    it('does not count read stories against the cap', () => {
-      const articles = [
-        ...Array.from({ length: 12 }, (_, i) => item('reported', 1, `read-${i}`)),
-        ...Array.from({ length: 12 }, (_, i) => item('reported', 2, `new-${i}`)),
-      ];
-
-      const sections = splitBrief(
-        articles,
-        cutoff,
-        isRead(articles.slice(0, 12).map((a) => a.id)),
-        12,
-      );
-
-      expect(sections.brief).toHaveLength(24);
-      expect(sections.earlier).toEqual([]);
-      expect(sections.truncated).toBe(false);
-    });
-  });
-
-  describe('the cap', () => {
-    const many = Array.from({ length: 20 }, (_, i) => item('reported', 1, `a${i}`));
-
-    it('limits how many unread the brief shows', () => {
-      const sections = splitBrief(many, cutoff, unread, 5);
-      expect(sections.brief).toHaveLength(5);
-      expect(sections.briefTotal).toBe(20);
-      expect(sections.unread).toBe(20);
-      expect(sections.unreadShown).toBe(5);
-      expect(sections.truncated).toBe(true);
-    });
-
-    // The cap limits what the brief *shows*, never what the app keeps.
-    it('moves the overflow into earlier rather than dropping it', () => {
-      const sections = splitBrief(many, cutoff, unread, 5);
-      expect(sections.earlier).toHaveLength(15);
-      expect(sections.brief.length + sections.earlier.length).toBe(20);
-    });
-
-    it('overflows the unread ones past the cap, in order', () => {
-      const sections = splitBrief(
-        Array.from({ length: 13 }, (_, i) => item('reported', 1, `a${i}`)),
-        cutoff,
-        unread,
-        12,
-      );
-
-      expect(sections.brief).toHaveLength(12);
-      expect(sections.earlier.map((a) => a.id)).toEqual(['a12']);
-    });
-
-    it('is not truncated when everything fits', () => {
-      const sections = splitBrief([item('reported', 1)], cutoff, unread, 5);
-      expect(sections.truncated).toBe(false);
-    });
+    expect(sections.unread).toHaveLength(40);
+    expect(sections.read).toHaveLength(0);
   });
 
   it('handles an empty feed', () => {
-    const sections = splitBrief([], cutoff, unread);
-    expect(sections).toMatchObject({
-      brief: [],
-      chatter: [],
-      earlier: [],
-      briefTotal: 0,
-      unread: 0,
-      unreadShown: 0,
-    });
+    expect(splitBrief([], () => false)).toEqual({ unread: [], read: [], total: 0 });
   });
 });
 
 describe('briefEndCopy', () => {
-  const sections = (briefTotal: number, unread: number, unreadShown = unread) => ({
-    brief: [],
-    chatter: [],
-    earlier: [],
-    briefTotal,
-    unread,
-    unreadShown,
-    truncated: unread > unreadShown,
+  const sections = (total: number, unread: number): BriefSections<unknown> => ({
+    unread: Array.from({ length: unread }),
+    read: Array.from({ length: total - unread }),
+    total,
   });
 
   it('counts the unread against the total', () => {
@@ -194,7 +60,14 @@ describe('briefEndCopy', () => {
     });
   });
 
-  it('says so when everything in the window has been read', () => {
+  it('uses the singular for a feed of one unread story', () => {
+    expect(briefEndCopy(sections(1, 1))).toEqual({
+      title: 'End of the brief',
+      detail: '1 unread of 1 story',
+    });
+  });
+
+  it('says so when everything has been read', () => {
     expect(briefEndCopy(sections(14, 0))).toEqual({
       title: "You're caught up",
       detail: 'All 14 stories read',
@@ -211,17 +84,14 @@ describe('briefEndCopy', () => {
   it('says so when there is nothing at all', () => {
     expect(briefEndCopy(sections(0, 0))).toEqual({
       title: "You're caught up",
-      detail: 'Nothing new in the last two days',
+      detail: 'Nothing new',
     });
   });
 
   // The heading is what the reader catches from the corner of their eye, so
-  // it must not say "caught up" over a dozen unread stories one tap below.
-  it('never claims completeness when the cap truncated the list', () => {
-    expect(briefEndCopy(sections(20, 20, 12))).toEqual({
-      title: 'End of the brief',
-      detail: 'Showing 12 of 20 unread',
-    });
+  // it must not say "caught up" while a single unread story remains.
+  it('never claims completeness while anything is unread', () => {
+    expect(briefEndCopy(sections(30, 1)).title).toBe('End of the brief');
   });
 
   describe('scope', () => {
@@ -242,15 +112,7 @@ describe('briefEndCopy', () => {
     });
 
     it('names it when there is nothing', () => {
-      expect(briefEndCopy(sections(0, 0), 'Michigan').detail).toBe(
-        'Nothing new for Michigan in the last two days',
-      );
-    });
-
-    it('names it in the truncated form too', () => {
-      expect(briefEndCopy(sections(20, 20, 12), 'Michigan').detail).toBe(
-        'Showing 12 of 20 unread for Michigan',
-      );
+      expect(briefEndCopy(sections(0, 0), 'Michigan').detail).toBe('Nothing new for Michigan');
     });
   });
 });
