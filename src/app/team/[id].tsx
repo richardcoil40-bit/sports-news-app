@@ -137,9 +137,13 @@ export default function TeamScreen() {
     return { ...pool, recent: withinFeedWindow(pool.articles, Date.now()) };
   });
 
-  const schedule = useAsync<ScheduledGame[]>(async (publish) => {
+  // `checkedAt` is read here, when the schedule lands, for the same reason
+  // `recent` is above: the schedule tab decides which game is today's, and
+  // reading the clock during render is impure.
+  const schedule = useAsync<{ games: ScheduledGame[]; checkedAt: number }>(async (publish) => {
     const games = await fetchTeamSchedule(params.id, league);
-    publish(games);
+    const checkedAt = Date.now();
+    publish({ games, checkedAt });
 
     // Odds for just the next few upcoming games — fetching every game
     // on the schedule (a dozen-plus separate requests) was overkill
@@ -150,7 +154,10 @@ export default function TeamScreen() {
         upcoming.map(async (game) => [game.id, await fetchGameOdds(game.id, league).catch(() => null)] as const),
       ),
     );
-    return games.map((g) => (oddsByGameId.has(g.id) ? { ...g, odds: oddsByGameId.get(g.id)! } : g));
+    return {
+      games: games.map((g) => (oddsByGameId.has(g.id) ? { ...g, odds: oddsByGameId.get(g.id)! } : g)),
+      checkedAt,
+    };
   });
 
   const roster = useAsync<RosterData>(async () => {
@@ -317,10 +324,17 @@ export default function TeamScreen() {
 
         {tab === 'schedule' ? (
           <ScheduleTab
-            games={schedule.data}
+            games={schedule.data?.games ?? null}
+            checkedAt={schedule.data?.checkedAt ?? 0}
             loading={schedule.data === null && !schedule.error}
             error={schedule.error}
             accentColor={teamColor}
+            onOpenGame={(game) =>
+              router.push({
+                pathname: '/game/[id]',
+                params: { id: game.id, leagueId: league.id, teamId: params.id },
+              })
+            }
           />
         ) : null}
 

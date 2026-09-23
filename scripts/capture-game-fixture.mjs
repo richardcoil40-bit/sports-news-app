@@ -168,6 +168,8 @@ const trimmedSummary = {
   header: {
     competitions: [
       {
+        date: header.date,
+        broadcasts: (header.broadcasts ?? []).slice(0, 1).map((b) => ({ media: { shortName: b.media?.shortName } })),
         status: {
           displayClock: header.status?.displayClock,
           period: header.status?.period,

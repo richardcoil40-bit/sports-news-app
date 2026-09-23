@@ -265,9 +265,19 @@ describe('blurbFor precedence and variants', () => {
     expect(blurbRuleFor(c)).toBe('comeback');
   });
 
-  it('does not call a lead change or a tie without a marker to compare to', () => {
-    const c = ctx({ hasMarker: false, lines: [line('a', 'fg'), line('h', 'punt')], now: { home: 0, away: 3 } });
-    expect(blurbRuleFor(c)).toBe('first-points');
+  it('gives the standing, not a drive fact, on a first look mid-game', () => {
+    const c = ctx({ hasMarker: false, lines: [line('a', 'fg'), line('h', 'turnover')], now: { home: 0, away: 3 } });
+    expect(blurbRuleFor(c)).toBe('standing');
+    expect(blurbFor(c)).toBe('Michigan leads by 3.');
+    expect(blurbFor(ctx({ hasMarker: false, lines: [line('a', 'fg'), line('h', 'fg')], now: { home: 3, away: 3 } }))).toBe(
+      "It's tied at 3.",
+    );
+    expect(blurbFor(ctx({ hasMarker: false, lines: [line('a', 'punt')] }))).toBe('Scoreless so far.');
+  });
+
+  it('still names a comeback on a first look', () => {
+    const c = ctx({ hasMarker: false, lines: [line('h', 'td')], now: { home: 21, away: 17 }, maxDeficit: { home: 14, away: 0 } });
+    expect(blurbRuleFor(c)).toBe('comeback');
   });
 
   it('counts turnovers on each side', () => {
@@ -298,7 +308,6 @@ describe('blurbFor precedence and variants', () => {
 
   it('has nothing to say before kickoff', () => {
     expect(blurbFor(ctx({ state: 'pre' }))).toBeNull();
-    expect(blurbFor(ctx({ hasMarker: false }))).toBeNull();
   });
 });
 

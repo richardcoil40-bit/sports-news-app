@@ -132,6 +132,21 @@ export function isClockEvent(type: string): boolean {
   return /^(end\b|timeout|official timeout|two-minute warning|coin toss)/i.test(type.trim());
 }
 
+/**
+ * ESPN's play text, minus the scorer's-sheet clutter a reader doesn't need:
+ * a leading formation tag ("(Shotgun)", "(No Huddle, Shotgun)") and the
+ * trailing tacklers ("(C.Taylor-Britt; H.Wohler)"). Only parentheticals of
+ * those two shapes are removed, so a penalty or a replay note in brackets
+ * mid-sentence survives.
+ */
+export function cleanPlayText(text: string): string {
+  return text
+    .replace(/^\s*\((?:no huddle|shotgun|pistol|under center)(?:,\s*(?:no huddle|shotgun|pistol|under center))*\)\s*/i, '')
+    .replace(/\s*\((?:[A-Z][A-Za-z'-]*\.[^()]*)\)\.?\s*$/, '.')
+    .replace(/\.\.$/, '.')
+    .trim();
+}
+
 export function isScoringOutcome(outcome: DriveOutcome): boolean {
   return outcome === 'td' || outcome === 'fg' || outcome === 'turnover-td' || outcome === 'safety';
 }
