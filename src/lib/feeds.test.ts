@@ -100,6 +100,52 @@ describe('fetchFeeds', () => {
       expect(articles[0].publishedAt).toBe('2026-08-23T14:30:00.000Z');
     });
 
+    // The relaxed pass once stripped the " - " and handed the rest back to
+    // new Date(). Node reads "Sunday, August 23, 2026 14:30"; Hermes, which
+    // the app runs on, does not — so this suite passed while every phone
+    // showed Eleven Warriors undated at the bottom of the feed. Beyond ISO
+    // 8601 and RFC 2822 an engine's reading of a date string is
+    // implementation-defined, so this swaps in a Date that accepts only
+    // those two and refuses everything else, the way the strictest engine
+    // may. Anything that leans on leniency fails here instead of on a phone.
+    it('reads the rendered date without leaning on engine leniency', async () => {
+      const RealDate = Date;
+      const ISO = /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
+      const RFC_2822 =
+        /^([A-Za-z]{3},\s*)?\d{1,2}\s+[A-Za-z]{3}\s+\d{4}\s+\d{2}:\d{2}(:\d{2})?\s+([+-]\d{4}|[A-Z]{1,5})$/;
+      class StrictDate extends RealDate {
+        constructor(...args: unknown[]) {
+          const [first] = args;
+          if (args.length === 1 && typeof first === 'string') {
+            const text = first.trim();
+            super(ISO.test(text) || RFC_2822.test(text) ? text : Number.NaN);
+          } else {
+            // @ts-expect-error -- forwarding whichever Date overload was used
+            super(...args);
+          }
+        }
+      }
+      vi.stubGlobal('Date', StrictDate);
+      respondPerUrl({
+        'https://a.test/rss': { body: withDate('Tuesday, September 22, 2026 - 15:56') },
+      });
+
+      const { articles } = await fetchFeeds([source('a', 'https://a.test/rss')]);
+
+      expect(articles[0].publishedAt).not.toBeNull();
+      const parsed = new RealDate(articles[0].publishedAt!);
+      expect([parsed.getFullYear(), parsed.getMonth(), parsed.getDate()]).toEqual([2026, 8, 22]);
+      expect([parsed.getHours(), parsed.getMinutes()]).toEqual([15, 56]);
+    });
+
+    it('rejects a rendered date for a day that does not exist', async () => {
+      respondPerUrl({ 'https://a.test/rss': { body: withDate('Monday, February 30, 2026 - 09:00') } });
+
+      const { articles } = await fetchFeeds([source('a', 'https://a.test/rss')]);
+
+      expect(articles[0].publishedAt).toBeNull();
+    });
+
     it('still yields null for something that is not a date at all', async () => {
       respondPerUrl({ 'https://a.test/rss': { body: withDate('coming soon') } });
 

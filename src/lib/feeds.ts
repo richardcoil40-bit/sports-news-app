@@ -229,6 +229,16 @@ function extractAtomImageUrl(entry: Record<string, unknown>): string | null {
  * bottom of the sort (see `sortByDate`), so today's stories ranked below
  * a month-old one. A tester reported it as two separate bugs.
  *
+ * **The relaxed pass must not hand the string back to `new Date()`.** It
+ * used to: strip the ` - ` and let the engine read "Sunday, August 23, 2026
+ * 14:30". Node accepts that, so the tests passed. Hermes, which the app
+ * actually runs on, does not — so on every phone Eleven Warriors stayed
+ * undated and sank below stories eight months old, for a month after this
+ * was "fixed". Beyond ISO 8601 and RFC 2822, how an engine reads a date
+ * string is implementation-defined, so the rendered form is now matched
+ * field by field and built from numbers. `feeds.test.ts` runs it against a
+ * Hermes-strict `Date` so the next one can't pass on Node alone.
+ *
  * The relaxed pass runs only after the strict one fails, so a well-formed
  * date can never be reinterpreted by it. Swept across all 82 feed URLs in
  * the catalog on 2026-08-23: 81 parse strictly, and Eleven Warriors is
@@ -242,14 +252,40 @@ function extractAtomImageUrl(entry: Record<string, unknown>): string | null {
  * ever needs this, prefer asking the publisher for a real date over
  * growing a format table here.
  */
+const MONTHS = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+];
+
+/** `Sunday, August 23, 2026 - 14:30`, weekday optional. */
+const RENDERED_DATE = /^(?:[a-z]+,\s*)?([a-z]+)\s+(\d{1,2}),\s*(\d{4})\s*-\s*(\d{1,2}):(\d{2})$/i;
+
+/**
+ * Reads the rendered form field by field and builds the date from numbers,
+ * so no engine ever has to guess at the string.
+ */
+function parseRenderedDate(raw: string): Date | null {
+  const match = RENDERED_DATE.exec(raw.trim());
+  if (!match) return null;
+  const [, monthName, day, year, hours, minutes] = match;
+  const month = MONTHS.indexOf(monthName.toLowerCase());
+  if (month === -1) return null;
+
+  const date = new Date(Number(year), month, Number(day), Number(hours), Number(minutes));
+  // The numeric constructor rolls over instead of failing ("February 30"
+  // becomes March 2), so check it landed on the day it was given.
+  const landed =
+    date.getMonth() === month && date.getDate() === Number(day) && Number(hours) < 24;
+  return landed ? date : null;
+}
+
 function parsePubDate(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
 
   const strict = new Date(raw);
   if (!Number.isNaN(strict.getTime())) return strict.toISOString();
 
-  const relaxed = new Date(raw.trim().replace(/\s+-\s+/, ' '));
-  return Number.isNaN(relaxed.getTime()) ? null : relaxed.toISOString();
+  return parseRenderedDate(raw)?.toISOString() ?? null;
 }
 
 /** dc:creator is the common RSS extension for bylines; plain <author> is the fallback. */
