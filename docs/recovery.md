@@ -64,6 +64,16 @@ passes that gate.
   | `v1.0.0` | `a1c5e18` | 1.0.0 (1) |
   | `build-25` | `69acd27` | 1.0.1 (25) |
   | `build-26` | `17cebc2` | 1.0.1 (26) |
+  | `build-27` | `516ede8` | 1.0.1 (27): withdrawn, never launched. The Xcode 27 build; see AGENTS.md |
+  | `build-28` | `9a7658e` | 1.0.1 (28) |
+  | `build-29` | `1be8f05` | 1.0.1 (29): internal group only, superseded by 30 the same evening |
+  | `build-30` | `60d4a9b` | 1.0.1 (30) |
+  | `build-31` | `6ad2b63` | 1.0.1 (31): live games |
+
+  Builds 29 and 30 were not tagged at release. Their tags were added on
+  2026-09-23 from Xcode Cloud's run history and TestFlight's group state,
+  which is the derived mapping this convention exists to avoid, done once
+  while Apple could still answer.
 
   Builds 2, 3 and 4 predate the convention and are not tagged. Before this,
   the mapping was *derived* from Xcode Cloud's per-run source commit — which
