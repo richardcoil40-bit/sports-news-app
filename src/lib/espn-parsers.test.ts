@@ -246,10 +246,11 @@ describe('ESPN parsers on a well-formed response', () => {
 
     const categories = await fetchPlayerSeasonStats(freshId(), DEFAULT_LEAGUE, 2025);
 
-    // receiving (2025, has signal) is kept. puntReturns is 2025 but all
-    // zeroes; rushing has signal but is 2023.
+    // receiving's 2025 line is kept: the middle of three, so a parser that
+    // took the first or the last line would fail here. puntReturns is 2025
+    // but all zeroes; rushing has signal but is 2023.
     expect(categories.map((c) => c.name)).toEqual(['receiving']);
-    expect(categories[0].values).toEqual(['76', '1315', '17.3', '15', '70']);
+    expect(categories[0].values).toEqual(['87', '1,243', '14.3', '12', '87']);
     expect(categories[0].descriptions[0]).toBe('Receptions');
   });
 
@@ -261,9 +262,13 @@ describe('ESPN parsers on a well-formed response', () => {
     const id = freshId();
 
     const in2025 = await fetchPlayerSeasonStats(id, DEFAULT_LEAGUE, 2025);
+    const in2026 = await fetchPlayerSeasonStats(id, DEFAULT_LEAGUE, 2026);
     const in2023 = await fetchPlayerSeasonStats(id, DEFAULT_LEAGUE, 2023);
 
     expect(in2025.map((c) => c.name)).toEqual(['receiving']);
+    // The season in progress, which is the fixture's last line.
+    expect(in2026.map((c) => c.name)).toEqual(['receiving']);
+    expect(in2026[0].values).toEqual(['21', '400', '19.0', '3', '48']);
     expect(in2023.map((c) => c.name)).toEqual(['rushing']);
   });
 

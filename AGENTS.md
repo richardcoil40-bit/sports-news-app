@@ -936,6 +936,15 @@ shouldn't gain any.
     peeked on the bare team id while the write used `espnCacheKey` — so
     the fallback never found anything and always served empty. It looked
     correct on the page; the two lines are 40 apart.
+  - **An answer that belongs to one season keys on the season too**, with
+    `espnSeasonCacheKey`: a team's stat leaders and a player's season
+    line. Both caches live for the process, and a suspended app's process
+    routinely lives through a league's `seasonStartMonth`. Keyed on the
+    entity alone, they would go on serving last season's numbers under
+    this season's label until a force-quit. The season itself is the
+    caller's, a required argument: the team screen picks it once and
+    hands the same number to its header, the leaders fetch and the player
+    screen, so the two screens can't name different years.
 - **A fetcher that takes a `League` takes it as a required argument.**
   Nine of them used to default to `DEFAULT_LEAGUE`, and neither detail
   screen passed one, so an NFL team id silently built

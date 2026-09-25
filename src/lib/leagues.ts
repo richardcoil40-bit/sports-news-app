@@ -110,6 +110,22 @@ export function espnCacheKey(league: League, entityId: string): string {
   return `${espnSitePath(league)}:${entityId}`;
 }
 
+/**
+ * `espnCacheKey` plus the season, for a per-entity fetch whose answer
+ * belongs to one season: a team's stat leaders, a player's season line.
+ *
+ * The season is an input to those requests, so it has to be in the key.
+ * Both caches live as long as the process, and a backgrounded app is
+ * suspended rather than killed, so the process routinely lives through a
+ * league's `seasonStartMonth`. Keyed on the entity alone, the cache would
+ * go on serving last season's numbers under this season's label. Built
+ * here rather than as a template string at each call site, so the next
+ * per-season cache keys the same way.
+ */
+export function espnSeasonCacheKey(league: League, entityId: string, season: number): string {
+  return `${espnCacheKey(league, entityId)}:${season}`;
+}
+
 const DEFAULT_SEASON_START_MONTH = 8; // September — see seasonStartMonth
 
 /**

@@ -1,6 +1,6 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
-import { espnCacheKey, espnCorePath, League } from '@/lib/leagues';
+import { espnCorePath, espnSeasonCacheKey, League } from '@/lib/leagues';
 
 export interface StatLeader {
   athleteId: string;
@@ -113,7 +113,7 @@ export async function fetchTeamStatLeaders(
 ): Promise<StatLeader[]> {
   // The season is in the key so a process that lives across a season's start
   // doesn't serve last year's leaders under this year's heading.
-  return cache.get(`${espnCacheKey(league, teamId)}:${season}`, () =>
+  return cache.get(espnSeasonCacheKey(league, teamId, season), () =>
     fetchUncached(teamId, league, season),
   );
 }

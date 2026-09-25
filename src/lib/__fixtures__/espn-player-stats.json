@@ -1,14 +1,15 @@
 {
-  "athlete": { "id": "4685702", "displayName": "Jeremiah Smith" },
+  "athlete": { "id": "5079720", "displayName": "Jeremiah Smith" },
   "categories": [
     {
       "name": "receiving",
       "displayName": "Receiving",
       "labels": ["REC", "YDS", "AVG", "TD", "LNG"],
-      "displayNames": ["Receptions", "Receiving Yards", "Yards Per Reception", "Receiving Touchdowns", "Longest Reception"],
+      "displayNames": ["Receptions", "Receiving Yards", "Yards Per Reception", "Receiving Touchdowns", "Long Reception"],
       "statistics": [
-        { "season": { "year": 2025 }, "stats": ["76", "1315", "17.3", "15", "70"] },
-        { "season": { "year": 2024 }, "stats": ["50", "800", "16.0", "9", "60"] }
+        { "season": { "year": 2024 }, "stats": ["76", "1,315", "17.3", "15", "70"] },
+        { "season": { "year": 2025 }, "stats": ["87", "1,243", "14.3", "12", "87"] },
+        { "season": { "year": 2026 }, "stats": ["21", "400", "19.0", "3", "48"] }
       ]
     },
     {
