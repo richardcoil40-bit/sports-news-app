@@ -17,7 +17,8 @@ import { useTeams } from '@/hooks/use-teams';
 import { useTheme } from '@/hooks/use-theme';
 import { Article } from '@/lib/feeds';
 import { DEFAULT_LEAGUE, getLeague } from '@/lib/league-catalog';
-import { RankedPlayer, rankNotablePlayers } from '@/lib/notable-players';
+import { LeaderEntry, leaderBoards } from '@/lib/leader-boards';
+import { lastCompletedSeason } from '@/lib/leagues';
 import {
   ClaimFilter,
   ClaimType,
@@ -48,6 +49,8 @@ const TABS: { key: TabKey; label: string }[] = [
 interface RosterData {
   players: Player[];
   leaders: StatLeader[];
+  /** Which season `leaders` is from, read when they land — see `recent` below. */
+  season: number;
 }
 
 export default function TeamScreen() {
@@ -129,9 +132,8 @@ export default function TeamScreen() {
   // state reads `coverage` to say *why* it's empty.
   // `recent` is what the News tab shows: the pool capped at a week (see
   // withinFeedWindow). Computed here, when the pool lands, because reading
-  // the clock during render is impure. `articles` stays whole on purpose:
-  // notable players rank on the full pool, and the player screen's list has
-  // to agree with those counts.
+  // the clock during render is impure. `articles` stays whole; the player
+  // screen matches a player's name against the same whole pool.
   const news = useAsync<TeamNewsPool & { recent: Article[] }>(async () => {
     const pool = await fetchTeamNewsPoolWithStore(params.id, poolName, league);
     return { ...pool, recent: withinFeedWindow(pool.articles, Date.now()) };
@@ -163,11 +165,15 @@ export default function TeamScreen() {
   });
 
   const roster = useAsync<RosterData>(async () => {
+    // Picked once and handed to everything that names a season: the tab's
+    // header, the leaders fetch, and the stats of any player a leader opens.
+    // Read here, not in render, for the reason `recent` is: it reads the clock.
+    const season = lastCompletedSeason(league);
     const [players, leaders] = await Promise.all([
       fetchTeamRoster(params.id, league),
-      fetchTeamStatLeaders(params.id, league),
+      fetchTeamStatLeaders(params.id, league, season),
     ]);
-    return { players, leaders };
+    return { players, leaders, season };
   });
 
   useEffect(() => {
@@ -194,11 +200,7 @@ export default function TeamScreen() {
   useEffect(() => {
     if (tab === 'news' && poolName) news.load();
     if (tab === 'schedule') schedule.load();
-    // The players tab ranks by article mentions, so it needs the news pool too.
-    if (tab === 'players') {
-      roster.load();
-      if (poolName) news.load();
-    }
+    if (tab === 'players') roster.load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, params.id, poolName, league]);
 
@@ -221,12 +223,9 @@ export default function TeamScreen() {
     [classifiedNews, claimFilter],
   );
 
-  const notablePlayers = useMemo(
-    () =>
-      roster.data
-        ? rankNotablePlayers(roster.data.players, news.data?.articles ?? [], roster.data.leaders, 10)
-        : [],
-    [roster.data, news.data],
+  const boards = useMemo(
+    () => (roster.data ? leaderBoards(roster.data.leaders, roster.data.players, league) : []),
+    [roster.data, league],
   );
 
   const openArticle = (article: Article & { claimType?: ClaimType }) => {
@@ -244,7 +243,7 @@ export default function TeamScreen() {
     });
   };
 
-  const openPlayer = ({ player, matchesSurname }: RankedPlayer) => {
+  const openPlayer = ({ player, matchesSurname }: LeaderEntry) => {
     router.push({
       pathname: '/player/[id]',
       params: {
@@ -255,15 +254,17 @@ export default function TeamScreen() {
         // match on the same forms to agree on the same articles.
         firstName: player.firstName,
         lastName: player.lastName,
-        // The ranking decided whether this surname is specific enough to
-        // match on its own (it isn't, when a teammate shares it). Passing
-        // the decision along is what keeps the count on the card and the
-        // list on the screen describing the same articles.
+        // Whether this surname is specific enough to match on its own (it
+        // isn't, when a teammate shares it) is a roster question, and only
+        // this screen has the roster.
         surnameMatch: matchesSurname ? '1' : '0',
         jersey: player.jersey ?? '',
         position: player.position ?? '',
         headshotUrl: player.headshotUrl ?? '',
         teamId: params.id,
+        // The season of the leaders on the card you tapped, so the player's
+        // stats name the same year the card did.
+        season: roster.data ? String(roster.data.season) : '',
         // The resolved names, not the raw params: arriving here by deep link
         // the params are empty, and the player screen fetches this same pool
         // — with the same consequence for an empty name as above.
@@ -342,16 +343,13 @@ export default function TeamScreen() {
 
         {tab === 'players' ? (
           <PlayersTab
-            players={notablePlayers}
-            loading={
-              (roster.data === null || news.data === null) &&
-              !roster.error &&
-              !news.error &&
-              !unresolvableTeam
-            }
-            error={roster.error || unresolvableTeam}
+            boards={boards}
+            season={roster.data?.season ?? 0}
+            // Not `unresolvableTeam`: that is about the news pool's name,
+            // and the roster and leaders key off the id alone.
+            loading={roster.data === null && !roster.error}
+            error={roster.error}
             onOpenPlayer={openPlayer}
-            accentColor={teamColor}
           />
         ) : null}
       </SafeAreaView>

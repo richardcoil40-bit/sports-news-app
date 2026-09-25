@@ -33,12 +33,12 @@ function normalizeName(name: string): string {
  * A reusable matcher for one player's name.
  *
  * Compiled once per player rather than once per (player, article) pair:
- * ranking a full roster against a full news pool runs this thousands of
- * times, and rebuilding a RegExp per comparison is the expensive way to
- * get the same answer.
+ * matching a name against a whole news pool runs this hundreds of times,
+ * and rebuilding a RegExp per comparison is the expensive way to get the
+ * same answer.
  *
  * `allowLastName` is the caller's judgement about whether the surname is
- * specific enough to trust on its own — notable-players.ts says no when two
+ * specific enough to trust on its own — leader-boards.ts says no when two
  * players on the roster share it. Length is checked here regardless, since
  * that part doesn't depend on the caller's context.
  */
@@ -74,12 +74,10 @@ export function compilePlayerMatcher(
  * falls back to a last-name-only match (skipped for short/common surnames,
  * to keep false positives down) so recognizable players still surface.
  *
- * This is the list the player's screen renders, so it is also where any
- * count of that player's articles has to come from — notable-players.ts
- * counts the same two buckets with the same matcher rather than running its
- * own tally, because a card reading "4 articles" over a screen listing 2 is
- * exactly what two independent implementations of "the same" number
- * produce.
+ * This is the list the player's screen renders, so any count of a player's
+ * articles shown elsewhere has to come from here rather than a separate
+ * tally: a card reading "4 articles" over a screen listing 2 is exactly what
+ * two independent implementations of "the same" number produce.
  */
 export function matchArticlesForPlayer(
   articles: Article[],

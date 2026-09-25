@@ -24,9 +24,9 @@ that expansion doesn't mean a rewrite.
   the big national outlets. See `docs/source-reliability.md` for how a
   source earns a place in the app and what tier it's given.
 - Schedule and odds (where posted).
-- A "most talked about" players list per team, ranked by how often
-  they're actually named in recent coverage plus last season's
-  statistical leaders — not roster order or depth-chart guesses.
+- Each team's stat leaders this season, the top three in each key
+  category. Which categories count as "key" is set per league in the
+  catalog, so a new sport brings its own.
 - Recruiting news, filtered from the same article pool.
 - A morning/noon/night refresh cycle — see `src/lib/refresh-schedule.ts`
   for why that's foreground-triggered rather than a true background job.

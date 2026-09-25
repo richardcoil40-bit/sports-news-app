@@ -80,8 +80,8 @@ describe('ESPN parsers degrade to empty on a malformed response', () => {
     // League-wide takes no entity id; it shares the id-taking shape here so
     // it runs the same gauntlet. Uncached, so no freshId is needed either.
     ['fetchLeagueArticles', (_id, league) => fetchLeagueArticles(league)],
-    ['fetchTeamStatLeaders', fetchTeamStatLeaders],
-    ['fetchPlayerSeasonStats', fetchPlayerSeasonStats],
+    ['fetchTeamStatLeaders', (id, league) => fetchTeamStatLeaders(id, league, 2026)],
+    ['fetchPlayerSeasonStats', (id, league) => fetchPlayerSeasonStats(id, league, 2025)],
   ];
 
   for (const [name, parser] of emptyArrayParsers) {
@@ -191,30 +191,80 @@ describe('ESPN parsers on a well-formed response', () => {
   it('fetchTeamStatLeaders extracts athlete ids out of $ref urls', async () => {
     respondWith(teamLeadersFixture);
 
-    const leaders = await fetchTeamStatLeaders(freshId(), DEFAULT_LEAGUE);
+    const leaders = await fetchTeamStatLeaders(freshId(), DEFAULT_LEAGUE, 2026);
 
-    expect(leaders).toHaveLength(3);
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/seasons/2026/types/2/');
+    expect(leaders).toHaveLength(4);
     expect(leaders[0]).toEqual({
       athleteId: '4432762',
+      categoryName: 'passingLeader',
       category: 'Passing Leader',
-      displayValue: '3,323',
+      displayValue: '56/79, 839 YDS, 6 TD, 1 INT',
       rank: 0,
     });
     expect(leaders[1].rank).toBe(1);
-    // The third category's $ref has no athlete id, so it's dropped entirely.
+    // The receiving category's $ref has no athlete id, so it's dropped entirely.
     expect(leaders.map((l) => l.category)).not.toContain('Receiving Leader');
+    // A category with no `name` is kept, keyed on its label.
+    expect(leaders[3]).toMatchObject({ categoryName: 'Sacks', category: 'Sacks' });
   });
 
-  it('fetchPlayerSeasonStats keeps only the pinned season, and only categories with signal', async () => {
+  // These fields are rendered as text on the Players tab. A wrongly typed
+  // one has to be stopped here: past this point it throws in render, where
+  // nothing catches it.
+  it('fetchTeamStatLeaders reads a wrongly typed field as absent and keeps the rest', async () => {
+    const ref = 'http://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/2026/athletes/';
+    respondWith({
+      categories: [
+        null,
+        'nope',
+        { name: 42, displayName: { text: 'Sacks' }, leaders: 'nope' },
+        {
+          name: 42,
+          displayName: ['Tackles'],
+          leaders: [
+            null,
+            { displayValue: 17, athlete: { $ref: `${ref}111` } },
+            { displayValue: '9', athlete: { $ref: 123 } },
+          ],
+        },
+        { name: 'sacks', displayName: 'Sacks', leaders: [{ displayValue: '2', athlete: { $ref: `${ref}222` } }] },
+      ],
+    });
+
+    const leaders = await fetchTeamStatLeaders(freshId(), DEFAULT_LEAGUE, 2026);
+
+    expect(leaders).toEqual([
+      { athleteId: '111', categoryName: 'Leader', category: 'Leader', displayValue: '', rank: 1 },
+      { athleteId: '222', categoryName: 'sacks', category: 'Sacks', displayValue: '2', rank: 0 },
+    ]);
+  });
+
+  it('fetchPlayerSeasonStats keeps only the season asked for, and only categories with signal', async () => {
     respondWith(playerStatsFixture);
 
-    const categories = await fetchPlayerSeasonStats(freshId(), DEFAULT_LEAGUE);
+    const categories = await fetchPlayerSeasonStats(freshId(), DEFAULT_LEAGUE, 2025);
 
     // receiving (2025, has signal) is kept. puntReturns is 2025 but all
     // zeroes; rushing has signal but is 2023.
     expect(categories.map((c) => c.name)).toEqual(['receiving']);
     expect(categories[0].values).toEqual(['76', '1315', '17.3', '15', '70']);
     expect(categories[0].descriptions[0]).toBe('Receptions');
+  });
+
+  // It was pinned to 2025 once, which outlived the 2026 season's first
+  // games. The same athlete asked for another season has to be a different
+  // cache entry, or the first year asked for is the only one ever shown.
+  it('fetchPlayerSeasonStats answers for the season passed, per athlete and season', async () => {
+    respondWith(playerStatsFixture);
+    const id = freshId();
+
+    const in2025 = await fetchPlayerSeasonStats(id, DEFAULT_LEAGUE, 2025);
+    const in2023 = await fetchPlayerSeasonStats(id, DEFAULT_LEAGUE, 2023);
+
+    expect(in2025.map((c) => c.name)).toEqual(['receiving']);
+    expect(in2023.map((c) => c.name)).toEqual(['rushing']);
   });
 
   /**
@@ -237,7 +287,7 @@ describe('ESPN parsers on a well-formed response', () => {
       ],
     });
 
-    const categories = await fetchPlayerSeasonStats(freshId(), DEFAULT_LEAGUE);
+    const categories = await fetchPlayerSeasonStats(freshId(), DEFAULT_LEAGUE, 2025);
 
     expect(categories.map((c) => c.name)).toEqual(['puntReturns']);
   });
@@ -412,12 +462,41 @@ describe('ESPN parsers on a well-formed response', () => {
 });
 
 describe('ESPN parsers on a non-OK response', () => {
-  it.each([
-    ['fetchTeamStatLeaders', () => fetchTeamStatLeaders(freshId(), DEFAULT_LEAGUE), []],
-    ['fetchPlayerSeasonStats', () => fetchPlayerSeasonStats(freshId(), DEFAULT_LEAGUE), []],
-  ])('%s degrades to empty', async (_name, call, expected) => {
+  it('fetchPlayerSeasonStats degrades to empty', async () => {
     respondWith(null, { ok: false, status: 503 });
-    await expect(call()).resolves.toEqual(expected);
+    await expect(fetchPlayerSeasonStats(freshId(), DEFAULT_LEAGUE, 2025)).resolves.toEqual([]);
+  });
+
+  // The leaders are the Players tab's whole content, so an empty result
+  // renders as "No stat leaders yet this season". A failure has to throw
+  // instead, and stay uncached, or that false line outlives the outage.
+  it('fetchTeamStatLeaders throws on a failed response, and the next call retries', async () => {
+    const id = freshId();
+
+    respondWith(null, { ok: false, status: 503 });
+    await expect(fetchTeamStatLeaders(id, DEFAULT_LEAGUE, 2026)).rejects.toThrow('503');
+
+    respondWith(teamLeadersFixture);
+    await expect(fetchTeamStatLeaders(id, DEFAULT_LEAGUE, 2026)).resolves.toHaveLength(4);
+  });
+
+  // ESPN's real answer for a season with no games yet.
+  it('fetchTeamStatLeaders reads a 404 as a season with no leaders yet', async () => {
+    respondWith({ error: { message: 'No stats found.', code: 404 } }, { ok: false, status: 404 });
+    await expect(fetchTeamStatLeaders(freshId(), DEFAULT_LEAGUE, 2027)).resolves.toEqual([]);
+  });
+
+  it('fetchTeamStatLeaders keeps each season in its own cache entry', async () => {
+    const id = freshId();
+
+    respondWith(teamLeadersFixture);
+    await expect(fetchTeamStatLeaders(id, DEFAULT_LEAGUE, 2025)).resolves.toHaveLength(4);
+
+    // Not served last season's four: a fresh request for the new year.
+    respondWith({ categories: [] });
+    await expect(fetchTeamStatLeaders(id, DEFAULT_LEAGUE, 2026)).resolves.toEqual([]);
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/seasons/2026/');
   });
 
   it('fetchTeamColor and fetchGameOdds degrade to null', async () => {

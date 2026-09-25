@@ -138,7 +138,7 @@ describe('the middle-name / suffix case', () => {
 });
 
 describe('allowLastName', () => {
-  // notable-players.ts says no when two players on the roster share the
+  // leader-boards.ts says no when two players on the roster share the
   // surname: "Smith had a big day" is then evidence about neither of them.
   it('suppresses the surname fallback when the caller forbids it', () => {
     const articles = [article('a', 'Smith records two sacks')];

@@ -55,6 +55,18 @@ function optionalInteger(value: unknown, { min, max }: { min: number; max: numbe
 }
 
 /**
+ * A list of non-empty strings, trimmed. Junk members are dropped one by one
+ * rather than failing the list, and a list with nothing usable left is
+ * treated as absent, so the caller falls back to its default instead of
+ * showing nothing.
+ */
+function optionalStringList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const kept = value.filter(isNonEmptyString).map((entry) => entry.trim());
+  return kept.length > 0 ? kept : undefined;
+}
+
+/**
  * Validates one entry, returning null rather than throwing.
  *
  * Optional fields that are present but malformed are dropped to
@@ -90,6 +102,7 @@ function parseLeague(raw: unknown): League | null {
     espnLeaguePath: record.espnLeaguePath.trim(),
     espnGroup: optionalInteger(record.espnGroup, { min: 0, max: Number.MAX_SAFE_INTEGER }),
     seasonStartMonth: optionalInteger(record.seasonStartMonth, { min: 0, max: MAX_MONTH_INDEX }),
+    leaderCategories: optionalStringList(record.leaderCategories),
   };
 }
 

@@ -2,14 +2,6 @@ import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
 import { espnCacheKey, espnSitePath, League } from '@/lib/leagues';
 
-/**
- * Pinned to the 2025 season for this first pass rather than computed from
- * today's date (compare lastCompletedSeason() in team-leaders.ts) — once the
- * 2026 season starts generating box scores this should move to the same
- * "most recently completed season" logic, but for now the ask is 2025 only.
- */
-export const PLAYER_STATS_SEASON = 2025;
-
 export interface PlayerStatCategory {
   /** e.g. "receiving" */
   name: string;
@@ -21,6 +13,12 @@ export interface PlayerStatCategory {
   descriptions: string[];
   /** e.g. ["3", "31", "10.3", "0", "14"] — same length/order as labels. */
   values: string[];
+}
+
+/** A player's stats for one season, and which season that is. */
+export interface PlayerSeasonStats {
+  season: number;
+  categories: PlayerStatCategory[];
 }
 
 interface RawStatEntry {
@@ -47,7 +45,11 @@ function hasSignal(values: string[]): boolean {
 // stat lines each.
 const cache = createEntityCache<string, PlayerStatCategory[]>({ maxEntries: 500 });
 
-async function fetchUncached(athleteId: string, league: League): Promise<PlayerStatCategory[]> {
+async function fetchUncached(
+  athleteId: string,
+  league: League,
+  season: number,
+): Promise<PlayerStatCategory[]> {
   const url = `https://site.web.api.espn.com/apis/common/v3/sports/${espnSitePath(league)}/athletes/${athleteId}/stats`;
   const response = await fetchWithTimeout(url);
   if (!response.ok) return [];
@@ -57,7 +59,7 @@ async function fetchUncached(athleteId: string, league: League): Promise<PlayerS
   const result: PlayerStatCategory[] = [];
   for (const category of categories) {
     const seasonEntry = (category.statistics ?? []).find(
-      (entry) => entry.season?.year === PLAYER_STATS_SEASON,
+      (entry) => entry.season?.year === season,
     );
     if (!seasonEntry?.stats || !hasSignal(seasonEntry.stats)) continue;
 
@@ -74,18 +76,27 @@ async function fetchUncached(athleteId: string, league: League): Promise<PlayerS
 }
 
 /**
- * A player's 2025 season stats, broken out by category (passing, rushing,
+ * A player's stats for one season, broken out by category (passing, rushing,
  * receiving, defense, etc. — whichever ones ESPN actually recorded for
- * them). Cached per athlete since the player detail screen is the only
- * consumer and re-visiting it shouldn't re-fetch.
+ * them). Cached per athlete and season since the player detail screen is the
+ * only consumer and re-visiting it shouldn't re-fetch.
+ *
+ * The season is the caller's, and required. This used to be pinned to 2025,
+ * which outlived the 2026 season's first games: a 2026 stat leader opened
+ * onto last season's numbers, or onto "no stats" for a first-year starter.
+ * The player screen passes the season of the leaders you tapped, so the two
+ * screens can't name different years.
  */
 export async function fetchPlayerSeasonStats(
   athleteId: string,
   league: League,
+  season: number,
 ): Promise<PlayerStatCategory[]> {
   // Failures degrade to (and are cached as) empty — a player screen without a
-  // stats card is fine; one that fails to load isn't.
-  return cache.get(espnCacheKey(league, athleteId), () =>
-    fetchUncached(athleteId, league).catch(() => [] as PlayerStatCategory[]),
+  // stats card is fine; one that fails to load isn't. The season is in the
+  // key so a process that lives across a season's start doesn't serve the
+  // old year's line for the new one.
+  return cache.get(`${espnCacheKey(league, athleteId)}:${season}`, () =>
+    fetchUncached(athleteId, league, season).catch(() => [] as PlayerStatCategory[]),
   );
 }

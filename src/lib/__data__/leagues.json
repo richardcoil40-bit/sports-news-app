@@ -7,7 +7,15 @@
     "espnSport": "football",
     "espnLeaguePath": "college-football",
     "espnGroup": 5,
-    "seasonStartMonth": 8
+    "seasonStartMonth": 8,
+    "leaderCategories": [
+      "passingLeader",
+      "rushingLeader",
+      "receivingLeader",
+      "totalTackles",
+      "sacks",
+      "interceptions"
+    ]
   },
   {
     "id": "sec",
@@ -17,7 +25,15 @@
     "espnSport": "football",
     "espnLeaguePath": "college-football",
     "espnGroup": 8,
-    "seasonStartMonth": 8
+    "seasonStartMonth": 8,
+    "leaderCategories": [
+      "passingLeader",
+      "rushingLeader",
+      "receivingLeader",
+      "totalTackles",
+      "sacks",
+      "interceptions"
+    ]
   },
   {
     "id": "big-12",
@@ -27,7 +43,15 @@
     "espnSport": "football",
     "espnLeaguePath": "college-football",
     "espnGroup": 4,
-    "seasonStartMonth": 8
+    "seasonStartMonth": 8,
+    "leaderCategories": [
+      "passingLeader",
+      "rushingLeader",
+      "receivingLeader",
+      "totalTackles",
+      "sacks",
+      "interceptions"
+    ]
   },
   {
     "id": "nfl",
@@ -36,6 +60,14 @@
     "level": "NFL",
     "espnSport": "football",
     "espnLeaguePath": "nfl",
-    "seasonStartMonth": 8
+    "seasonStartMonth": 8,
+    "leaderCategories": [
+      "passingLeader",
+      "rushingLeader",
+      "receivingLeader",
+      "totalTackles",
+      "sacks",
+      "interceptions"
+    ]
   }
 ]

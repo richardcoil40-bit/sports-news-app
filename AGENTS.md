@@ -70,9 +70,9 @@ inventing a new one:
   - **Error policy stays at the call site.** The helper caches whatever
     the loader resolves to and caches nothing when it rejects. If a
     source should degrade to empty *and* remember that, catch inside
-    the loader you pass (`team-leaders.ts`, `player-stats.ts`); if it
-    should stay uncached so the next call retries, let it throw
-    (`roster.ts`).
+    the loader you pass (`player-stats.ts`); if it should stay uncached
+    so the next call retries, let it throw (`roster.ts`,
+    `team-leaders.ts`).
 - **Tolerate partial failure.** Multi-source fetches (`fetchFeeds`,
   `fetchTeamNewsPool`) use `Promise.allSettled`, not `Promise.all` — one
   dead feed should never take down the others. Failed sources get
@@ -99,12 +99,17 @@ inventing a new one:
   not crash.
   - **One deliberate exception: `teams.ts` throws on a non-OK
     response.** Every other source is supplementary — a screen missing
-    stat leaders or a team color still works. The team list isn't: the
+    a team color still works. The team list isn't: the
     tab bar, the filters, and every per-team fetch key off it, so
     degrading to empty produces an empty app that looks like it loaded
     correctly. Throwing surfaces a retryable error instead. Don't
     "fix" this to match the rule; if you add another source the app
     genuinely can't function without, it belongs in this exception too.
+    - **`team-leaders.ts` joined it** when the stat leaders became the
+      Players tab's whole content. Empty there renders as "No stat
+      leaders yet this season", which after a 503 is false, and was
+      cached for the session. It throws on any non-OK response except
+      404, which is ESPN's real answer for a season with no games yet.
 
 ## Cost scales with follows, not with the catalog
 
@@ -949,6 +954,13 @@ shouldn't gain any.
   football is September, not the late-August opener — ESPN has no stats
   until games are played, and setting it a month early silently returns
   zero stat leaders all preseason.
+  - **`leaderCategories` is the same rule for stats.** It names, by ESPN's
+    category `name`, which team stat leaders the Players tab shows and in
+    what order. "Key stats" for football mean nothing for basketball, so
+    they are data. Absent means every category ESPN returns, in ESPN's
+    order, which is correct but long. The Worker serves this file, so a
+    change to it needs a `wrangler deploy` before it reaches an installed
+    app.
 - **`parseLeagues` validates as if the data were hostile**, dropping bad
   entries individually and falling back to the bundled catalog. That was
   written as groundwork for the day the catalog arrived over the network,

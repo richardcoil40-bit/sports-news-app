@@ -62,6 +62,17 @@ export interface League {
    * which is the entire reason this field exists rather than a constant.
    */
   seasonStartMonth?: number;
+  /**
+   * Which of ESPN's team stat-leader categories the Players tab shows, in
+   * the order it shows them, by ESPN's category `name` (`passingLeader`,
+   * `totalTackles`, `pointsPerGame`). Absent means every category ESPN
+   * returns, in ESPN's order — correct, just long.
+   *
+   * On the descriptor for the same reason as `seasonStartMonth`: "key stats"
+   * for football are wrong for every other sport, and a new sport should be
+   * able to name its own without a code change.
+   */
+  leaderCategories?: string[];
 }
 
 /**
