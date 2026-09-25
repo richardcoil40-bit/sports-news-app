@@ -22,6 +22,7 @@ import '@/global.css';
 import { Platform, type TextStyle } from 'react-native';
 
 import type { ClaimType } from '@/lib/claim-type';
+import type { GameResult } from '@/lib/schedule';
 
 export const Colors = {
   light: {
@@ -106,7 +107,7 @@ export function withAlpha(color: string, alpha: number): string {
   return `${color}${byte}`;
 }
 
-/** Every claim badge's text, in both themes — see below. */
+/** Every solid badge's text — claim and result — in both themes. See below. */
 const BADGE_INK = Colors.light.background;
 
 /**
@@ -141,6 +142,33 @@ export function claimBadgeColors(
     unlabeled: { background: withAlpha(theme.text, 0.14), text: theme.text },
   };
   return byType[type];
+}
+
+/**
+ * The result badge's two colours: how a finished game ended, from the
+ * followed team's side.
+ *
+ * The second "what kind of thing" vocabulary, and built the same way as
+ * the first: win and loss are fixed hues with cream text in both themes —
+ * a loss is no less a loss at night — and a tie recedes into translucent
+ * ink the way `unlabeled` does, because it is the absence of a verdict.
+ *
+ * The loss crimson is deliberately a third red. The link accent (#9F422B)
+ * means "tap to leave" and rumor (#B5482E) means "unconfirmed"; a loss
+ * that could be mistaken for either would break the rule that red in this
+ * app is a link. This one is cooler and darker, and it only ever appears
+ * as a solid block around a single letter.
+ */
+export function resultBadgeColors(
+  result: GameResult,
+  theme: { text: string },
+): { background: string; text: string } {
+  const byResult: Record<GameResult, { background: string; text: string }> = {
+    W: { background: '#3D6B45', text: BADGE_INK },
+    L: { background: '#8E2E36', text: BADGE_INK },
+    T: { background: withAlpha(theme.text, 0.14), text: theme.text },
+  };
+  return byResult[result];
 }
 
 /**

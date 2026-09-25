@@ -148,7 +148,9 @@ export default function TeamScreen() {
     // Odds for just the next few upcoming games — fetching every game
     // on the schedule (a dozen-plus separate requests) was overkill
     // and most of those games don't have a line posted yet anyway.
-    const upcoming = games.filter((g) => !g.completed).slice(0, 5);
+    // By state rather than `completed`: a canceled or postponed game is never
+    // completed, and ESPN still answers with a line for it.
+    const upcoming = games.filter((g) => g.state !== 'post').slice(0, 5);
     const oddsByGameId = new Map(
       await Promise.all(
         upcoming.map(async (game) => [game.id, await fetchGameOdds(game.id, league).catch(() => null)] as const),

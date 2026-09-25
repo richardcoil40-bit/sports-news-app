@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { resultBadgeColors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ScheduledGame } from '@/lib/schedule';
 
@@ -11,15 +11,40 @@ function moneylineLabel(value: number | null): string {
   return value > 0 ? `+${value}` : `${value}`;
 }
 
+const RESULT_WORD = { W: 'Won', L: 'Lost', T: 'Tied' } as const;
+
+function accessibilityLabelFor(game: ScheduledGame, vsAt: string): string {
+  const matchup = `${vsAt} ${game.opponentShortName}`;
+  if (game.result && game.score) {
+    return `${RESULT_WORD[game.result]} ${game.score.own} to ${game.score.opponent} ${matchup}. Open the recap.`;
+  }
+  return `${matchup}. Open the game.`;
+}
+
 /**
- * `onPress` is passed only for a game close enough to now that its game
- * screen has something to show — see `isRecentOrUpcoming`. Every other row
- * stays inert rather than opening an empty screen for a game in November.
+ * `onPress` is passed for any finished game — its game screen renders a
+ * recap however old it is — and for an upcoming one close enough to now
+ * that its screen has something to show (see `isRecentOrUpcoming`). A
+ * game in November stays inert rather than opening an empty screen.
  */
 export function ScheduleRow({ game, onPress }: { game: ScheduledGame; onPress?: () => void }) {
   const theme = useTheme();
   const vsAt = game.homeAway === 'away' ? '@' : game.homeAway === 'neutral' ? 'vs' : 'vs';
   const Container = onPress ? TouchableOpacity : View;
+  const started = game.state !== 'pre';
+  const final = game.result && game.score ? { result: game.result, score: game.score } : null;
+  const badge = final ? resultBadgeColors(final.result, theme) : null;
+
+  // Live, finished, canceled and postponed rows lead with ESPN's short status
+  // ("3:12 - 3rd", "Final/OT", "Canceled") and, once a game is final, the
+  // record it left the team with. Upcoming rows keep the long kickoff line,
+  // which is the thing to read. A tappable row without a score column says
+  // so in words; one with a score gets a chevron beside it instead, which
+  // keeps the meta line short enough not to wrap against that column.
+  const meta = started
+    ? [game.statusShort, game.network, game.record]
+    : [game.statusDetail || 'Date TBD', game.network];
+  if (onPress && !final) meta.push('Game day ›');
 
   return (
     <Container
@@ -29,7 +54,7 @@ export function ScheduleRow({ game, onPress }: { game: ScheduledGame; onPress?: 
             onPress,
             activeOpacity: 0.6,
             accessibilityRole: 'button' as const,
-            accessibilityLabel: `${vsAt} ${game.opponentShortName}. Open the game.`,
+            accessibilityLabel: accessibilityLabelFor(game, vsAt),
           }
         : {})}>
       <View style={styles.row}>
@@ -44,11 +69,27 @@ export function ScheduleRow({ game, onPress }: { game: ScheduledGame; onPress?: 
             {vsAt} {game.opponentShortName}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
-            {game.statusDetail || 'Date TBD'}
-            {game.network ? ` · ${game.network}` : ''}
-            {onPress ? ' · Game day ›' : ''}
+            {meta.filter(Boolean).join(' · ')}
           </ThemedText>
         </View>
+
+        {final ? (
+          <View style={styles.result}>
+            <View style={[styles.badge, { backgroundColor: badge?.background }]}>
+              <ThemedText type="smallBold" style={[styles.badgeText, { color: badge?.text }]}>
+                {final.result}
+              </ThemedText>
+            </View>
+            <ThemedText type="smallBold">
+              {final.score.own}–{final.score.opponent}
+            </ThemedText>
+            {onPress ? (
+              <ThemedText type="smallBold" themeColor="textSecondary">
+                ›
+              </ThemedText>
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
       {game.odds ? (
@@ -61,7 +102,7 @@ export function ScheduleRow({ game, onPress }: { game: ScheduledGame; onPress?: 
             ML {moneylineLabel(game.homeAway === 'away' ? game.odds.awayMoneyline : game.odds.homeMoneyline)}
           </ThemedText>
         </View>
-      ) : !game.completed ? (
+      ) : game.state === 'pre' ? (
         <View style={[styles.oddsRow, { borderTopColor: theme.text }]}>
           <ThemedText type="small" themeColor="textSecondary" style={styles.meta}>
             Odds not posted yet
@@ -98,6 +139,27 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     fontSize: 11,
+  },
+  result: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    // The opponent column gives way on a narrow phone, never the score.
+    flexShrink: 0,
+  },
+  // The claim chip's shape (sharp, tight padding, solid fill) at a size
+  // that sits level with the score beside it rather than the 9pt caption
+  // a claim chip is.
+  badge: {
+    minWidth: 20,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 0,
+    alignItems: 'center',
+  },
+  badgeText: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   oddsRow: {
     flexDirection: 'row',
