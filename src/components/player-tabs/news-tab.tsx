@@ -40,7 +40,7 @@ export function NewsTab({
       renderItem={({ item }) => (
         <ArticleCard
           article={item}
-          onPress={() => onOpenArticle(item)}
+          onPress={onOpenArticle}
           claimType={item.claimType}
           read={readLinks.has(item.link)}
         />
