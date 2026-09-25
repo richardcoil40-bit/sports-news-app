@@ -634,7 +634,9 @@ Established and intentional — don't drift from it without discussing:
   - Translucent control fills are derived with `withAlpha(theme.text, …)`
     rather than written as the blended grey. Same call, both themes.
 - **Badges are the one colour that means "what kind of thing".** Two
-  vocabularies, both in `theme.ts`, both solid blocks with cream text:
+  vocabularies, both in `theme.ts`. Each is a solid block with cream text,
+  except the entry that means "no verdict" (unlabeled, tie), which recedes
+  to translucent ink with ink text:
   - `claimBadgeColors`: reported stays ink-on-paper and inverts with the
     theme, rumor and take carry fixed hues in both modes. Two screens draw
     it (`article-card.tsx` and `article.tsx`).

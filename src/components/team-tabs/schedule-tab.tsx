@@ -42,8 +42,11 @@ export function ScheduleTab({
             game={item}
             // A finished game opens its recap however old it is; an upcoming
             // one only once it is close enough for its screen to show something.
+            // A game canceled or postponed on the day is over without having
+            // been played, so it has no screen worth opening.
             onPress={
-              onOpenGame && (item.completed || isRecentOrUpcoming(item.date, checkedAt))
+              onOpenGame &&
+              (item.completed || (item.state !== 'post' && isRecentOrUpcoming(item.date, checkedAt)))
                 ? () => onOpenGame(item)
                 : undefined
             }

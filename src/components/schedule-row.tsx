@@ -44,7 +44,7 @@ export function ScheduleRow({ game, onPress }: { game: ScheduledGame; onPress?: 
   const meta = started
     ? [game.statusShort, game.network, game.record]
     : [game.statusDetail || 'Date TBD', game.network];
-  if (onPress && !final) meta.push('Game day ›');
+  if (onPress && !final) meta.push(game.completed ? 'Recap ›' : 'Game day ›');
 
   return (
     <Container

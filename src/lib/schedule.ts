@@ -207,8 +207,8 @@ interface RawOddsRoot {
 }
 
 /**
- * Scores move while a game is in progress, so this is a TTL rather than a
- * cache-for-the-process-lifetime like roster.ts. Three minutes matches the
+ * A game's status, and then its final score, change on game day, so this
+ * is a TTL rather than a cache-for-the-process-lifetime like roster.ts. Three minutes matches the
  * news pools, which is the cadence the rest of the app already refreshes at.
  *
  * The team screen re-requests its schedule on every visit and fans out one
