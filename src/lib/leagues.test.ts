@@ -5,6 +5,7 @@ import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import {
   espnCacheKey,
   espnCorePath,
+  espnSeasonCacheKey,
   espnSitePath,
   lastCompletedSeason,
   League,
@@ -71,6 +72,23 @@ describe('espnCacheKey', () => {
   it('shares a key between two conferences of the same sport', () => {
     const bigTwelve: League = { ...DEFAULT_LEAGUE, id: 'big-12', displayName: 'Big 12', espnGroup: 4 };
     expect(espnCacheKey(bigTwelve, '130')).toBe(espnCacheKey(DEFAULT_LEAGUE, '130'));
+  });
+});
+
+describe('espnSeasonCacheKey', () => {
+  // A team's 2025 leaders and its 2026 leaders are different answers. Shared,
+  // whichever season was asked for first would be the only one ever shown.
+  it('separates the same entity across seasons', () => {
+    expect(espnSeasonCacheKey(DEFAULT_LEAGUE, '194', 2025)).not.toBe(
+      espnSeasonCacheKey(DEFAULT_LEAGUE, '194', 2026),
+    );
+  });
+
+  // Built on espnCacheKey, so it keeps both of that key's rules.
+  it("keeps espnCacheKey's sport boundary and conference sharing", () => {
+    const bigTwelve: League = { ...DEFAULT_LEAGUE, id: 'big-12', displayName: 'Big 12', espnGroup: 4 };
+    expect(espnSeasonCacheKey(DEFAULT_LEAGUE, '13', 2026)).not.toBe(espnSeasonCacheKey(NBA_FOR_TEST, '13', 2026));
+    expect(espnSeasonCacheKey(bigTwelve, '130', 2026)).toBe(espnSeasonCacheKey(DEFAULT_LEAGUE, '130', 2026));
   });
 });
 

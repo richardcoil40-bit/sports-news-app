@@ -1,6 +1,6 @@
 import { createEntityCache } from '@/lib/cache';
 import { fetchWithTimeout } from '@/lib/http';
-import { espnCacheKey, espnSitePath, League } from '@/lib/leagues';
+import { espnSeasonCacheKey, espnSitePath, League } from '@/lib/leagues';
 
 export interface PlayerStatCategory {
   /** e.g. "receiving" */
@@ -96,7 +96,7 @@ export async function fetchPlayerSeasonStats(
   // stats card is fine; one that fails to load isn't. The season is in the
   // key so a process that lives across a season's start doesn't serve the
   // old year's line for the new one.
-  return cache.get(`${espnCacheKey(league, athleteId)}:${season}`, () =>
+  return cache.get(espnSeasonCacheKey(league, athleteId, season), () =>
     fetchUncached(athleteId, league, season).catch(() => [] as PlayerStatCategory[]),
   );
 }
