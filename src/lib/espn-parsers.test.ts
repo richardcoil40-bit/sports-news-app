@@ -12,7 +12,7 @@ import { DEFAULT_LEAGUE } from '@/lib/league-catalog';
 import { League } from '@/lib/leagues';
 import { fetchPlayerSeasonStats } from '@/lib/player-stats';
 import { fetchTeamRoster } from '@/lib/roster';
-import { fetchGameOdds, fetchTeamSchedule } from '@/lib/schedule';
+import { competitorScore, fetchGameOdds, fetchTeamSchedule, gameResult } from '@/lib/schedule';
 import { fetchScoreboard } from '@/lib/scoreboard';
 import { fetchTeamColor } from '@/lib/team-color';
 import { fetchTeamStatLeaders } from '@/lib/team-leaders';
@@ -247,20 +247,127 @@ describe('ESPN parsers on a well-formed response', () => {
 
     const games = await fetchTeamSchedule('194', DEFAULT_LEAGUE);
 
-    expect(games).toHaveLength(2);
+    expect(games.map((g) => g.id)).toEqual(['401628461', '401628462', '401628999', '401629001', '401629002']);
+    // A regulation win at home: ESPN's object-shaped score, its winner
+    // flag, and the record the game left the team with.
     expect(games[0]).toMatchObject({
-      id: '401628461',
       opponentShortName: 'Michigan',
       homeAway: 'home',
       network: 'FOX',
-      statusDetail: 'Final: W 34-10',
+      statusDetail: 'Final',
+      statusShort: 'Final',
+      state: 'post',
       completed: true,
+      score: { own: 34, opponent: 10 },
+      result: 'W',
+      record: '1-0',
       odds: null,
     });
-    // neutralSite wins over the competitor's own homeAway.
-    expect(games[1].homeAway).toBe('neutral');
-    expect(games[1].completed).toBe(false);
-    expect(games[1].network).toBeNull();
+    // An overtime loss on the road: the score reads from our side even
+    // though we are the second competitor, and the record is ours.
+    expect(games[1]).toMatchObject({
+      opponentShortName: 'Oregon',
+      homeAway: 'away',
+      statusShort: 'Final/OT',
+      score: { own: 31, opponent: 34 },
+      result: 'L',
+      record: '1-1',
+    });
+    // neutralSite wins over the competitor's own homeAway. An upcoming game
+    // carries no score, winner or record, and all three stay absent.
+    expect(games[2]).toMatchObject({
+      homeAway: 'neutral',
+      completed: false,
+      network: null,
+      state: 'pre',
+      statusShort: '12/6 - 3:00 PM EST',
+      score: null,
+      result: null,
+      record: null,
+    });
+    // In progress: the schedule endpoint sends no score, winner or record
+    // until the game is final.
+    expect(games[3]).toMatchObject({
+      state: 'in',
+      statusShort: '3:12 - 3rd',
+      score: null,
+      result: null,
+      record: null,
+    });
+    // Canceled: state "post" but never completed, with 0-0 scores and the
+    // team's current record attached. None of it describes a game that was
+    // played, so none of it comes through — this used to read as a 0-0 tie.
+    expect(games[4]).toMatchObject({
+      state: 'post',
+      completed: false,
+      statusShort: 'Canceled',
+      score: null,
+      result: null,
+      record: null,
+    });
+  });
+
+  it('fetchTeamSchedule degrades score, result and record to absent when they are the wrong types', async () => {
+    respondWith({
+      events: [
+        {
+          id: '1',
+          date: '2025-09-01T00:00Z',
+          competitions: [
+            {
+              competitors: [
+                { homeAway: 'home', score: 'abc', winner: 'yes', record: 'nope', team: { id: 'x', displayName: 'X', shortDisplayName: 'X' } },
+                { homeAway: 'away', score: [1], winner: 1, team: { id: 'y', displayName: 'Y', shortDisplayName: 'Y' } },
+              ],
+              status: { type: { state: 7, shortDetail: 9, completed: true } },
+            },
+          ],
+        },
+        {
+          // A record that is an array of junk rather than not an array at all.
+          id: '2',
+          date: '2025-09-08T00:00Z',
+          competitions: [
+            {
+              competitors: [
+                { homeAway: 'home', record: [{ type: 5 }, { type: 'total', displayValue: 7 }], team: { id: 'x', displayName: 'X', shortDisplayName: 'X' } },
+                { homeAway: 'away', team: { id: 'y', displayName: 'Y', shortDisplayName: 'Y' } },
+              ],
+              status: { type: { completed: true } },
+            },
+          ],
+        },
+      ],
+    });
+
+    const games = await fetchTeamSchedule('x', DEFAULT_LEAGUE, { force: true });
+
+    // `completed` still says it is over, so the state follows it — but with
+    // no usable score and no real winner flag there is no result to show.
+    expect(games[0]).toMatchObject({ state: 'post', statusShort: '', score: null, result: null, record: null });
+    expect(games[1].record).toBeNull();
+  });
+
+  it('competitorScore reads the schedule object, the scoreboard string, and nothing else', () => {
+    expect(competitorScore({ value: 56, displayValue: '56' })).toBe(56);
+    expect(competitorScore({ value: '21' })).toBe(21);
+    expect(competitorScore('33')).toBe(33);
+    expect(competitorScore(0)).toBe(0);
+    expect(competitorScore({ displayValue: '7' })).toBeNull();
+    expect(competitorScore({ value: 'abc' })).toBeNull();
+    expect(competitorScore(null)).toBeNull();
+    expect(competitorScore([1])).toBeNull();
+  });
+
+  it('gameResult trusts winner flags first and falls back to the score', () => {
+    const side = (winner: unknown, score: number | null) => ({ winner, score });
+    expect(gameResult(side(true, 23), side(false, 24))).toBe('W'); // a flag outranks the score (forfeit)
+    expect(gameResult(side(false, 30), side(true, 10))).toBe('L');
+    expect(gameResult(side(undefined, 21), side(undefined, 14))).toBe('W');
+    expect(gameResult(side(undefined, 14), side(undefined, 21))).toBe('L');
+    // Every loser carries winner:false, so two of them with equal scores is a tie.
+    expect(gameResult(side(false, 17), side(false, 17))).toBe('T');
+    expect(gameResult(side('yes', null), side(undefined, 3))).toBeNull();
   });
 
   it('fetchTeamArticles drops articles with no web link and normalises dates', async () => {

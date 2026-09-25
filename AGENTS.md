@@ -633,11 +633,19 @@ Established and intentional — don't drift from it without discussing:
   old neutral scale, plus lightened accents.
   - Translucent control fills are derived with `withAlpha(theme.text, …)`
     rather than written as the blended grey. Same call, both themes.
-- **Claim badges are the one colour that means "what kind of thing".**
-  `claimBadgeColors` in `theme.ts`: reported stays ink-on-paper and
-  inverts with the theme, rumor and take carry fixed hues with cream text
-  in both modes. Two screens draw that badge (`article-card.tsx` and
-  `article.tsx`) — neither should hard-code the hues.
+- **Badges are the one colour that means "what kind of thing".** Two
+  vocabularies, both in `theme.ts`, both solid blocks with cream text:
+  - `claimBadgeColors`: reported stays ink-on-paper and inverts with the
+    theme, rumor and take carry fixed hues in both modes. Two screens draw
+    it (`article-card.tsx` and `article.tsx`).
+  - `resultBadgeColors`: how a finished game ended, on the schedule row
+    (`schedule-row.tsx`). Win green and loss crimson are fixed in both
+    modes; a tie recedes to 14% ink the way `unlabeled` does. The crimson
+    is deliberately a third red, darker and cooler than the link accent
+    and the rumor badge, so a loss never reads as a link.
+
+  No call site hard-codes a hue. A third vocabulary is the point to ask
+  whether colour is still the right tool, not to add a third function.
 - Sharp corners. `borderRadius: 0` on every card, thumbnail, and logo.
   - **Two exceptions, both from design handoffs, both scoped to a single
     component.** `DropdownPill` — a 20pt pill and an 8pt panel: rounding

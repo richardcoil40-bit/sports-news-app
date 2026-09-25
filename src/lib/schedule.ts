@@ -1,4 +1,5 @@
 import { createEntityCache } from '@/lib/cache';
+import { list, num, str } from '@/lib/espn-raw';
 import { fetchWithTimeout } from '@/lib/http';
 import { espnCacheKey, espnCorePath, espnSitePath, League } from '@/lib/leagues';
 
@@ -11,6 +12,8 @@ export interface Odds {
   awayMoneyline: number | null;
 }
 
+export type GameResult = 'W' | 'L' | 'T';
+
 export interface ScheduledGame {
   id: string;
   date: string; // ISO
@@ -19,8 +22,23 @@ export interface ScheduledGame {
   opponentLogoUrl: string | null;
   homeAway: 'home' | 'away' | 'neutral';
   network: string | null;
-  statusDetail: string; // "Sat, September 5th at 12:30 PM EDT" or "Final: W 34-10"
+  /** ESPN's long form: "Sat, September 5th at 12:30 PM EDT", or just "Final". */
+  statusDetail: string;
+  /** ESPN's short form: "9/5 - 12:30 PM EDT", "Final", "Final/OT", "3:12 - 3rd". */
+  statusShort: string;
+  state: 'pre' | 'in' | 'post';
   completed: boolean;
+  /**
+   * Both sides' points, ours first. Present only once the game is final:
+   * the team schedule endpoint sends no score while a game is in progress
+   * (checked live against NFL and college games, 2026-09-24) — a live score
+   * is the scoreboard's job, not this one's.
+   */
+  score: { own: number; opponent: number } | null;
+  /** How it ended, from our side. Only set once the game is over. */
+  result: GameResult | null;
+  /** Our overall record *after* this game — "2-1" — as ESPN files it on the event. */
+  record: string | null;
   odds: Odds | null;
 }
 
@@ -34,6 +52,9 @@ interface RawTeamRef {
 interface RawCompetitor {
   homeAway: 'home' | 'away';
   team: RawTeamRef;
+  score?: unknown;
+  winner?: unknown;
+  record?: unknown;
 }
 
 interface RawBroadcast {
@@ -41,7 +62,44 @@ interface RawBroadcast {
 }
 
 interface RawStatus {
-  type?: { detail?: string; completed?: boolean };
+  type?: { detail?: string; shortDetail?: unknown; state?: unknown; completed?: boolean };
+}
+
+/**
+ * A competitor's points. The schedule endpoint files them as an object
+ * (`{ value: 56, displayValue: "56" }`) where the scoreboard sends a bare
+ * `"56"` or `56` — so read the object's `value` first and fall through to
+ * the bare shape. `num()` on an object is null, so junk degrades to absent.
+ */
+export function competitorScore(raw: unknown): number | null {
+  const value = raw && typeof raw === 'object' ? (raw as { value?: unknown }).value : undefined;
+  return num(value) ?? num(raw);
+}
+
+/**
+ * Who won, from our side. ESPN's `winner` flags are the authoritative call
+ * (they cover a forfeit, where the score says nothing); the score comparison
+ * is the fallback for a final that carries scores but no flag. A tie is
+ * only equal scores with neither side flagged — a lone `winner: false`
+ * means nothing on its own, since every loser carries one.
+ */
+export function gameResult(
+  own: { winner: unknown; score: number | null },
+  opponent: { winner: unknown; score: number | null },
+): GameResult | null {
+  if (own.winner === true) return 'W';
+  if (opponent.winner === true) return 'L';
+  if (own.score === null || opponent.score === null) return null;
+  if (own.score > opponent.score) return 'W';
+  if (own.score < opponent.score) return 'L';
+  return 'T';
+}
+
+/** The `total` record if ESPN labelled one, else whatever came first. */
+function totalRecord(raw: unknown): string | null {
+  const entries = list<{ type?: unknown; displayValue?: unknown }>(raw);
+  const total = entries.find((r) => str(r?.type) === 'total') ?? entries[0];
+  return str(total?.displayValue);
 }
 
 interface RawCompetition {
@@ -89,6 +147,22 @@ async function fetchTeamScheduleUncached(
       ? 'neutral'
       : (self?.homeAway ?? 'home');
 
+    const statusType = competition.status?.type;
+    const completed = statusType?.completed ?? false;
+    const rawState = str(statusType?.state);
+    const state: ScheduledGame['state'] =
+      rawState === 'in' || rawState === 'post' ? rawState : completed ? 'post' : 'pre';
+
+    // Everything below is gated on `completed`, not on `state`. A canceled or
+    // postponed game is state "post" but never completed, and ESPN still files
+    // 0-0 scores and the team's *current* record on it — read by state, that
+    // is a tie that never happened beside a record the team didn't have yet.
+    // Seen live on Ohio State 2020 and the Bills' canceled 2022 game.
+    const ownScore = competitorScore(self?.score);
+    const opponentScore = competitorScore(opponent.score);
+    const score =
+      completed && ownScore !== null && opponentScore !== null ? { own: ownScore, opponent: opponentScore } : null;
+
     games.push({
       id: event.id,
       date: event.date,
@@ -97,8 +171,18 @@ async function fetchTeamScheduleUncached(
       opponentLogoUrl: opponent.team.logos?.[0]?.href ?? null,
       homeAway,
       network: competition.broadcasts?.[0]?.media?.shortName ?? null,
-      statusDetail: competition.status?.type?.detail ?? '',
-      completed: competition.status?.type?.completed ?? false,
+      statusDetail: statusType?.detail ?? '',
+      statusShort: str(statusType?.shortDetail) ?? statusType?.detail ?? '',
+      state,
+      completed,
+      score,
+      result: completed
+        ? gameResult(
+            { winner: self?.winner, score: ownScore },
+            { winner: opponent.winner, score: opponentScore },
+          )
+        : null,
+      record: completed ? totalRecord(self?.record) : null,
       odds: null,
     });
   }
@@ -127,14 +211,13 @@ interface RawOddsRoot {
  * cache-for-the-process-lifetime like roster.ts. Three minutes matches the
  * news pools, which is the cadence the rest of the app already refreshes at.
  *
- * Added because the home screen now reads a schedule per followed team on
- * mount; without a cache that is one network round trip per team every time
- * the tab is opened.
+ * The team screen re-requests its schedule on every visit and fans out one
+ * odds request per upcoming game off the result; without a cache that is
+ * a network round trip plus the fan-out every time the tab is opened.
  */
 const SCHEDULE_TTL_MS = 3 * 60 * 1000;
 // Bounded for the same reason as the other visited-team caches: the TTL
-// bounds staleness, not size, and the home screen reads a schedule per
-// followed team on mount.
+// bounds staleness, not size, and the key grows with the teams a user opens.
 const scheduleCache = createEntityCache<string, ScheduledGame[]>({ ttlMs: SCHEDULE_TTL_MS, maxEntries: 100 });
 
 /**

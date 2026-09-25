@@ -1,9 +1,204 @@
 {
-  "team": { "id": "194", "displayName": "Ohio State Buckeyes" },
+  "team": {
+    "id": "194",
+    "displayName": "Ohio State Buckeyes"
+  },
   "events": [
     {
       "id": "401628461",
       "date": "2025-11-29T17:00Z",
+      "competitions": [
+        {
+          "neutralSite": false,
+          "competitors": [
+            {
+              "homeAway": "home",
+              "winner": true,
+              "score": {
+                "value": 34.0,
+                "displayValue": "34"
+              },
+              "record": [
+                {
+                  "type": "total",
+                  "displayValue": "1-0"
+                },
+                {
+                  "type": "vsconf",
+                  "displayValue": "1-0"
+                }
+              ],
+              "team": {
+                "id": "194",
+                "abbreviation": "OSU",
+                "displayName": "Ohio State Buckeyes",
+                "shortDisplayName": "Ohio State"
+              }
+            },
+            {
+              "homeAway": "away",
+              "winner": false,
+              "score": {
+                "value": 10.0,
+                "displayValue": "10"
+              },
+              "team": {
+                "id": "130",
+                "abbreviation": "MICH",
+                "displayName": "Michigan Wolverines",
+                "shortDisplayName": "Michigan",
+                "logos": [
+                  {
+                    "href": "https://a.espncdn.com/i/teamlogos/ncaa/500/130.png"
+                  }
+                ]
+              }
+            }
+          ],
+          "broadcasts": [
+            {
+              "media": {
+                "shortName": "FOX"
+              }
+            }
+          ],
+          "status": {
+            "period": 4,
+            "type": {
+              "state": "post",
+              "completed": true,
+              "detail": "Final",
+              "shortDetail": "Final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401628462",
+      "date": "2025-12-06T00:30Z",
+      "competitions": [
+        {
+          "neutralSite": false,
+          "competitors": [
+            {
+              "homeAway": "home",
+              "winner": true,
+              "score": {
+                "value": 34.0,
+                "displayValue": "34"
+              },
+              "team": {
+                "id": "2483",
+                "displayName": "Oregon Ducks",
+                "shortDisplayName": "Oregon"
+              }
+            },
+            {
+              "homeAway": "away",
+              "winner": false,
+              "score": {
+                "value": 31.0,
+                "displayValue": "31"
+              },
+              "record": [
+                {
+                  "type": "total",
+                  "displayValue": "1-1"
+                },
+                {
+                  "type": "vsconf",
+                  "displayValue": "1-1"
+                }
+              ],
+              "team": {
+                "id": "194",
+                "displayName": "Ohio State Buckeyes",
+                "shortDisplayName": "Ohio State"
+              }
+            }
+          ],
+          "broadcasts": [
+            {
+              "media": {
+                "shortName": "NBC"
+              }
+            }
+          ],
+          "status": {
+            "period": 5,
+            "type": {
+              "state": "post",
+              "completed": true,
+              "detail": "Final/OT",
+              "shortDetail": "Final/OT"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401628999",
+      "date": "2025-12-06T20:00Z",
+      "competitions": [
+        {
+          "neutralSite": true,
+          "competitors": [
+            {
+              "homeAway": "home",
+              "team": {
+                "id": "194",
+                "displayName": "Ohio State Buckeyes",
+                "shortDisplayName": "Ohio State"
+              }
+            },
+            {
+              "homeAway": "away",
+              "team": {
+                "id": "213",
+                "displayName": "Penn State Nittany Lions",
+                "shortDisplayName": "Penn State"
+              }
+            }
+          ],
+          "status": {
+            "period": 0,
+            "type": {
+              "state": "pre",
+              "completed": false,
+              "detail": "Sat, December 6th at 3:00 PM EST",
+              "shortDetail": "12/6 - 3:00 PM EST"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401629000",
+      "date": "2025-12-13T20:00Z",
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "home",
+              "team": {
+                "id": "194",
+                "displayName": "Ohio State Buckeyes",
+                "shortDisplayName": "Ohio State"
+              }
+            }
+          ],
+          "status": {
+            "type": {
+              "detail": "No opponent listed — should be skipped"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "401629001",
+      "date": "2025-12-20T17:00Z",
       "competitions": [
         {
           "neutralSite": false,
@@ -19,50 +214,86 @@
             {
               "homeAway": "away",
               "team": {
-                "id": "130",
-                "displayName": "Michigan Wolverines",
-                "shortDisplayName": "Michigan",
-                "logos": [{ "href": "https://a.espncdn.com/i/teamlogos/ncaa/500/130.png" }]
+                "id": "275",
+                "displayName": "Wisconsin Badgers",
+                "shortDisplayName": "Wisconsin"
               }
             }
           ],
-          "broadcasts": [{ "media": { "shortName": "FOX" } }],
-          "status": { "type": { "detail": "Final: W 34-10", "completed": true } }
+          "broadcasts": [
+            {
+              "media": {
+                "shortName": "BTN"
+              }
+            }
+          ],
+          "status": {
+            "period": 3,
+            "type": {
+              "state": "in",
+              "completed": false,
+              "detail": "3:12 - 3rd Quarter",
+              "shortDetail": "3:12 - 3rd"
+            }
+          }
         }
       ]
     },
     {
-      "id": "401628999",
-      "date": "2025-12-06T20:00Z",
+      "id": "401629002",
+      "date": "2025-12-27T17:00Z",
       "competitions": [
         {
-          "neutralSite": true,
+          "neutralSite": false,
           "competitors": [
             {
               "homeAway": "home",
-              "team": { "id": "194", "displayName": "Ohio State Buckeyes", "shortDisplayName": "Ohio State" }
+              "score": {
+                "value": 0.0,
+                "displayValue": "0"
+              },
+              "record": [
+                {
+                  "type": "total",
+                  "displayValue": "7-1"
+                }
+              ],
+              "team": {
+                "id": "194",
+                "displayName": "Ohio State Buckeyes",
+                "shortDisplayName": "Ohio State"
+              }
             },
             {
               "homeAway": "away",
-              "team": { "id": "213", "displayName": "Penn State Nittany Lions", "shortDisplayName": "Penn State" }
+              "score": {
+                "value": 0.0,
+                "displayValue": "0"
+              },
+              "team": {
+                "id": "130",
+                "displayName": "Michigan Wolverines",
+                "shortDisplayName": "Michigan"
+              }
             }
           ],
-          "status": { "type": { "detail": "Sat, December 6th at 3:00 PM EST" } }
-        }
-      ]
-    },
-    {
-      "id": "401629000",
-      "date": "2025-12-13T20:00Z",
-      "competitions": [
-        {
-          "competitors": [
+          "broadcasts": [
             {
-              "homeAway": "home",
-              "team": { "id": "194", "displayName": "Ohio State Buckeyes", "shortDisplayName": "Ohio State" }
+              "media": {
+                "shortName": "FOX"
+              }
             }
           ],
-          "status": { "type": { "detail": "No opponent listed — should be skipped" } }
+          "status": {
+            "period": 0,
+            "type": {
+              "name": "STATUS_CANCELED",
+              "state": "post",
+              "completed": false,
+              "detail": "Canceled",
+              "shortDetail": "Canceled"
+            }
+          }
         }
       ]
     }

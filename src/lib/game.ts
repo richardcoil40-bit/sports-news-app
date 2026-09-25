@@ -76,10 +76,10 @@ export function inTickerWindow(
 }
 
 /**
- * For a schedule row, which knows a date and `completed` but not a live
- * state: is this game close enough to now that its game screen is worth
- * opening? Covers the whole of a game day — from six hours before kickoff
- * to eight after it.
+ * By date alone: is this game close enough to now that its game screen is
+ * worth opening? Covers the whole of a game day — from six hours before
+ * kickoff to eight after it. The schedule tab asks this only of unfinished
+ * games, since a finished one opens its recap at any age.
  */
 export function isRecentOrUpcoming(dateIso: string, now: number): boolean {
   const start = Date.parse(dateIso);

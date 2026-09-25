@@ -40,7 +40,13 @@ export function ScheduleTab({
         <AccentRow color={accentColor}>
           <ScheduleRow
             game={item}
-            onPress={onOpenGame && isRecentOrUpcoming(item.date, checkedAt) ? () => onOpenGame(item) : undefined}
+            // A finished game opens its recap however old it is; an upcoming
+            // one only once it is close enough for its screen to show something.
+            onPress={
+              onOpenGame && (item.completed || isRecentOrUpcoming(item.date, checkedAt))
+                ? () => onOpenGame(item)
+                : undefined
+            }
           />
         </AccentRow>
       )}
