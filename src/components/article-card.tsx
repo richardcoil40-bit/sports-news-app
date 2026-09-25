@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -11,7 +11,7 @@ import { Article } from '@/lib/feeds';
 import { formatRelativeTime } from '@/lib/format';
 import { tierLabel } from '@/lib/source-tier';
 
-export function ArticleCard({
+function ArticleCardInner({
   article,
   onPress,
   /**
@@ -42,7 +42,7 @@ export function ArticleCard({
   onPressClaim,
 }: {
   article: Article;
-  onPress: () => void;
+  onPress: (article: Article) => void;
   tagLabel?: string;
   read?: boolean;
   claimType: ClaimType;
@@ -68,13 +68,18 @@ export function ArticleCard({
     .join(' · ');
 
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.container} onPress={() => onPress(article)} activeOpacity={0.7}>
       {article.imageUrl ? (
         <Image
           source={{ uri: article.imageUrl }}
           style={styles.thumbnail}
           contentFit="cover"
-          transition={150}
+          // Keyed so a recycled cell swaps its bitmap instead of showing the
+          // previous row's thumbnail for a frame, and with no fade: a fling
+          // mounts dozens of rows at once, and dozens of thumbnails fading in
+          // on their own clocks reads as flicker rather than as polish.
+          recyclingKey={article.link}
+          transition={0}
         />
       ) : (
         <View style={[styles.thumbnail, styles.placeholder, { backgroundColor: theme.backgroundElement }]}>
@@ -202,6 +207,16 @@ export function ArticleCard({
     </TouchableOpacity>
   );
 }
+
+/**
+ * Memoized because the home feed re-renders the whole screen on every
+ * state tick — the live ticker's 30-second check, a read mark landing —
+ * and without this every mounted card re-rendered with it, including
+ * mid-fling. The callbacks are stable at the call sites (useCallback in
+ * the feed, and the card passes its own article to onPress so nobody
+ * needs a per-row closure), which is what lets the shallow compare hold.
+ */
+export const ArticleCard = memo(ArticleCardInner);
 
 const styles = StyleSheet.create({
   container: {

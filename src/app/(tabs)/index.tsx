@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -195,8 +195,10 @@ export default function FeedScreen() {
   // for as long as this screen is mounted: a remembered open "read" would
   // quietly turn the endless feed back on.
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
-  const toggleSection = (id: string) =>
-    setOpenSections((current) => ({ ...current, [id]: !current[id] }));
+  const toggleSection = useCallback(
+    (id: string) => setOpenSections((current) => ({ ...current, [id]: !current[id] })),
+    [],
+  );
 
   type FeedRow =
     | { kind: 'card'; key: string; article: (typeof visibleArticles)[number]; ruled: boolean }
@@ -251,7 +253,7 @@ export default function FeedScreen() {
   // also handed the duplicates a cluster absorbed, which carry neither a
   // classification nor a team attribution of their own — hence optional,
   // and the chip is simply omitted for them.
-  const openArticle = (article: Article & { claimType?: ClaimType }) => {
+  const openArticle = useCallback((article: Article & { claimType?: ClaimType }) => {
     router.push({
       pathname: '/article',
       params: {
@@ -264,12 +266,17 @@ export default function FeedScreen() {
         claimType: article.claimType ?? '',
       },
     });
-  };
+  }, []);
 
-  const renderCard = (item: (typeof visibleArticles)[number]) => (
+  // Stable across renders, and the card is memoized, so a state tick here
+  // — the ticker's 30-second check, a read mark — no longer re-renders
+  // every mounted card. The card hands its own article back to onPress,
+  // which is what removes the per-row closure that defeated the memo.
+  const renderCard = useCallback(
+    (item: (typeof visibleArticles)[number]) => (
     <ArticleCard
       article={item}
-      onPress={() => openArticle(item)}
+      onPress={openArticle}
       // The team the headline actually names, which is not always the
       // followed team whose pool surfaced it. Omitted when no team is
       // named rather than guessed at.
@@ -280,9 +287,11 @@ export default function FeedScreen() {
       duplicates={item.duplicates}
       onOpenDuplicate={openArticle}
     />
+    ),
+    [openArticle, readLinks],
   );
 
-  const renderRow = ({ item }: { item: FeedRow }) => {
+  const renderRow = useCallback(({ item }: { item: FeedRow }) => {
     if (item.kind === 'marker') return <CaughtUpMarker title={item.title} detail={item.detail} />;
     if (item.kind === 'section') {
       return (
@@ -303,7 +312,7 @@ export default function FeedScreen() {
         {renderCard(item.article)}
       </View>
     );
-  };
+  }, [renderCard, toggleSection, theme.text]);
 
   // What the empty states call the current scope. Only names a team when
   // exactly one is selected — "no reported news for Nebraska and two
@@ -497,6 +506,19 @@ export default function FeedScreen() {
             data={rows}
             keyExtractor={(item) => item.key}
             renderItem={renderRow}
+            // Tuned for a fling rather than a browse. The defaults (10 per
+            // batch, a 21-screen window) let a fast scroll outrun rendering,
+            // so cells went blank and the scroll position jumped as each
+            // row's estimated height was corrected — the "skip". Smaller,
+            // more frequent batches over a narrower window keep up.
+            // No getItemLayout: card heights vary with title length and
+            // expanded duplicates, so a fixed height would be a lie. No
+            // removeClippedSubviews: on iOS it is the usual source of cells
+            // that stay blank after they scroll back into view.
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
+            updateCellsBatchingPeriod={30}
+            windowSize={11}
             // Suppressed in sectioned mode, where the finish line is
             // itself a row and already says there's nothing new. This copy
             // is written for the whole feed — it would claim the feed is

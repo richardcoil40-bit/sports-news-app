@@ -71,7 +71,7 @@ export function NewsTab({
         <AccentRow color={accentColor}>
           <ArticleCard
             article={item}
-            onPress={() => onOpenArticle(item)}
+            onPress={onOpenArticle}
             claimType={item.claimType}
             read={readLinks.has(item.link)}
             onPressClaim={onChangeClaim}
