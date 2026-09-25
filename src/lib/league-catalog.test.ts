@@ -98,7 +98,7 @@ describe('parseLeagues', () => {
     };
 
     expect(parseLeagues([minimal])).toEqual([
-      { ...minimal, espnGroup: undefined, seasonStartMonth: undefined },
+      { ...minimal, espnGroup: undefined, seasonStartMonth: undefined, leaderCategories: undefined },
     ]);
   });
 
@@ -158,6 +158,38 @@ describe('parseLeagues', () => {
         const [league] = parseLeagues([{ ...VALID, [field]: value }]);
         expect(league).toBeDefined();
         expect(league[field]).toBeUndefined();
+      });
+    }
+  });
+
+  // Same trade as the optional fields above: a bad list costs the Players
+  // tab its ordering (it falls back to every category ESPN returns), which
+  // is far cheaper than costing the user the league.
+  describe('leaderCategories', () => {
+    it('keeps a list of names, trimmed and in order', () => {
+      const [league] = parseLeagues([{ ...VALID, leaderCategories: [' sacks ', 'passingLeader'] }]);
+      expect(league.leaderCategories).toEqual(['sacks', 'passingLeader']);
+    });
+
+    it('drops junk members but keeps the good ones', () => {
+      const [league] = parseLeagues([
+        { ...VALID, leaderCategories: ['sacks', 42, null, '   ', { name: 'x' }, 'interceptions'] },
+      ]);
+      expect(league.leaderCategories).toEqual(['sacks', 'interceptions']);
+    });
+
+    const absent: [string, unknown][] = [
+      ['a bare string', 'sacks'],
+      ['an array of numbers', [1, 2, 3]],
+      ['an empty array', []],
+      ['an object', { sacks: true }],
+    ];
+
+    for (const [label, value] of absent) {
+      it(`reads ${label} as absent and keeps the league`, () => {
+        const [league] = parseLeagues([{ ...VALID, leaderCategories: value }]);
+        expect(league).toBeDefined();
+        expect(league.leaderCategories).toBeUndefined();
       });
     }
   });

@@ -5,16 +5,17 @@ import { StatCategoryCard } from '@/components/player-tabs/stat-category-card';
 import { Centered, tabStyles } from '@/components/team-tabs/shared';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { PLAYER_STATS_SEASON, PlayerStatCategory } from '@/lib/player-stats';
+import { PlayerSeasonStats } from '@/lib/player-stats';
 
 export function StatsTab({
-  categories,
+  stats,
   error,
 }: {
-  categories: PlayerStatCategory[] | null;
+  /** The categories and the season they're from — null until they land. */
+  stats: PlayerSeasonStats | null;
   error: boolean;
 }) {
-  if (categories === null && !error) {
+  if (stats === null && !error) {
     return (
       <Centered>
         <ActivityIndicator />
@@ -22,13 +23,13 @@ export function StatsTab({
     );
   }
 
-  if (error || !categories || categories.length === 0) {
+  if (error || !stats || stats.categories.length === 0) {
     return (
       <Centered>
         <ThemedText themeColor="textSecondary" style={tabStyles.centeredText}>
-          {error
+          {error || !stats
             ? "Couldn't load stats right now. Try again later."
-            : `No ${PLAYER_STATS_SEASON} stats recorded for this player.`}
+            : `No ${stats.season} stats recorded for this player.`}
         </ThemedText>
       </Centered>
     );
@@ -36,7 +37,7 @@ export function StatsTab({
 
   return (
     <FlatList
-      data={categories}
+      data={stats.categories}
       keyExtractor={(item) => item.name}
       renderItem={({ item }) => <StatCategoryCard category={item} />}
       // Plain spacing between cards, not the house 1.5px Separator — the
@@ -45,7 +46,7 @@ export function StatsTab({
       ItemSeparatorComponent={() => <View style={styles.categoryGap} />}
       ListHeaderComponent={
         <ThemedText type="small" themeColor="textSecondary" style={styles.statsNote}>
-          {PLAYER_STATS_SEASON} season
+          {stats.season} season
         </ThemedText>
       }
       contentContainerStyle={[tabStyles.listContent, playerTabStyles.fillHeight, styles.statsContent]}

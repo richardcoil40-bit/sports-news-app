@@ -48,9 +48,9 @@ least-recently-used on insert.
 | Last-looked markers | `lib/game-markers.ts` | Sport + league path + event ID. Not a fetch cache: a single play id per game, overwritten each time you leave that game's screen and dropped when the game ends. Not persisted, so a cold launch mid-game shows the whole game instead | 20, oldest out | None (process lifetime) |
 | Team list | `lib/teams.ts` | League — 3 entries today | None needed (see below) | 30 minutes |
 | Rosters | `lib/roster.ts` | Sport + league path + team ID | 100 | None (process lifetime) |
-| Stat leaders | `lib/team-leaders.ts` | Sport + league path + team ID | 100 | None (process lifetime) |
+| Stat leaders | `lib/team-leaders.ts` | Sport + league path + team ID + season. A failed fetch is not cached; a season with no games yet is, as empty | 100 | None (process lifetime) |
 | Team colors | `lib/team-color.ts` | Sport + league path + team ID | 100 | None (process lifetime) |
-| Player season stats | `lib/player-stats.ts` | Athlete ID — one per player screen opened | 500 | None (process lifetime) |
+| Player season stats | `lib/player-stats.ts` | Sport + league path + athlete ID + season — one per player screen opened | 500 | None (process lifetime) |
 | Verdict classifications | `lib/verdicts.ts` | Headline title — one per unique headline seen; empty only if `EXPO_PUBLIC_VERDICT_URL` is cleared | 2000 | None (process lifetime) |
 | League catalog | `lib/league-catalog.ts` | Not a keyed cache — a single list, fetched at most once per launch and held in a module variable. Bounded by the catalog itself, a few KB | n/a | None (process lifetime) |
 | Diagnostics: verdict disagreements | `lib/diagnostics.ts` | Not keyed — a flat log, oldest entries spliced off once full | 200 | None (process lifetime) |

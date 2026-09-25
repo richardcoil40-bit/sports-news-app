@@ -1,29 +1,29 @@
-import { ActivityIndicator, FlatList, StyleSheet } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 
-import { AccentRow } from '@/components/accent-row';
-import { PlayerRow } from '@/components/player-row';
-import { Centered, Separator, tabStyles } from '@/components/team-tabs/shared';
+import { playerTabStyles } from '@/components/player-tabs/shared';
+import { LeaderBoardCard } from '@/components/team-tabs/leader-board-card';
+import { Centered, tabStyles } from '@/components/team-tabs/shared';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { RankedPlayer } from '@/lib/notable-players';
+import { LeaderBoard, LeaderEntry } from '@/lib/leader-boards';
 
 export function PlayersTab({
-  players,
+  boards,
+  season,
   loading,
   error,
   onOpenPlayer,
-  accentColor,
 }: {
-  players: RankedPlayer[];
+  boards: LeaderBoard[];
+  /** The season the leaders are from, for the header — see `lastCompletedSeason`. */
+  season: number;
   loading: boolean;
   error: boolean;
   /**
-   * The whole ranked entry, not just the player: the screen it opens has to
-   * be told how this row's article count was matched, or it lists a
-   * different set of articles than the count promises.
+   * The whole entry, not just the player: the screen it opens has to be told
+   * whether this player's surname is safe to match on alone.
    */
-  onOpenPlayer: (entry: RankedPlayer) => void;
-  accentColor: string | null;
+  onOpenPlayer: (entry: LeaderEntry) => void;
 }) {
   if (loading) {
     return (
@@ -35,43 +35,45 @@ export function PlayersTab({
 
   return (
     <FlatList
-      data={players}
-      keyExtractor={(item) => item.player.id}
-      renderItem={({ item }) => (
-        <AccentRow color={accentColor}>
-          <PlayerRow
-            player={item.player}
-            detail={item.detail}
-            onPress={() => onOpenPlayer(item)}
-          />
-        </AccentRow>
-      )}
-      ItemSeparatorComponent={Separator}
+      data={boards}
+      keyExtractor={(item) => item.name}
+      renderItem={({ item }) => <LeaderBoardCard board={item} onOpenPlayer={onOpenPlayer} />}
+      // Plain spacing between cards, not the house 1.5px Separator — the
+      // cards are already bordered, so a rule between them would read as a
+      // double line. Same call as the player screen's stats tab.
+      ItemSeparatorComponent={() => <View style={styles.cardGap} />}
       ListHeaderComponent={
-        <ThemedText type="small" themeColor="textSecondary" style={styles.playersNote}>
-          Most talked about — ranked by recent coverage and last season&apos;s stat leaders.
-        </ThemedText>
+        boards.length > 0 ? (
+          <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
+            {season} season leaders
+          </ThemedText>
+        ) : null
       }
       ListEmptyComponent={
         <Centered>
           <ThemedText themeColor="textSecondary" style={tabStyles.centeredText}>
             {error
-              ? "Couldn't load the roster right now. Try again later."
-              : 'No players stand out in recent coverage yet.'}
+              ? "Couldn't load stat leaders right now. Try again later."
+              : 'No stat leaders yet this season.'}
           </ThemedText>
         </Centered>
       }
-      contentContainerStyle={tabStyles.listContent}
+      contentContainerStyle={[tabStyles.listContent, playerTabStyles.fillHeight, styles.content]}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  playersNote: {
+  cardGap: {
+    height: Spacing.two,
+  },
+  content: {
     paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.two,
+  },
+  note: {
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     fontSize: 11,
+    paddingBottom: Spacing.two,
   },
 });

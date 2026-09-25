@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
   },
 });
 
-/** Shared by all four tabs, which are otherwise independent FlatLists. */
+/** Shared by the team tabs, which are otherwise independent FlatLists. */
 export const tabStyles = StyleSheet.create({
   centeredText: {
     textAlign: 'center',

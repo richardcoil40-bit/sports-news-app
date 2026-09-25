@@ -56,8 +56,8 @@ export const MAX_ARTICLE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
  * Eleven Warriors went missing before. An unparseable date is treated the
  * same way.
  *
- * Not applied to player-ranking inputs: `notable-players.ts` counts across
- * the whole pool, and the player screen's list has to agree with that count.
+ * Not applied to the player screen's News tab, which matches a name across
+ * the whole pool: a player written about three weeks ago still has news.
  */
 export function withinFeedWindow<T extends Pick<Article, 'publishedAt'>>(
   articles: T[],

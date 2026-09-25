@@ -340,9 +340,9 @@ async function fetchTeamNewsPoolUncached(
 
   // Dropped here, alongside the team-name filter above, rather than at
   // render: affiliate copy and campus-governance stories aren't news at
-  // all, so nothing downstream should count them either. notable-players.ts
-  // ranks by how often a player is named, and a jersey ad naming a star
-  // would inflate that.
+  // all, so nothing downstream should count them either. A player's News
+  // tab lists every article that names the player, and a jersey ad naming
+  // a star would land there.
   //
   // Other sports go at the same point and for the same reason, but they
   // answer a different question — see off-sport.ts. The team-name filter

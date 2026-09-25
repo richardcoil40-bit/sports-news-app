@@ -16,7 +16,8 @@ import { ClaimType, withClaimTypes } from '@/lib/claim-type';
 import { Article } from '@/lib/feeds';
 import { DEFAULT_LEAGUE, getLeague } from '@/lib/league-catalog';
 import { matchArticlesForPlayer } from '@/lib/player-match';
-import { fetchPlayerSeasonStats, PlayerStatCategory } from '@/lib/player-stats';
+import { lastCompletedSeason } from '@/lib/leagues';
+import { fetchPlayerSeasonStats, PlayerSeasonStats } from '@/lib/player-stats';
 import { fetchTeamNewsPoolWithStore } from '@/lib/article-store';
 
 type TabKey = 'stats' | 'news';
@@ -42,6 +43,8 @@ export default function PlayerScreen() {
     teamShortName: string;
     /** Which league the team screen resolved — see the note on `league`. */
     leagueId?: string;
+    /** The season of the leaders the player was opened from — see `stats`. */
+    season?: string;
   }>();
 
   // Same reason the team screen resolves one: an ESPN athlete or team id is
@@ -57,11 +60,10 @@ export default function PlayerScreen() {
     // newsroom + national feeds), and cached there, so this is usually
     // instant rather than a fresh fetch of everything.
     const pool = await fetchTeamNewsPoolWithStore(params.teamId, params.teamShortName || params.teamName, league);
-    // The same matcher, with the same inputs, that produced the article
-    // count on the card you tapped — see notable-players.ts. Surname
-    // matching is opt-*out*: '0' is the Players tab saying a teammate
-    // shares this surname, and anything else (including arriving here by
-    // deep link, with no such judgement to pass on) leaves it enabled.
+    // Surname matching is opt-*out*: '0' is the team screen saying a
+    // teammate shares this surname (see leader-boards.ts), and anything else
+    // (including arriving here by deep link, with no such judgement to pass
+    // on) leaves it enabled.
     return matchArticlesForPlayer(pool.articles, params, {
       allowLastName: params.surnameMatch !== '0',
     });
@@ -72,7 +74,14 @@ export default function PlayerScreen() {
   // team screen passes its own news tab.
   const classifiedMatches = useMemo(() => withClaimTypes(news.data ?? []), [news.data]);
 
-  const stats = useAsync<PlayerStatCategory[]>(() => fetchPlayerSeasonStats(params.id, league));
+  const stats = useAsync<PlayerSeasonStats>(async () => {
+    // The season of the leaders you tapped, so this screen names the year
+    // the card did. A deep link carries none and gets the league's current
+    // season, read here rather than in render because it reads the clock.
+    const passed = Number.parseInt(params.season ?? '', 10);
+    const season = Number.isInteger(passed) && passed > 0 ? passed : lastCompletedSeason(league);
+    return { season, categories: await fetchPlayerSeasonStats(params.id, league, season) };
+  });
 
   // Both tabs load on mount rather than lazily when their tab is opened (the
   // team screen's pattern): there are only two of them, the news pool is
@@ -112,7 +121,7 @@ export default function PlayerScreen() {
   useEffect(() => {
     stats.reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id, league]);
+  }, [params.id, params.season, league]);
 
   const openArticle = (article: Article & { claimType?: ClaimType }) => {
     router.push({
@@ -167,11 +176,11 @@ export default function PlayerScreen() {
 
         {tab === 'stats' ? (
           // No `loading` prop: StatsTab derives its spinner from
-          // `categories === null && !error`, which is what this screen has
+          // `stats === null && !error`, which is what this screen has
           // always done. useAsync exposes a `loading` flag too, but rendering
           // from it would add a state this tab never had — see the news tab
           // below for the case where it's actually needed.
-          <StatsTab categories={stats.data} error={stats.error} />
+          <StatsTab stats={stats.data} error={stats.error} />
         ) : (
           <NewsTab
             fullName={params.fullName}

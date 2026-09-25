@@ -14,11 +14,11 @@ import { Article } from '@/lib/feeds';
  *
  * ## Presentation layer only
  *
- * Never run this inside the news pool. `notable-players.ts` ranks "most
- * talked about" players by counting how many articles name them, and six
- * outlets covering one hire genuinely *is* more coverage than one — collapse
- * that first and the ranking inverts. `source-balance.ts` states the same
- * rule for itself; this falls under the same sentence.
+ * Never run this inside the news pool. The pool is also what a player's
+ * News tab matches against, and six outlets covering one story genuinely
+ * *is* more coverage than one — collapse that first and anything counting
+ * coverage undercounts it. `source-balance.ts` states the same rule for
+ * itself; this falls under the same sentence.
  */
 
 const DEFAULT_THRESHOLD = 0.55;

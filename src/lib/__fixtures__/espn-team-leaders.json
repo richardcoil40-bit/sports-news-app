@@ -1,34 +1,46 @@
 {
   "categories": [
     {
-      "name": "passingYards",
+      "name": "passingLeader",
       "displayName": "Passing Leader",
+      "abbreviation": "PYDS",
       "leaders": [
         {
-          "displayValue": "3,323",
+          "displayValue": "56/79, 839 YDS, 6 TD, 1 INT",
           "athlete": { "$ref": "http://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/2025/athletes/4432762?lang=en" }
         },
         {
-          "displayValue": "412",
+          "displayValue": "9/11, 203 YDS, 2 TD, 2 INT",
           "athlete": { "$ref": "http://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/2025/athletes/4433971?lang=en" }
         }
       ]
     },
     {
-      "name": "rushingYards",
-      "displayName": "Rushing Leader",
+      "name": "totalTackles",
+      "displayName": "Tackles",
+      "abbreviation": "TOT",
       "leaders": [
         {
-          "displayValue": "168 CAR, 1035 YDS, 5 TD",
+          "displayValue": "17",
           "athlete": { "$ref": "http://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/2025/athletes/4636106?lang=en" }
         }
       ]
     },
     {
-      "name": "brokenRef",
+      "name": "receivingLeader",
       "displayName": "Receiving Leader",
+      "abbreviation": "RECYDS",
       "leaders": [
-        { "displayValue": "62 REC, 934 YDS", "athlete": { "$ref": "http://example.com/no-athlete-id-here" } }
+        { "displayValue": "21 REC, 400 YDS, 3 TD", "athlete": { "$ref": "http://example.com/no-athlete-id-here" } }
+      ]
+    },
+    {
+      "displayName": "Sacks",
+      "leaders": [
+        {
+          "displayValue": "1",
+          "athlete": { "$ref": "http://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/2025/athletes/4433971?lang=en" }
+        }
       ]
     }
   ]
